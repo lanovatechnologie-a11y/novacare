@@ -1,6 +1,5 @@
-// server.js - Backend Hospital Management System (Simple Version)
+// server.js - Backend Hospital Management System
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
@@ -14,31 +13,28 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ==================== CONFIGURATION ====================
-// Pour Render, utilisez la variable d'environnement MONGODB_URI
-// Pour le développement local, utilisez cette URI de test
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hospital';
+// ==================== ROUTE RACINE ====================
+app.get('/', (req, res) => {
+  res.json({ 
+    message: '🚀 Hospital Management System API is running!',
+    version: '1.0.0',
+    status: 'OK',
+    endpoints: {
+      login: '/api/auth/login',
+      patients: '/api/patients',
+      consultations: '/api/consultations',
+      analyses: '/api/analyses',
+      transactions: '/api/transactions',
+      stock: '/api/stock',
+      appointments: '/api/appointments',
+      employees: '/api/employees',
+      emergency: '/api/emergency',
+      stats: '/api/stats/dashboard'
+    }
+  });
+});
 
-// ==================== MONGODB CONNECTION ====================
-const connectDB = async () => {
-  try {
-    await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log('✅ MongoDB Connected Successfully');
-  } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error.message);
-    // Si MongoDB échoue, on utilise une base de données en mémoire
-    console.log('⚠️ Using in-memory database (for testing only)');
-  }
-};
-
-connectDB();
-
-// ==================== SCHEMAS & MODELS ====================
-
-// Simple in-memory database simulation
+// ==================== IN-MEMORY DATABASE ====================
 const memoryDB = {
   users: [],
   patients: [],
@@ -53,7 +49,6 @@ const memoryDB = {
   emergencies: []
 };
 
-// Helper functions for in-memory database
 let idCounter = {
   patient: 1,
   consultation: 1,
@@ -63,6 +58,8 @@ let idCounter = {
   employee: 1,
   emergency: 1
 };
+
+// ==================== ROUTES ====================
 
 // 1. AUTHENTICATION ENDPOINTS
 app.post('/api/auth/login', (req, res) => {
@@ -275,6 +272,27 @@ app.post('/api/prescriptions', (req, res) => {
     success: true,
     prescription: newPrescription
   });
+});
+
+app.put('/api/prescriptions/:id', (req, res) => {
+  const { delivered } = req.body;
+  const prescription = memoryDB.prescriptions.find(p => p.id == req.params.id);
+  
+  if (prescription) {
+    prescription.delivered = delivered;
+    if (delivered) {
+      prescription.deliveredBy = req.body.username || 'pharmacist';
+      prescription.deliveredAt = new Date().toISOString();
+      prescription.status = 'delivered';
+    }
+    
+    res.json({
+      success: true,
+      prescription
+    });
+  } else {
+    res.status(404).json({ message: 'Prescription not found' });
+  }
 });
 
 // 6. TRANSACTION ENDPOINTS
@@ -523,7 +541,7 @@ app.get('/api/stats/admin', (req, res) => {
 });
 
 // Test endpoint
-app.get('/test', (req, res) => {
+app.get('/api/test', (req, res) => {
   res.json({
     message: 'Backend is working!',
     database: 'Using in-memory database',
@@ -532,12 +550,15 @@ app.get('/test', (req, res) => {
       '/api/patients',
       '/api/consultations',
       '/api/analyses',
+      '/api/prescriptions',
       '/api/transactions',
       '/api/stock',
       '/api/appointments',
       '/api/employees',
+      '/api/attendance',
       '/api/emergency',
-      '/api/stats/dashboard'
+      '/api/stats/dashboard',
+      '/api/stats/admin'
     ]
   });
 });
@@ -545,6 +566,8 @@ app.get('/test', (req, res) => {
 // ==================== START SERVER ====================
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔗 Test endpoint: http://localhost:${PORT}/test`);
+  console.log(`🌐 Access the API at: https://novacare-qahi.onrender.com`);
+  console.log(`📊 Health check: https://novacare-qahi.onrender.com/`);
+  console.log(`🔍 Test endpoint: https://novacare-qahi.onrender.com/api/test`);
   console.log(`📡 Using in-memory database (no MongoDB required)`);
 });
