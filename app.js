@@ -1,5 +1,5 @@
 // Configuration de l'API
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://novacare-qahi.onrender.com/api';
 
 // Variables globales
 let currentUser = null;
