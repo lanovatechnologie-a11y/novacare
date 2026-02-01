@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const cors = require('cors');  // ← LIGNE 3
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
@@ -8,14 +8,9 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors());  // ← LIGNE 11
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-const cors = require('cors');
-app.use(cors({
-    origin: '*',  // Ou ton domaine spécifique
-    credentials: true
-}));
 
 // Connexion MongoDB Atlas
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://username:password@cluster.mongodb.net/lotato';
