@@ -1,7 +1,11 @@
 const CONFIG = {
+    // POUR RENDER :
     SERVER_URL: window.location.hostname.includes('localhost') 
         ? 'http://localhost:3000/api' 
-        : '/api',
+        : '/api',  // ← RELATIVE PATH POUR RENDER
+    
+    // ... reste du code
+};
     CURRENCY: 'Gdes',
     GAMING_RULES: {
         BORLETTE: { lot1: 60, lot2: 20, lot3: 10 },

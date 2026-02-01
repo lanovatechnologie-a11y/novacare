@@ -11,6 +11,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const cors = require('cors');
+app.use(cors({
+    origin: '*',  // Ou ton domaine spécifique
+    credentials: true
+}));
 
 // Connexion MongoDB Atlas
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://username:password@cluster.mongodb.net/lotato';
@@ -981,10 +986,27 @@ app.put('/api/profile', authenticate, async (req, res) => {
         res.status(500).json({ error: 'Erreur serveur' });
     }
 });
+// Servir les fichiers statiques
+app.use(express.static('.'));
+
+// Route pour servir index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Route pour servir login.html  
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Route pour servir owner.html
+app.get('/owner', (req, res) => {
+    res.sendFile(path.join(__dirname, 'owner.html'));
+});
 
 // Port d'écoute
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur démarré sur le port ${PORT}`);
     console.log(`📊 MongoDB: ${mongoose.connection.readyState === 1 ? 'Connecté' : 'Déconnecté'}`);
 });

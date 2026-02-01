@@ -17,8 +17,11 @@ class OwnerManager {
         this.setupEventListeners();
     }
 
-    async request(endpoint, options = {}) {
-        const url = `/api${endpoint}`;
+    // Modifier la méthode request pour utiliser le path relatif
+async request(endpoint, options = {}) {
+    const url = `/api${endpoint}`;  // ← Path relatif
+    // ..reste code
+}
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.token}`,
