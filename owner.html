@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOTATO - Panneau Propriétaire</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Styles spécifiques au panneau propriétaire */
+        .owner-container {
+            max-width: 1800px;
+            margin: 0 auto;
+            background: var(--bg);
+            min-height: 100vh;
+        }
+
+        .owner-header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            padding: 20px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .owner-main {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: calc(100vh - 80px);
+        }
+
+        .owner-sidebar {
+            background: rgba(255, 255, 255, 0.05);
+            border-right: 1px solid var(--glass-border);
+            padding: 20px;
+        }
+
+        .owner-content {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .view-content {
+            display: none;
+        }
+
+        #dashboard-view {
+            display: block;
+        }
+
+        .nav-item {
+            padding: 15px;
+            margin: 5px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-dim);
+            transition: all 0.3s;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(173, 0, 241, 0.1);
+            color: var(--primary);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .dashboard-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .user-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .user-card.blocked {
+            border-color: var(--danger);
+            opacity: 0.7;
+        }
+
+        .draws-list {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .draw-item {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .draw-item.blocked {
+            border-color: var(--danger);
+            opacity: 0.7;
+        }
+
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .number-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .number-item.normal {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-dim);
+        }
+
+        .number-item.blocked {
+            background: var(--danger);
+            color: white;
+        }
+
+        .number-item.limited {
+            background: var(--warning);
+            color: black;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: black;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: black;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-dim);
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="owner-container">
+        <!-- Header -->
+        <header class="owner-header">
+            <div class="brand">
+                <h1>LOTATO <span class="pro-badge">PRO</span> - Propriétaire</h1>
+                <div style="font-size: 0.9rem; color: var(--text-dim);" id="live-clock">00:00:00</div>
+            </div>
+            <div class="user-profile">
+                <span id="admin-name">Chargement...</span>
+                <div class="status-dot" style="width: 10px; height: 10px; border-radius: 50%; background: var(--success);"></div>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="owner-main">
+            <!-- Sidebar -->
+            <aside class="owner-sidebar">
+                <div class="nav-menu">
+                    <div class="nav-item active" data-view="dashboard">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Tableau de Bord</span>
+                    </div>
+                    <div class="nav-item" data-view="users">
+                        <i class="fas fa-users-cog"></i>
+                        <span>Gestion Utilisateurs</span>
+                    </div>
+                    <div class="nav-item" data-view="draws">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Contrôle des Tirages</span>
+                    </div>
+                    <div class="nav-item" data-view="numbers">
+                        <i class="fas fa-dice"></i>
+                        <span>Gestion des Boules</span>
+                    </div>
+                    <div class="nav-item" onclick="ownerManager.logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Déconnexion</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Content Area -->
+            <main class="owner-content">
+                <!-- Dashboard View -->
+                <div id="dashboard-view" class="view-content">
+                    <h2>Tableau de Bord</h2>
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-users"></i> Utilisateurs</h3>
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--secondary);" id="dashboard-users">0</div>
+                            <div style="color: var(--text-dim);">Total</div>
+                        </div>
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-money-bill-wave"></i> Ventes</h3>
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--success);" id="dashboard-sales">0 Gdes</div>
+                            <div style="color: var(--text-dim);">Aujourd'hui</div>
+                        </div>
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-ticket-alt"></i> Tickets</h3>
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--primary);" id="dashboard-tickets">0</div>
+                            <div style="color: var(--text-dim);">Aujourd'hui</div>
+                        </div>
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-trophy"></i> Gains</h3>
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--warning);" id="dashboard-wins">0 Gdes</div>
+                            <div style="color: var(--text-dim);">Distribués</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Management View -->
+                <div id="users-view" class="view-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2>Gestion des Utilisateurs</h2>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-success" onclick="ownerManager.showCreateUserModal('supervisor')">
+                                <i class="fas fa-user-shield"></i> Nouveau Superviseur
+                            </button>
+                            <button class="btn btn-primary" onclick="ownerManager.showCreateUserModal('agent')">
+                                <i class="fas fa-user-plus"></i> Nouvel Agent
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <h3>Superviseurs</h3>
+                    <div id="supervisors-container" class="users-grid">
+                        <!-- Superviseurs chargés dynamiquement -->
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;">Agents</h3>
+                    <div id="agents-container" class="users-grid">
+                        <!-- Agents chargés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Draws Control View -->
+                <div id="draws-view" class="view-content">
+                    <h2>Contrôle des Tirages</h2>
+                    <div class="draws-list" id="draws-container">
+                        <!-- Tirages chargés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Numbers Management View -->
+                <div id="numbers-view" class="view-content">
+                    <h2>Gestion des Boules</h2>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h3>Blocage Manuel</h3>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <input type="text" id="block-number-input" class="form-control" placeholder="Numéro (00-99)" maxlength="2" style="width: 150px;">
+                            <button class="btn btn-danger" onclick="ownerManager.toggleNumberBlock(document.getElementById('block-number-input').value, true)">
+                                <i class="fas fa-ban"></i> Bloquer
+                            </button>
+                        </div>
+                        
+                        <h4>Grille des Boules</h4>
+                        <div id="blocks-numbers-grid" class="numbers-grid">
+                            <!-- Grille chargée dynamiquement -->
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3>Boules Bloqués</h3>
+                        <div id="blocked-numbers-list">
+                            <!-- Liste chargée dynamiquement -->
+                        </div>
+                        <button class="btn btn-success" onclick="ownerManager.unblockSelected()" style="margin-top: 10px;">
+                            <i class="fas fa-unlock-alt"></i> Débloquer la Sélection
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour mettre à jour l'horloge
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('live-clock').innerText = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    <script src="owner.js"></script>
+</body>
+</html>

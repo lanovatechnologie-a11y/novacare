@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ht">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>LOTATO PRO | Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0b1e, #1a1b3a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(173, 0, 241, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #fff;
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #ad00f1, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo .pro-badge {
+            background: #ad00f1;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            color: white;
+            font-weight: 600;
+        }
+
+        .logo p {
+            color: #a0a0b8;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            color: #a0a0b8;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(173, 0, 241, 0.5);
+            padding: 16px;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            border-color: #00d4ff;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+        }
+
+        input::placeholder {
+            color: rgba(160, 160, 184, 0.6);
+        }
+
+        .role-selector {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .role-btn {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid rgba(173, 0, 241, 0.5);
+            background: rgba(173, 0, 241, 0.1);
+            color: #a0a0b8;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .role-btn:hover {
+            background: rgba(173, 0, 241, 0.2);
+        }
+
+        .role-btn.active {
+            background: linear-gradient(135deg, #ad00f1, #ff007a);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 5px 15px rgba(173, 0, 241, 0.3);
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #ad00f1, #ff007a);
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(173, 0, 241, 0.3);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            color: #ff4d4d;
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255, 77, 77, 0.1);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .forgot-password {
+            text-align: center;
+            color: #00d4ff;
+            font-size: 0.9rem;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .forgot-password:hover {
+            color: #00f190;
+            text-decoration: underline;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+            
+            .logo h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>LOTATO <span class="pro-badge">PRO</span></h1>
+            <p>Système de Gestion de Loteries Professionnel</p>
+        </div>
+
+        <form class="login-form" id="loginForm">
+            <div class="form-group">
+                <label for="userId">Identifiant Utilisateur</label>
+                <input type="text" id="userId" placeholder="Ex: AGENT-001" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" placeholder="Votre mot de passe" required autocomplete="current-password">
+            </div>
+
+            <div class="form-group">
+                <label>Type de compte</label>
+                <div class="role-selector">
+                    <div class="role-btn active" data-role="agent">Agent</div>
+                    <div class="role-btn" data-role="supervisor">Superviseur</div>
+                    <div class="role-btn" data-role="owner">Propriétaire</div>
+                </div>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">
+                <span id="btnText">Se Connecter</span>
+                <div class="loading-spinner" id="loadingSpinner"></div>
+            </button>
+
+            <div class="error-message" id="errorMessage">
+                Identifiants incorrects. Veuillez réessayer.
+            </div>
+
+            <div class="forgot-password" onclick="showForgotPassword()">
+                Mot de passe oublié ?
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let selectedRole = 'agent';
+        const API_BASE_URL = window.location.hostname.includes('localhost') 
+            ? 'http://localhost:3000/api' 
+            : 'https://votre-backend.onrender.com/api';
+
+        // Gestion du sélecteur de rôle
+        document.querySelectorAll('.role-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedRole = this.dataset.role;
+            });
+        });
+
+        // Gestion du formulaire de connexion
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('userId').value.trim();
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const btnText = document.getElementById('btnText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const loginBtn = document.getElementById('loginBtn');
+
+            // Validation
+            if (!userId || !password) {
+                errorMessage.textContent = 'Veuillez remplir tous les champs';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            // Afficher le chargement
+            btnText.style.display = 'none';
+            loadingSpinner.style.display = 'block';
+            loginBtn.disabled = true;
+            errorMessage.style.display = 'none';
+
+            try {
+                // Appel à l'API de login
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Stocker le token et rediriger
+                    localStorage.setItem('lotato_token', data.token);
+                    localStorage.setItem('lotato_user', JSON.stringify(data.user));
+                    
+                    // Redirection basée sur le rôle
+                    if (data.user.role === 'agent') {
+                        window.location.href = 'index.html';
+                    } else if (data.user.role === 'supervisor') {
+                        window.location.href = 'responsable.html';
+                    } else if (data.user.role === 'owner') {
+                        window.location.href = 'owner.html';
+                    } else {
+                        throw new Error('Rôle non reconnu');
+                    }
+                } else {
+                    throw new Error(data.error || 'Erreur de connexion');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorMessage.textContent = error.message || 'Erreur de connexion au serveur';
+                errorMessage.style.display = 'block';
+                
+                // Réactiver le bouton
+                btnText.style.display = 'inline';
+                loadingSpinner.style.display = 'none';
+                loginBtn.disabled = false;
+            }
+        });
+
+        function showForgotPassword() {
+            const userId = prompt("Entrez votre identifiant pour réinitialiser le mot de passe:");
+            if (userId) {
+                alert(`Demande de réinitialisation envoyée pour ${userId}.\nContactez l'administrateur système.`);
+            }
+        }
+
+        // Auto-focus sur le champ ID
+        document.getElementById('userId').focus();
+
+        // Vérifier si l'utilisateur est déjà connecté
+        const token = localStorage.getItem('lotato_token');
+        const user = JSON.parse(localStorage.getItem('lotato_user') || '{}');
+        
+        if (token && user.role) {
+            // Rediriger automatiquement
+            if (user.role === 'agent') {
+                window.location.href = 'index.html';
+            } else if (user.role === 'supervisor') {
+                window.location.href = 'responsable.html';
+            } else if (user.role === 'owner') {
+                window.location.href = 'owner.html';
+            }
+        }
+
+        // Gestion de la touche Entrée
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !document.activeElement.id.includes('btn')) {
+                document.getElementById('loginBtn').click();
+            }
+        });
+    </script>
+</body>
+</html>
