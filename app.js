@@ -1,3247 +1,1691 @@
-// Configuration de l'API
-const API_BASE_URL = 'https://novacare-qahi.onrender.com/api';
+// ============================================================
+//  APP.JS — Logique principale frontend
+//  Connecté à l'API backend via api.js
+// ============================================================
 
-// Variables globales
-let currentUser = null;
-let currentRole = null;
-let currentPaymentTransaction = null;
-let currentPaymentTotal = 0;
-let selectedPaymentMethod = null;
-
-// Fonctions API
-const api = {
-    // Authentification
-    async login(username, password, role) {
-        const response = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, role })
-        });
-        return await response.json();
-    },
-
-    // Patients
-    async getPatients() {
-        const response = await fetch(`${API_BASE_URL}/patients`);
-        return await response.json();
-    },
-
-    async createPatient(patientData) {
-        const response = await fetch(`${API_BASE_URL}/patients`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patientData)
-        });
-        return await response.json();
-    },
-
-    async getPatientById(id) {
-        const response = await fetch(`${API_BASE_URL}/patients/${id}`);
-        return await response.json();
-    },
-
-    // Consultations
-    async getConsultations() {
-        const response = await fetch(`${API_BASE_URL}/consultations`);
-        return await response.json();
-    },
-
-    async createConsultation(consultationData) {
-        const response = await fetch(`${API_BASE_URL}/consultations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(consultationData)
-        });
-        return await response.json();
-    },
-
-    // Analyses
-    async getAnalyses() {
-        const response = await fetch(`${API_BASE_URL}/analyses`);
-        return await response.json();
-    },
-
-    async createAnalysis(analysisData) {
-        const response = await fetch(`${API_BASE_URL}/analyses`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(analysisData)
-        });
-        return await response.json();
-    },
-
-    async updateAnalysis(id, results) {
-        const response = await fetch(`${API_BASE_URL}/analyses/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ results })
-        });
-        return await response.json();
-    },
-
-    // Prescriptions
-    async getPrescriptions() {
-        const response = await fetch(`${API_BASE_URL}/prescriptions`);
-        return await response.json();
-    },
-
-    async createPrescription(prescriptionData) {
-        const response = await fetch(`${API_BASE_URL}/prescriptions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(prescriptionData)
-        });
-        return await response.json();
-    },
-
-    async updatePrescription(id, delivered) {
-        const response = await fetch(`${API_BASE_URL}/prescriptions/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ delivered })
-        });
-        return await response.json();
-    },
-
-    // Transactions
-    async getTransactions() {
-        const response = await fetch(`${API_BASE_URL}/transactions`);
-        return await response.json();
-    },
-
-    async createTransaction(transactionData) {
-        const response = await fetch(`${API_BASE_URL}/transactions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(transactionData)
-        });
-        return await response.json();
-    },
-
-    async updateTransaction(id, status, paymentMethod, paymentDetails) {
-        const response = await fetch(`${API_BASE_URL}/transactions/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status, paymentMethod, paymentDetails })
-        });
-        return await response.json();
-    },
-
-    // Stock
-    async getStock() {
-        const response = await fetch(`${API_BASE_URL}/stock`);
-        return await response.json();
-    },
-
-    async updateStock(id, quantity) {
-        const response = await fetch(`${API_BASE_URL}/stock/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ quantity })
-        });
-        return await response.json();
-    },
-
-    async createStockItem(stockData) {
-        const response = await fetch(`${API_BASE_URL}/stock`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(stockData)
-        });
-        return await response.json();
-    },
-
-    // Rendez-vous
-    async getAppointments() {
-        const response = await fetch(`${API_BASE_URL}/appointments`);
-        return await response.json();
-    },
-
-    async createAppointment(appointmentData) {
-        const response = await fetch(`${API_BASE_URL}/appointments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(appointmentData)
-        });
-        return await response.json();
-    },
-
-    async updateAppointment(id, status) {
-        const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-        });
-        return await response.json();
-    },
-
-    // Employés
-    async getEmployees() {
-        const response = await fetch(`${API_BASE_URL}/employees`);
-        return await response.json();
-    },
-
-    async createEmployee(employeeData) {
-        const response = await fetch(`${API_BASE_URL}/employees`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(employeeData)
-        });
-        return await response.json();
-    },
-
-    async updateEmployee(id, employeeData) {
-        const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(employeeData)
-        });
-        return await response.json();
-    },
-
-    async deleteEmployee(id) {
-        const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
-            method: 'DELETE'
-        });
-        return await response.json();
-    },
-
-    // Présence
-    async getAttendance() {
-        const response = await fetch(`${API_BASE_URL}/attendance`);
-        return await response.json();
-    },
-
-    async createAttendance(attendanceData) {
-        const response = await fetch(`${API_BASE_URL}/attendance`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(attendanceData)
-        });
-        return await response.json();
-    },
-
-    async updateAttendance(id, checkOut) {
-        const response = await fetch(`${API_BASE_URL}/attendance/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ checkOut })
-        });
-        return await response.json();
-    },
-
-    // Urgences
-    async getEmergencyPatients() {
-        const response = await fetch(`${API_BASE_URL}/emergency`);
-        return await response.json();
-    },
-
-    async createEmergencyPatient(emergencyData) {
-        const response = await fetch(`${API_BASE_URL}/emergency`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(emergencyData)
-        });
-        return await response.json();
-    },
-
-    async updateEmergencyPatient(id, emergencyData) {
-        const response = await fetch(`${API_BASE_URL}/emergency/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(emergencyData)
-        });
-        return await response.json();
-    },
-
-    // Statistiques
-    async getDashboardStats() {
-        const response = await fetch(`${API_BASE_URL}/stats/dashboard`);
-        return await response.json();
-    },
-
-    async getAdminStats() {
-        const response = await fetch(`${API_BASE_URL}/stats/admin`);
-        return await response.json();
-    }
+// ─── État global ─────────────────────────────────────────────
+const state = {
+    currentUser:   null,
+    currentRole:   null,
+    // Données chargées depuis l'API (cache léger)
+    consultationTypes:    [],
+    vitalTypes:           [],
+    labAnalysisTypes:     [],
+    externalServiceTypes: [],
+    medications:          [],
+    hospitalSettings:     {},
+    // État UI temporaire
+    currentModifiedConsultation: null,
+    currentModifiedAnalysis:     null,
+    currentCashierPatient:       null,
+    selectedServices:            [],
+    currentDoctorPatient:        null,
 };
 
-// Données constantes
-const servicePrices = {
-    'Consultation': 500,
-    'Consultation Urgence': 800,
-    'Analyse': 300,
-    'Analyse Urgence': 500,
-    'Médicament': 0
-};
+// ─── Utilitaires UI ─────────────────────────────────────────
+function showSpinner()  { document.getElementById('spinner-overlay').classList.remove('hidden'); }
+function hideSpinner()  { document.getElementById('spinner-overlay').classList.add('hidden'); }
 
-const externalServices = [
-    { name: 'Pansement', price: 150 },
-    { name: 'Piqûre', price: 200 },
-    { name: 'Planning familial', price: 300 },
-    { name: 'Vaccination', price: 250 },
-    { name: 'Soins infirmiers', price: 180 },
-    { name: 'Prélèvement sanguin', price: 120 }
-];
-
-const paymentMethods = [
-    { id: 'cash', name: 'Cash', icon: 'fas fa-money-bill-wave', needsDetails: true },
-    { id: 'moncash', name: 'Mon Cash', icon: 'fas fa-mobile-alt', needsDetails: true, isMobile: true },
-    { id: 'natcash', name: 'NatCash', icon: 'fas fa-phone-alt', needsDetails: true, isMobile: true },
-    { id: 'debit', name: 'Carte Débit', icon: 'fas fa-credit-card', needsDetails: true },
-    { id: 'credit', name: 'Carte Credit', icon: 'fas fa-credit-card', needsDetails: true },
-    { id: 'mastercard', name: 'Master Card', icon: 'fab fa-cc-mastercard', needsDetails: true },
-    { id: 'bank-transfer', name: 'Virement Bancaire', icon: 'fas fa-university', needsDetails: true }
-];
-
-// Fonctions utilitaires
-function getRoleName(role) {
-    const roles = {
-        'admin': 'Administrateur',
-        'doctor': 'Docteur',
-        'lab': 'Technicien de Laboratoire',
-        'pharmacy': 'Pharmacien',
-        'reception': 'Réceptionniste',
-        'cashier': 'Caissier'
-    };
-    return roles[role] || 'Utilisateur';
+function toast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3200);
 }
 
-function showAlert(message, type) {
-    // Supprimer les alertes existantes
-    document.querySelectorAll('.alert').forEach(alert => {
-        if (alert.parentNode) {
-            alert.parentNode.removeChild(alert);
-        }
-    });
-    
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type}`;
-    alertDiv.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
-        ${message}
-        <button type="button" class="close-alert" style="float: right; background: none; border: none; font-size: 1.2rem; cursor: pointer;">&times;</button>
-    `;
-    
-    const currentContent = document.querySelector('.content.active');
-    if (currentContent) {
-        currentContent.insertBefore(alertDiv, currentContent.firstChild);
+async function apiCall(fn, errorMsg = 'Erreur') {
+    showSpinner();
+    try {
+        return await fn();
+    } catch (err) {
+        toast(err.message || errorMsg, 'error');
+        throw err;
+    } finally {
+        hideSpinner();
     }
-    
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 5000);
-    
-    alertDiv.querySelector('.close-alert').addEventListener('click', function() {
-        alertDiv.remove();
-    });
 }
 
-function printContentDirectly(content, title = 'Document') {
-    const printContainer = document.getElementById('print-container');
-    printContainer.innerHTML = `
-        <div class="printable">
-            ${content}
-        </div>
-    `;
-    
-    // Attendre que le DOM soit mis à jour
-    setTimeout(() => {
-        window.print();
-        
-        // Nettoyer après impression
-        setTimeout(() => {
-            printContainer.innerHTML = '';
-        }, 100);
-    }, 100);
+function formatDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('fr-FR');
 }
 
-// Initialize application
-document.addEventListener('DOMContentLoaded', function() {
-    initApp();
-});
-
-async function initApp() {
+// ─── INITIALISATION ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
     setupLogin();
     setupNavigation();
-    setupPatients();
-    setupConsultation();
-    setupAppointments();
-    setupLaboratory();
-    setupPharmacy();
-    setupCashier();
-    setupAdministration();
-    setupEmployees();
-    setupEmergency();
-    
-    // Charger les données initiales
-    await updateDashboard();
-}
+});
 
+// ─── CONNEXION ────────────────────────────────────────────────
 function setupLogin() {
-    const roleButtons = document.querySelectorAll('.login-role-btn');
-    const loginForm = document.getElementById('login-form');
-    
-    roleButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            roleButtons.forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-        });
-    });
-    
-    document.querySelector('.login-role-btn[data-role="admin"]').classList.add('active');
-    
-    loginForm.addEventListener('submit', async function(e) {
+    const roleBtns = document.querySelectorAll('.login-role-btn');
+    roleBtns.forEach(btn => btn.addEventListener('click', function () {
+        roleBtns.forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+    }));
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const username = document.getElementById('username').value;
+        const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
-        const selectedRole = document.querySelector('.login-role-btn.active').getAttribute('data-role');
-        
-        if (!username || !password) {
-            showAlert('Veuillez entrer un nom d\'utilisateur et un mot de passe', 'warning');
-            return;
-        }
-        
+        const role     = document.querySelector('.login-role-btn.active').dataset.role;
+
         try {
-            const result = await api.login(username, password, selectedRole);
-            
-            if (result.success) {
-                currentUser = username;
-                currentRole = selectedRole;
-                
-                document.getElementById('current-username').textContent = username;
-                document.getElementById('current-user-role').textContent = getRoleName(selectedRole);
-                
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
-                
-                showAlert('Connexion réussie! Bienvenue ' + username, 'success');
-                
-                updatePermissions();
-                await updateDashboard();
-            } else {
-                showAlert('Identifiants incorrects', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur de connexion au serveur', 'danger');
-            console.error('Login error:', error);
+            showSpinner();
+            const data = await API.login(username, password, role);
+            localStorage.setItem('hopital_token', data.token);
+            state.currentUser = data.user;
+            state.currentRole = role;
+
+            document.getElementById('current-username').textContent = data.user.name;
+            document.getElementById('current-user-role').textContent = role;
+            document.getElementById('dashboard-role').textContent = role.charAt(0).toUpperCase() + role.slice(1);
+
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+
+            await loadBaseData();
+            setupRoleBasedNavigation();
+            updateRoleDashboard();
+            checkUnreadMessages();
+        } catch (err) {
+            toast(err.message || 'Identifiants incorrects', 'error');
+        } finally {
+            hideSpinner();
         }
     });
-    
-    document.getElementById('logout-btn').addEventListener('click', function() {
-        currentUser = null;
-        currentRole = null;
-        
-        document.getElementById('login-screen').classList.remove('hidden');
-        document.getElementById('main-app').classList.add('hidden');
-        
-        document.getElementById('login-form').reset();
-        document.querySelectorAll('.login-role-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('.login-role-btn[data-role="admin"]').classList.add('active');
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+        if (confirm('Voulez-vous vous déconnecter?')) {
+            localStorage.removeItem('hopital_token');
+            location.reload();
+        }
     });
 }
 
-function updatePermissions() {
-    const role = currentRole;
-    
-    // Montrer/Masquer le total employé
-    const employeeTotalDiv = document.getElementById('employee-today-total');
-    if (role !== 'admin') {
-        employeeTotalDiv.classList.remove('hidden');
-        updateEmployeeTodayTotal();
-    } else {
-        employeeTotalDiv.classList.add('hidden');
+async function loadBaseData() {
+    try {
+        const [ct, vt, lat, est, meds, settings] = await Promise.all([
+            API.getConsultationTypes(),
+            API.getVitalTypes(),
+            API.getLabAnalysisTypes(),
+            API.getExternalServiceTypes(),
+            API.getMedications(),
+            API.getSettings(),
+        ]);
+        state.consultationTypes    = ct;
+        state.vitalTypes           = vt;
+        state.labAnalysisTypes     = lat;
+        state.externalServiceTypes = est;
+        state.medications          = meds;
+        state.hospitalSettings     = settings;
+
+        applyHospitalSettings();
+        updateConsultationTypesSelect();
+        updateVitalsInputs();
+        updateLabAnalysesSelect();
+        updateExternalServicesSelect();
+        updateExternalServicesOptions();
+        updateDoctorConsultationTypes();
+    } catch (err) {
+        toast('Erreur chargement des données', 'error');
     }
-    
-    // Gestion des permissions pharmacie
-    const addMedicationBtn = document.getElementById('add-medication-btn');
-    const stockPermissionLabel = document.getElementById('stock-permission-label');
-    
-    if (role === 'admin') {
-        addMedicationBtn.classList.remove('hidden');
-        stockPermissionLabel.textContent = 'Administration seulement';
-    } else if (role === 'pharmacy') {
-        addMedicationBtn.classList.add('hidden');
-        stockPermissionLabel.textContent = 'Vue seulement';
-    } else {
-        addMedicationBtn.classList.add('hidden');
-        stockPermissionLabel.textContent = 'Vue seulement';
+}
+
+function applyHospitalSettings() {
+    const s = state.hospitalSettings;
+    if (s.name) {
+        document.getElementById('hospital-name-login').textContent = s.name;
+        document.getElementById('hospital-name-header').textContent = s.name;
+        document.getElementById('hospital-name').value = s.name;
     }
-    
-    // Rendez-vous docteur
-    const doctorAppointmentsDiv = document.getElementById('doctor-appointments-dashboard');
-    if (role === 'doctor' || role === 'admin') {
-        doctorAppointmentsDiv.classList.remove('hidden');
-        updateDoctorAppointmentsDashboard();
-    } else {
-        doctorAppointmentsDiv.classList.add('hidden');
+    if (s.address) {
+        document.getElementById('hospital-address-header').textContent = s.address;
+        document.getElementById('hospital-address').value = s.address;
     }
-    
-    // Gestion des employés (admin seulement)
-    const addEmployeeBtn = document.getElementById('add-employee-btn');
-    const employeeAdminSection = document.getElementById('employee-admin-section');
-    const employeeManagementForm = document.getElementById('employee-management-form');
-    
-    if (role === 'admin') {
-        addEmployeeBtn.classList.remove('hidden');
-        employeeAdminSection.classList.remove('hidden');
-    } else {
-        addEmployeeBtn.classList.add('hidden');
-        employeeAdminSection.classList.add('hidden');
-        employeeManagementForm.classList.add('hidden');
-    }
-    
-    // Services externes (caisse seulement)
-    const externalServicesSection = document.getElementById('external-services-section');
-    if (role === 'cashier' || role === 'admin') {
-        externalServicesSection.classList.remove('hidden');
-    } else {
-        externalServicesSection.classList.add('hidden');
-    }
-    
-    // Montrer tous les onglets pour admin
-    if (role === 'admin') {
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.style.display = 'flex';
+    if (s.phone) document.getElementById('hospital-phone').value = s.phone;
+    if (s.logo) {
+        ['header-logo', 'login-logo', 'card-logo', 'certificate-logo', 'invoice-logo'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.src = s.logo; el.style.display = 'block'; }
         });
-        return;
-    }
-    
-    // Pour les autres rôles, afficher seulement les onglets pertinents
-    const tabs = document.querySelectorAll('.nav-tab');
-    tabs.forEach(tab => {
-        tab.style.display = 'none';
-    });
-    
-    if (role === 'doctor') {
-        document.querySelector('[data-target="dashboard"]').style.display = 'flex';
-        document.querySelector('[data-target="patients"]').style.display = 'flex';
-        document.querySelector('[data-target="consultation"]').style.display = 'flex';
-        document.querySelector('[data-target="appointments"]').style.display = 'flex';
-        document.querySelector('[data-target="emergency"]').style.display = 'flex';
-    } else if (role === 'lab') {
-        document.querySelector('[data-target="dashboard"]').style.display = 'flex';
-        document.querySelector('[data-target="laboratory"]').style.display = 'flex';
-        document.querySelector('[data-target="emergency"]').style.display = 'flex';
-    } else if (role === 'pharmacy') {
-        document.querySelector('[data-target="dashboard"]').style.display = 'flex';
-        document.querySelector('[data-target="pharmacy"]').style.display = 'flex';
-        document.querySelector('[data-target="emergency"]').style.display = 'flex';
-    } else if (role === 'reception') {
-        document.querySelector('[data-target="dashboard"]').style.display = 'flex';
-        document.querySelector('[data-target="patients"]').style.display = 'flex';
-        document.querySelector('[data-target="appointments"]').style.display = 'flex';
-        document.querySelector('[data-target="emergency"]').style.display = 'flex';
-    } else if (role === 'cashier') {
-        document.querySelector('[data-target="dashboard"]').style.display = 'flex';
-        document.querySelector('[data-target="cashier"]').style.display = 'flex';
-        document.querySelector('[data-target="emergency"]').style.display = 'flex';
+        document.getElementById('header-icon').style.display = 'none';
+        document.getElementById('login-icon').style.display  = 'none';
     }
 }
 
+// ─── NAVIGATION ──────────────────────────────────────────────
 function setupNavigation() {
     const tabs = document.querySelectorAll('.nav-tab');
-    
     tabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            const target = this.getAttribute('data-target');
-            
+        tab.addEventListener('click', function () {
             tabs.forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-            
-            showContent(target);
-            
-            if (target === 'cashier') {
-                updateCashierTotals();
-            }
-            
-            if (target === 'appointments') {
-                updateAppointmentsLists();
-            }
-            
-            if (target === 'emergency') {
-                updateEmergencyPatientsTable();
-            }
-            
-            if (currentRole !== 'admin') {
-                updateEmployeeTodayTotal();
-            }
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.getElementById(this.dataset.target).classList.add('active');
+
+            const target = this.dataset.target;
+            if      (target === 'dashboard')      updateRoleDashboard();
+            else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); loadAppointmentsList(); }
+            else if (target === 'administration') { updateAdminStats(); }
+            else if (target === 'pharmacy')       updateMedicationStockDisplay();
+            else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
+            else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); }
         });
     });
 }
 
-function showContent(contentId) {
-    document.querySelectorAll('.content').forEach(content => {
-        content.classList.remove('active');
+function setupRoleBasedNavigation() {
+    const tabs = document.querySelectorAll('.nav-tab');
+    const role = state.currentRole;
+    const roleAccess = {
+        admin:     ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','settings'],
+        secretary: ['dashboard','secretary','messaging'],
+        cashier:   ['dashboard','cashier','messaging'],
+        nurse:     ['dashboard','nurse','messaging'],
+        doctor:    ['dashboard','doctor','messaging'],
+        lab:       ['dashboard','laboratory','messaging'],
+        pharmacy:  ['dashboard','pharmacy','messaging'],
+    };
+    const allowed = roleAccess[role] || ['dashboard'];
+    tabs.forEach(tab => {
+        if (allowed.includes(tab.dataset.target)) tab.classList.remove('hidden');
+        else tab.classList.add('hidden');
     });
-    
-    document.getElementById(contentId).classList.add('active');
+    const visible = document.querySelectorAll('.nav-tab:not(.hidden)');
+    if (visible.length > 0) {
+        visible.forEach(t => t.classList.remove('active'));
+        visible[0].classList.add('active');
+        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+        document.getElementById(visible[0].dataset.target).classList.add('active');
+    }
 }
 
-function setupPatients() {
-    const patientForm = document.getElementById('patient-form');
-    const printCardBtn = document.getElementById('print-card-btn');
-    const closeCardBtn = document.getElementById('close-card-btn');
-    
-    patientForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const isPediatric = document.getElementById('patient-pediatric').checked;
-        const isEmergency = document.getElementById('patient-emergency').checked;
-        
-        const patientData = {
-            name: document.getElementById('patient-name').value,
-            dob: document.getElementById('patient-dob').value,
-            birthplace: document.getElementById('patient-birthplace').value,
-            phone: document.getElementById('patient-phone').value,
-            address: document.getElementById('patient-address').value,
-            responsible: document.getElementById('patient-responsible').value,
-            pediatric: isPediatric,
-            emergency: isEmergency,
-            registrationDate: new Date().toISOString(),
-            registeredBy: currentUser
-        };
-        
-        try {
-            const result = await api.createPatient(patientData);
-            
-            if (result.success) {
-                showAlert('Patient enregistré avec succès! Numéro: ' + result.patientId, 'success');
-                patientForm.reset();
-                await updatePatientsTable();
-                await updateDashboard();
-                
-                // Afficher la carte du patient
-                displayPatientCard(result.patient);
-            } else {
-                showAlert('Erreur lors de l\'enregistrement du patient', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur de connexion au serveur', 'danger');
-            console.error('Create patient error:', error);
-        }
-    });
-    
-    printCardBtn.addEventListener('click', function() {
-        const printContent = document.getElementById('print-area').innerHTML;
-        printContentDirectly(printContent, 'Carte du Patient');
-    });
-    
-    closeCardBtn.addEventListener('click', function() {
-        document.getElementById('patient-card-preview').classList.add('hidden');
-    });
-    
-    // Charger la liste des patients au chargement
-    updatePatientsTable();
+function showSection(sectionId) {
+    const tab = document.querySelector(`.nav-tab[data-target="${sectionId}"]`);
+    if (tab) tab.click();
 }
 
-async function updatePatientsTable() {
+// ─── TABLEAU DE BORD ─────────────────────────────────────────
+async function updateRoleDashboard() {
+    const container = document.getElementById('role-dashboard-content');
+    const role = state.currentRole;
+    const today = new Date().toISOString().split('T')[0];
+
     try {
-        const patients = await api.getPatients();
-        const tableBody = document.getElementById('patients-table-body');
-        tableBody.innerHTML = '';
-        
-        patients.forEach(patient => {
-            let typeText = '';
-            if (patient.emergency) {
-                typeText = '<span class="emergency-patient-tag">URGENCE</span>';
-            } else if (patient.pediatric) {
-                typeText = '<span class="pediatric-tag">PÉDIATRIE</span>';
-            } else {
-                typeText = 'Normal';
-            }
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${patient.id}</td>
-                <td>${patient.name}</td>
-                <td>${new Date(patient.dob).toLocaleDateString('fr-FR')}</td>
-                <td>${patient.phone || 'N/A'}</td>
-                <td>${new Date(patient.registrationDate).toLocaleDateString('fr-FR')}</td>
-                <td>${typeText}</td>
+        if (role === 'admin') {
+            const stats = await apiCall(() => API.getStats());
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card"><div class="stat-icon" style="background:#1a6bca"><i class="fas fa-users"></i></div>
+                        <div class="stat-info"><h3>${stats.totalPatients}</h3><p>Patients total</p></div></div>
+                    <div class="stat-card"><div class="stat-icon" style="background:#28a745"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="stat-info"><h3>${stats.totalRevenue.toLocaleString('fr-FR')} Gdes</h3><p>Revenus totaux</p></div></div>
+                    <div class="stat-card"><div class="stat-icon" style="background:#ffc107"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="stat-info"><h3>${stats.unpaidCount}</h3><p>Services impayés</p></div></div>
+                    <div class="stat-card"><div class="stat-icon" style="background:#dc3545"><i class="fas fa-pills"></i></div>
+                        <div class="stat-info"><h3>${stats.lowStock.length}</h3><p>Médicaments en alerte</p></div></div>
+                </div>
+                <div class="card mt-3"><h3>Transactions récentes</h3>
+                    <div class="table-container"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant</th><th>Statut</th></tr></thead>
+                    <tbody>${stats.recentTransactions.slice(0,8).map(t => `
+                        <tr><td>${t.date}</td><td>${t.patient_name}</td><td>${t.service}</td>
+                        <td>${t.amount} Gdes</td>
+                        <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td></tr>`).join('')}
+                    </tbody></table></div></div>`;
+        } else if (role === 'secretary') {
+            const patients = await apiCall(() => API.getPatients({ date: today }));
+            const unread = await API.getUnreadCount();
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card"><div class="stat-icon" style="background:#1a6bca"><i class="fas fa-user-plus"></i></div>
+                        <div class="stat-info"><h3>${patients.length}</h3><p>Patients aujourd'hui</p></div></div>
+                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                        <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
+                        <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div></div>
+                </div>
+                <div class="card mt-3"><h3>Patients du jour</h3>
+                    <div class="table-container"><table><thead><tr><th>ID</th><th>Nom</th><th>Type</th><th>Heure</th></tr></thead>
+                    <tbody>${patients.slice(0,8).map(p=>`<tr><td>${p.id}</td><td>${p.full_name}</td><td>${p.type}</td><td>${p.registration_time||'-'}</td></tr>`).join('')}
+                    </tbody></table></div></div>`;
+        } else if (role === 'cashier') {
+            const txs = await apiCall(() => API.getTransactions({ status: 'paid' }));
+            const todayTxs = txs.filter(t => t.payment_date === today);
+            const revenue = todayTxs.reduce((s,t) => s + parseFloat(t.amount), 0);
+            const unread = await API.getUnreadCount();
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card"><div class="stat-icon" style="background:#28a745"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="stat-info"><h3>${revenue.toLocaleString('fr-FR')} Gdes</h3><p>Encaissements aujourd'hui</p></div></div>
+                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                        <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
+                        <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div></div>
+                </div>`;
+        } else if (role === 'nurse') {
+            const unread = await API.getUnreadCount();
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                        <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
+                        <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div></div>
+                </div>
+                <p class="mt-3">Utilisez l'onglet <strong>Infirmier</strong> pour saisir les signes vitaux.</p>`;
+        } else if (role === 'doctor') {
+            const apps = await apiCall(() => API.getAppointments({ doctor: state.currentUser.username, fromDate: today }));
+            const unread = await API.getUnreadCount();
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card"><div class="stat-icon" style="background:#1a6bca"><i class="fas fa-calendar-alt"></i></div>
+                        <div class="stat-info"><h3>${apps.length}</h3><p>Rendez-vous à venir</p></div></div>
+                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                        <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
+                        <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div></div>
+                </div>`;
+        } else if (role === 'pharmacy') {
+            const meds = state.medications.filter(m => m.quantity <= m.alert_threshold);
+            const unread = await API.getUnreadCount();
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card"><div class="stat-icon" style="background:#dc3545"><i class="fas fa-pills"></i></div>
+                        <div class="stat-info"><h3>${meds.length}</h3><p>Médicaments en alerte</p></div></div>
+                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                        <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
+                        <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div></div>
+                </div>`;
+        } else if (role === 'lab') {
+            const txs = await apiCall(() => API.getTransactions({ type: 'lab' }));
+            const pending = txs.filter(t => t.status === 'paid' && t.lab_status !== 'completed');
+            const unread = await API.getUnreadCount();
+            container.innerHTML = `
+                <div class="stats-container">
+                    <div class="stat-card"><div class="stat-icon" style="background:#ffc107"><i class="fas fa-flask"></i></div>
+                        <div class="stat-info"><h3>${pending.length}</h3><p>Analyses en attente</p></div></div>
+                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                        <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
+                        <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div></div>
+                </div>`;
+        }
+    } catch(e) {
+        container.innerHTML = `<div class="alert alert-danger">Erreur chargement du tableau de bord</div>`;
+    }
+}
+
+// ─── SECRÉTARIAT ─────────────────────────────────────────────
+function updateConsultationTypesSelect() {
+    const sel = document.getElementById('consultation-type-secretary');
+    sel.innerHTML = '<option value="">Sélectionner...</option>';
+    state.consultationTypes.filter(ct => ct.active).forEach(ct => {
+        sel.innerHTML += `<option value="${ct.id}">${ct.name} — ${ct.price} Gdes</option>`;
+    });
+}
+
+function updateExternalServicesOptions() {
+    const container = document.getElementById('external-services-options');
+    let html = '<div class="service-external-list">';
+    state.externalServiceTypes.filter(s => s.active).forEach(s => {
+        html += `<div class="service-item"><label>
+            <input type="checkbox" class="external-service-option" value="${s.id}" data-price="${s.price}">
+            ${s.name} — ${s.price} Gdes</label></div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function updateExternalServicesSelect() {
+    const sel = document.getElementById('external-service-select');
+    sel.innerHTML = '<option value="">Choisir un service</option>';
+    state.externalServiceTypes.filter(s => s.active).forEach(s => {
+        sel.innerHTML += `<option value="${s.id}" data-price="${s.price}">${s.name} — ${s.price} Gdes</option>`;
+    });
+}
+
+// Gestion type patient → affichage consultation vs services externes
+function setupPatientTypeChange() {
+    document.querySelectorAll('input[name="patient-type"]').forEach(radio => {
+        radio.addEventListener('change', function () { syncExternalUI(); });
+    });
+    document.getElementById('external-only').addEventListener('change', syncExternalUI);
+}
+
+function syncExternalUI() {
+    const type       = document.querySelector('input[name="patient-type"]:checked').value;
+    const extOnly    = document.getElementById('external-only').checked;
+    const isExternal = type === 'externe' || extOnly;
+    document.getElementById('consultation-type-container').classList.toggle('hidden', isExternal);
+    document.getElementById('external-services-selection').classList.toggle('hidden', !isExternal);
+    document.getElementById('consultation-type-secretary').required = !isExternal;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Bouton "ajouter service externe" dans le formulaire
+    document.getElementById('add-external-service-registration').addEventListener('click', () => {
+        const container = document.getElementById('external-services-options');
+        const div = document.createElement('div');
+        div.className = 'service-item';
+        div.innerHTML = `
+            <input type="text" class="form-control external-service-custom" placeholder="Nom du service" style="width:200px;display:inline-block;">
+            <input type="number" class="form-control external-service-price" placeholder="Prix (Gdes)" style="width:150px;display:inline-block;">
+            <button type="button" class="btn btn-danger btn-sm remove-external-service">✕</button>`;
+        container.appendChild(div);
+        div.querySelector('.remove-external-service').addEventListener('click', () => div.remove());
+    });
+
+    // Modification consultation
+    document.getElementById('consultation-type-secretary').addEventListener('change', function () {
+        document.getElementById('modify-consultation-type-btn').classList.toggle('hidden', !this.value);
+    });
+    document.getElementById('modify-consultation-type-btn').addEventListener('click', () => {
+        const id = parseInt(document.getElementById('consultation-type-secretary').value);
+        const ct = state.consultationTypes.find(c => c.id === id);
+        if (!ct) return;
+        document.getElementById('modified-consultation-name').value  = ct.name;
+        document.getElementById('modified-consultation-price').value = ct.price;
+        document.getElementById('consultation-modification-secretary').classList.remove('hidden');
+    });
+    document.getElementById('save-modified-consultation').addEventListener('click', () => {
+        const name  = document.getElementById('modified-consultation-name').value;
+        const price = parseFloat(document.getElementById('modified-consultation-price').value);
+        if (!name || isNaN(price)) { toast('Remplir tous les champs', 'error'); return; }
+        state.currentModifiedConsultation = { name, price };
+        document.getElementById('consultation-modification-secretary').classList.add('hidden');
+        toast('Modification enregistrée pour ce patient uniquement');
+    });
+    document.getElementById('cancel-consultation-modification').addEventListener('click', () => {
+        state.currentModifiedConsultation = null;
+        document.getElementById('consultation-modification-secretary').classList.add('hidden');
+    });
+
+    // Formulaire d'enregistrement patient
+    document.getElementById('patient-registration-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fullName           = document.getElementById('patient-fullname').value;
+        const birthDate          = document.getElementById('patient-birthdate').value;
+        const address            = document.getElementById('patient-address').value;
+        const phone              = document.getElementById('patient-phone').value;
+        const responsible        = document.getElementById('patient-responsible').value;
+        const type               = document.querySelector('input[name="patient-type"]:checked').value;
+        const externalOnly       = document.getElementById('external-only').checked;
+        const consultationTypeId = parseInt(document.getElementById('consultation-type-secretary').value);
+
+        if (type !== 'externe' && !externalOnly && !consultationTypeId) {
+            toast('Sélectionner un type de consultation', 'error'); return;
+        }
+
+        // Construire la liste des services externes
+        const externalServices = [];
+        document.querySelectorAll('.external-service-option:checked').forEach(cb => {
+            const svc = state.externalServiceTypes.find(s => s.id == cb.value);
+            if (svc) externalServices.push({ name: svc.name, price: svc.price });
+        });
+        document.querySelectorAll('.external-service-custom').forEach((input, i) => {
+            const name  = input.value.trim();
+            const price = parseFloat(document.querySelectorAll('.external-service-price')[i].value);
+            if (name && !isNaN(price)) externalServices.push({ name, price });
+        });
+
+        if ((externalOnly || type === 'externe') && externalServices.length === 0) {
+            toast('Sélectionner au moins un service externe', 'error'); return;
+        }
+
+        try {
+            const result = await apiCall(() => API.createPatient({
+                fullName, birthDate, address, phone, responsible, type,
+                externalOnly, consultationTypeId: externalOnly ? null : consultationTypeId,
+                modifiedConsultation: state.currentModifiedConsultation,
+                externalServices,
+            }));
+
+            toast(`Patient enregistré ! ID: ${result.id}`);
+            e.target.reset();
+            document.getElementById('patient-normal').checked = true;
+            document.getElementById('external-only').checked  = false;
+            document.getElementById('consultation-type-container').classList.remove('hidden');
+            document.getElementById('external-services-selection').classList.add('hidden');
+            document.getElementById('modify-consultation-type-btn').classList.add('hidden');
+            document.getElementById('consultation-modification-secretary').classList.add('hidden');
+            state.currentModifiedConsultation = null;
+            updateTodayPatientsList();
+            // Notifier la caisse
+            await API.sendMessage({
+                recipient: 'cashier',
+                recipientRole: 'cashier',
+                subject: 'Nouveau patient',
+                content: `Nouveau patient enregistré ID ${result.id} — ${fullName}`,
+                type: 'notification',
+            }).catch(() => {});
+        } catch (err) { /* toast already shown */ }
+    });
+
+    // Rendez-vous depuis secrétariat
+    document.getElementById('search-appointment-patient').addEventListener('click', async () => {
+        const search = document.getElementById('appointment-patient-search').value.trim();
+        if (!search) return;
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            document.getElementById('appointment-patient-name').textContent = `${p.full_name} (${p.id})`;
+            document.getElementById('appointment-patient-details').dataset.patientId = p.id;
+            document.getElementById('appointment-patient-details').dataset.patientName = p.full_name;
+            document.getElementById('appointment-patient-details').classList.remove('hidden');
+            // Charger médecins
+            const users = await API.getUsers().catch(() => []);
+            const doctors = users.filter(u => u.role === 'doctor' && u.active);
+            const sel = document.getElementById('appointment-doctor');
+            sel.innerHTML = '<option value="">Sélectionner un médecin</option>';
+            doctors.forEach(d => sel.innerHTML += `<option value="${d.username}">${d.name}</option>`);
+        } catch(e) {}
+    });
+
+    document.getElementById('schedule-appointment').addEventListener('click', async () => {
+        const details = document.getElementById('appointment-patient-details');
+        const patientId   = details.dataset.patientId;
+        const patientName = details.dataset.patientName;
+        const date   = document.getElementById('appointment-date').value;
+        const time   = document.getElementById('appointment-time').value;
+        const reason = document.getElementById('appointment-reason').value;
+        const doctor = document.getElementById('appointment-doctor').value;
+        if (!date || !time || !doctor) { toast('Remplir tous les champs', 'error'); return; }
+        try {
+            await apiCall(() => API.addAppointment({ patientId, patientName, date, time, reason, doctor }));
+            toast('Rendez-vous programmé!');
+            loadAppointmentsList();
+        } catch(e) {}
+    });
+
+    // Services externes (secrétariat)
+    document.getElementById('search-external-patient').addEventListener('click', async () => {
+        const search = document.getElementById('external-service-search').value.trim();
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            document.getElementById('external-patient-name').textContent = `${p.full_name} (${p.id})`;
+            document.getElementById('external-patient-name').dataset.patientId = p.id;
+            document.getElementById('external-services-container').classList.remove('hidden');
+            await loadExternalServicesList(p.id);
+        } catch(e) {}
+    });
+
+    document.getElementById('add-external-service').addEventListener('click', async () => {
+        const patientId = document.getElementById('external-patient-name').dataset.patientId;
+        const sel = document.getElementById('external-service-select');
+        const svcId = sel.value;
+        const svc = state.externalServiceTypes.find(s => s.id == svcId);
+        if (!svc) { toast('Sélectionner un service', 'error'); return; }
+        try {
+            await apiCall(() => API.addTransaction({
+                patientId,
+                patientName: document.getElementById('external-patient-name').textContent.split('(')[0].trim(),
+                service: `Service externe: ${svc.name}`,
+                amount: svc.price,
+                type: 'external',
+            }));
+            toast('Service ajouté!');
+            await loadExternalServicesList(patientId);
+        } catch(e) {}
+    });
+});
+
+async function loadExternalServicesList(patientId) {
+    const txs = await API.getTransactions({ patientId, type: 'external' });
+    const container = document.getElementById('external-services-list');
+    if (!txs.length) { container.innerHTML = '<p>Aucun service externe.</p>'; return; }
+    container.innerHTML = txs.map(t => `
+        <div class="service-item">
+            <div>${t.service}</div>
+            <div>${t.amount} Gdes</div>
+            <div><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></div>
+        </div>`).join('');
+}
+
+async function updateTodayPatientsList() {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+        const patients = await API.getPatients({ date: today });
+        const tbody = document.getElementById('today-patients-list');
+        tbody.innerHTML = patients.map(p => `
+            <tr>
+                <td>${p.id}</td><td>${p.full_name}</td><td>${p.phone}</td>
+                <td>${p.type}</td>
+                <td><span class="${p.vip?'vip-tag':''}">${p.vip?'VIP':p.sponsored?`Sponsorisé ${p.discount_percentage}%`:'-'}</span></td>
                 <td>
-                    <button class="btn btn-secondary" onclick="viewPatient('${patient.id}')">
-                        <i class="fas fa-eye"></i> Voir
-                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="printPatientCard('${p.id}')"><i class="fas fa-id-card"></i></button>
                 </td>
-            `;
-            tableBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error('Error loading patients:', error);
-        showAlert('Erreur de chargement des patients', 'danger');
-    }
+            </tr>`).join('') || '<tr><td colspan="6">Aucun patient aujourd\'hui</td></tr>';
+    } catch(e) {}
 }
 
-async function viewPatient(patientId) {
+async function loadAppointmentsList() {
     try {
-        const patient = await api.getPatientById(patientId);
-        if (patient) {
-            displayPatientCard(patient);
-            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector('[data-target="patients"]').classList.add('active');
-            showContent('patients');
-        }
-    } catch (error) {
-        showAlert('Erreur de chargement du patient', 'danger');
-        console.error('View patient error:', error);
-    }
-}
-
-function displayPatientCard(patient) {
-    document.getElementById('card-patient-id').textContent = patient.id;
-    document.getElementById('card-patient-name').textContent = patient.name;
-    document.getElementById('card-patient-dob').textContent = new Date(patient.dob).toLocaleDateString('fr-FR');
-    document.getElementById('card-patient-birthplace').textContent = patient.birthplace;
-    document.getElementById('card-patient-responsible').textContent = patient.responsible || 'N/A';
-    document.getElementById('card-patient-date').textContent = new Date(patient.registrationDate).toLocaleDateString('fr-FR');
-    
-    const printArea = document.getElementById('print-area').innerHTML;
-    document.getElementById('patient-card-display').innerHTML = printArea;
-    
-    document.getElementById('patient-card-preview').classList.remove('hidden');
-}
-
-function setupConsultation() {
-    const searchBtn = document.getElementById('search-patient-btn');
-    const consultationForm = document.getElementById('consultation-form');
-    const scheduleAppointmentBtn = document.getElementById('schedule-appointment-btn');
-    const checkMedicationsBtn = document.getElementById('check-medications-btn');
-    const addMedicationRowBtn = document.getElementById('add-medication-row-btn');
-    
-    // Ajouter une ligne au tableau des médicaments
-    addMedicationRowBtn.addEventListener('click', function() {
-        const tableBody = document.getElementById('medication-table-body');
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-            <td><input type="text" class="form-control medication-name" placeholder="Paracétamol 500mg"></td>
-            <td><input type="text" class="form-control medication-dosage" placeholder="1 comprimé"></td>
-            <td><input type="text" class="form-control medication-frequency" placeholder="3 fois par jour"></td>
-            <td><input type="text" class="form-control medication-duration" placeholder="5 jours"></td>
-            <td><button type="button" class="btn btn-danger remove-medication-btn"><i class="fas fa-trash"></i></button></td>
-        `;
-        tableBody.appendChild(newRow);
-        
-        // Ajouter l'événement pour supprimer la ligne
-        newRow.querySelector('.remove-medication-btn').addEventListener('click', function() {
-            newRow.remove();
-        });
-    });
-    
-    // Initialiser l'événement pour supprimer la première ligne
-    document.querySelector('.remove-medication-btn').addEventListener('click', function() {
-        this.closest('tr').remove();
-    });
-    
-    searchBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('search-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (patient) {
-                displayPatientForConsultation(patient);
-                document.getElementById('consultation-form-container').classList.remove('hidden');
-            } else {
-                showAlert('Patient non trouvé. Vérifiez le numéro.', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur de recherche du patient', 'danger');
-            console.error('Search patient error:', error);
-        }
-    });
-    
-    checkMedicationsBtn.addEventListener('click', async function() {
-        const medications = getMedicationsFromTable();
-        if (medications.length === 0) {
-            showAlert('Veuillez ajouter au moins un médicament', 'warning');
-            return;
-        }
-        
-        await checkMedicationsAvailability(medications);
-    });
-    
-    scheduleAppointmentBtn.addEventListener('click', function() {
-        const patientId = document.getElementById('search-patient-id').value;
-        if (patientId) {
-            document.getElementById('appointment-patient-id').value = patientId;
-            
-            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector('[data-target="appointments"]').classList.add('active');
-            showContent('appointments');
-            
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            document.getElementById('appointment-date').value = tomorrow.toISOString().split('T')[0];
-        } else {
-            showAlert('Veuillez d\'abord rechercher un patient', 'warning');
-        }
-    });
-    
-    consultationForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const patientId = document.getElementById('search-patient-id').value;
-        const diagnosis = document.getElementById('consultation-diagnosis').value;
-        const notes = document.getElementById('consultation-notes').value;
-        const otherAnalysis = document.getElementById('consultation-other-analysis').value;
-        
-        const selectedAnalyses = [];
-        document.querySelectorAll('.checkbox-item input[type="checkbox"]:checked').forEach(cb => {
-            selectedAnalyses.push(cb.value);
-        });
-        
-        if (otherAnalysis.trim() !== '') {
-            selectedAnalyses.push(otherAnalysis);
-        }
-        
-        const analyses = selectedAnalyses.join(', ');
-        
-        // Récupérer les médicaments du tableau
-        const medications = getMedicationsFromTable();
-        
-        try {
-            const patient = await api.getPatientById(patientId);
-            const isEmergency = patient && patient.emergency;
-            
-            const consultationData = {
-                patientId: patientId,
-                doctor: currentUser,
-                diagnosis: diagnosis,
-                medications: medications,
-                analyses: analyses,
-                notes: notes,
-                emergency: isEmergency
-            };
-            
-            const result = await api.createConsultation(consultationData);
-            
-            if (result.success) {
-                // Créer les analyses si nécessaire
-                if (analyses.trim() !== '') {
-                    const analysisData = {
-                        patientId: patientId,
-                        consultationId: result.consultationId,
-                        analyses: analyses,
-                        emergency: isEmergency
-                    };
-                    await api.createAnalysis(analysisData);
-                }
-                
-                // Créer les prescriptions
-                for (const medication of medications) {
-                    const prescriptionData = {
-                        patientId: patientId,
-                        consultationId: result.consultationId,
-                        prescription: `${medication.name} - ${medication.dosage} ${medication.frequency} pendant ${medication.duration}`,
-                        emergency: isEmergency
-                    };
-                    await api.createPrescription(prescriptionData);
-                }
-                
-                // Créer la transaction
-                const consultationType = isEmergency ? 'Consultation Urgence' : 'Consultation';
-                const consultationFee = isEmergency ? servicePrices['Consultation Urgence'] : servicePrices['Consultation'];
-                
-                const transactionData = {
-                    patientId: patientId,
-                    service: consultationType,
-                    amount: consultationFee,
-                    doctor: currentUser,
-                    emergency: isEmergency
-                };
-                await api.createTransaction(transactionData);
-                
-                // Si c'est une urgence, ajouter au suivi des urgences
-                if (isEmergency) {
-                    const emergencyData = {
-                        patientId: patientId,
-                        doctor: currentUser,
-                        status: 'En traitement',
-                        active: true,
-                        notes: ''
-                    };
-                    await api.createEmergencyPatient(emergencyData);
-                }
-                
-                consultationForm.reset();
-                document.getElementById('consultation-form-container').classList.add('hidden');
-                document.getElementById('consultation-patient-info').classList.add('hidden');
-                document.getElementById('medication-check-results').innerHTML = '';
-                
-                // Réinitialiser le tableau des médicaments
-                const tableBody = document.getElementById('medication-table-body');
-                tableBody.innerHTML = `
-                    <tr>
-                        <td><input type="text" class="form-control medication-name" placeholder="Paracétamol 500mg"></td>
-                        <td><input type="text" class="form-control medication-dosage" placeholder="1 comprimé"></td>
-                        <td><input type="text" class="form-control medication-frequency" placeholder="3 fois par jour"></td>
-                        <td><input type="text" class="form-control medication-duration" placeholder="5 jours"></td>
-                        <td><button type="button" class="btn btn-danger remove-medication-btn"><i class="fas fa-trash"></i></button></td>
-                    </tr>
-                `;
-                
-                document.querySelectorAll('.checkbox-item input[type="checkbox"]').forEach(cb => {
-                    cb.checked = false;
-                });
-                
-                showAlert('Consultation enregistrée avec succès!', 'success');
-                await updateDashboard();
-                await updateEmployeeTodayTotal();
-            } else {
-                showAlert('Erreur lors de l\'enregistrement de la consultation', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'enregistrement', 'danger');
-            console.error('Create consultation error:', error);
-        }
-    });
-}
-
-function getMedicationsFromTable() {
-    const medications = [];
-    const rows = document.querySelectorAll('#medication-table-body tr');
-    
-    rows.forEach(row => {
-        const name = row.querySelector('.medication-name').value.trim();
-        const dosage = row.querySelector('.medication-dosage').value.trim();
-        const frequency = row.querySelector('.medication-frequency').value.trim();
-        const duration = row.querySelector('.medication-duration').value.trim();
-        
-        if (name && dosage && frequency && duration) {
-            medications.push({
-                name: name,
-                dosage: dosage,
-                frequency: frequency,
-                duration: duration
-            });
-        }
-    });
-    
-    return medications;
-}
-
-async function checkMedicationsAvailability(medications) {
-    const resultsContainer = document.getElementById('medication-check-results');
-    resultsContainer.innerHTML = '';
-    
-    if (medications.length === 0) {
-        resultsContainer.innerHTML = '<div class="alert alert-info">Aucun médicament à vérifier.</div>';
-        return;
-    }
-    
-    try {
-        const stock = await api.getStock();
-        let unavailableMeds = [];
-        let availableMeds = [];
-        
-        medications.forEach(med => {
-            const medName = med.name.toLowerCase();
-            let found = false;
-            let available = false;
-            
-            for (const stockItem of stock) {
-                if (medName.includes(stockItem.medication.toLowerCase()) || 
-                    stockItem.medication.toLowerCase().includes(medName)) {
-                    found = true;
-                    if (stockItem.quantity > 0) {
-                        availableMeds.push({
-                            medication: med,
-                            stock: stockItem.quantity,
-                            price: stockItem.price
-                        });
-                        available = true;
-                    } else {
-                        unavailableMeds.push({
-                            medication: med,
-                            reason: 'Stock épuisé'
-                        });
-                    }
-                    break;
-                }
-            }
-            
-            if (!found) {
-                unavailableMeds.push({
-                    medication: med,
-                    reason: 'Non disponible à l\'hôpital'
-                });
-            }
-        });
-        
-        let html = '<div class="card"><h4>Vérification de disponibilité des médicaments</h4>';
-        
-        if (availableMeds.length > 0) {
-            html += '<h5 class="medication-available">Médicaments disponibles:</h5><ul>';
-            availableMeds.forEach(med => {
-                html += `<li>${med.medication.name} - ${med.medication.dosage} ${med.medication.frequency} pendant ${med.medication.duration} <span class="text-success">(Stock: ${med.stock}, Prix: ${med.price} Gdes)</span></li>`;
-            });
-            html += '</ul>';
-        }
-        
-        if (unavailableMeds.length > 0) {
-            html += '<h5 class="medication-unavailable">Médicaments non disponibles:</h5><ul>';
-            unavailableMeds.forEach(med => {
-                html += `<li>${med.medication.name} - ${med.medication.dosage} ${med.medication.frequency} pendant ${med.medication.duration} <span class="text-danger">(${med.reason})</span></li>`;
-            });
-            html += '</ul>';
-            
-            html += `<button id="print-external-prescription-btn" class="btn btn-warning">
-                <i class="fas fa-print"></i> Imprimer prescription pour pharmacie externe
-            </button>`;
-        }
-        
-        html += '</div>';
-        resultsContainer.innerHTML = html;
-        
-        if (unavailableMeds.length > 0) {
-            document.getElementById('print-external-prescription-btn').addEventListener('click', function() {
-                const patientId = document.getElementById('search-patient-id').value;
-                printExternalPrescription(patientId, unavailableMeds);
-            });
-        }
-    } catch (error) {
-        showAlert('Erreur de vérification du stock', 'danger');
-        console.error('Check medications error:', error);
-    }
-}
-
-async function printExternalPrescription(patientId, unavailableMeds) {
-    try {
-        const patient = await api.getPatientById(patientId);
-        
-        if (patient) {
-            let receiptHtml = `
-                <div class="receipt">
-                    <div class="receipt-header">
-                        <h3>Hôpital Saint-Luc</h3>
-                        <p>Reçu d'achat de médicaments</p>
-                        <p>Date: ${new Date().toLocaleDateString('fr-FR')}</p>
+        const today = new Date().toISOString().split('T')[0];
+        const apps = await API.getAppointments({ fromDate: today });
+        const container = document.getElementById('appointments-list');
+        container.innerHTML = apps.map(a => `
+            <div class="appointment-item">
+                <div class="d-flex justify-between">
+                    <div>
+                        <strong>${a.patient_name}</strong> — ${a.date} à ${a.time}<br>
+                        <small>Motif: ${a.reason||'-'} | Médecin: ${a.doctor||'-'}</small>
                     </div>
                     <div>
-                        <p><strong>Patient:</strong> ${patient.name}</p>
-                        <p><strong>Numéro:</strong> ${patient.id}</p>
-                        <p><strong>Docteur:</strong> ${currentUser}</p>
+                        <span class="appointment-status status-${a.status==='scheduled'?'pending':a.status}">${a.status}</span>
+                        <div class="appointment-actions">
+                            <button class="btn btn-sm btn-success" onclick="updateApptStatus('${a.id}','confirmed')">Confirmer</button>
+                            <button class="btn btn-sm btn-danger" onclick="updateApptStatus('${a.id}','cancelled')">Annuler</button>
+                        </div>
                     </div>
-                    <h4>Médicaments à acheter:</h4>
-            `;
-            
-            unavailableMeds.forEach(med => {
-                const medText = `${med.medication.name} - ${med.medication.dosage} ${med.medication.frequency} pendant ${med.medication.duration}`;
-                receiptHtml += `<div class="receipt-item"><span>${medText}</span><span>À acheter</span></div>`;
-            });
-            
-            receiptHtml += `
-                    <div class="receipt-total">
-                        <span>Total estimé:</span>
-                        <span>À déterminer à la pharmacie</span>
-                    </div>
-                    <p class="text-center" style="margin-top: 15px; font-size: 0.9rem;">
-                        Présentez ce reçu à la pharmacie externe
-                    </p>
                 </div>
-            `;
-            
-            printContentDirectly(receiptHtml, 'Prescription Médicaments');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de l\'impression', 'danger');
-        console.error('Print prescription error:', error);
-    }
+            </div>`).join('') || '<p>Aucun rendez-vous programmé.</p>';
+    } catch(e) {}
 }
 
-function displayPatientForConsultation(patient) {
-    const detailsContainer = document.getElementById('consultation-patient-details');
-    const emergencyTag = patient.emergency ? '<span class="emergency-patient-tag">URGENCE</span>' : '';
-    const pediatricTag = patient.pediatric ? '<span class="pediatric-tag">PÉDIATRIE</span>' : '';
-    
-    detailsContainer.innerHTML = `
-        <div class="patient-info-item">
-            <div class="patient-info-label">Numéro patient:</div>
-            <div>${patient.id} ${emergencyTag} ${pediatricTag}</div>
-        </div>
-        <div class="patient-info-item">
-            <div class="patient-info-label">Nom:</div>
-            <div>${patient.name}</div>
-        </div>
-        <div class="patient-info-item">
-            <div class="patient-info-label">Date de naissance:</div>
-            <div>${new Date(patient.dob).toLocaleDateString('fr-FR')}</div>
-        </div>
-        <div class="patient-info-item">
-            <div class="patient-info-label">Téléphone:</div>
-            <div>${patient.phone || 'N/A'}</div>
-        </div>
-        <div class="patient-info-item">
-            <div class="patient-info-label">Date d'enregistrement:</div>
-            <div>${new Date(patient.registrationDate).toLocaleDateString('fr-FR')}</div>
-        </div>
-    `;
-    
-    document.getElementById('consultation-patient-info').classList.remove('hidden');
+async function updateApptStatus(id, status) {
+    await apiCall(() => API.updateAppointment(id, { status }));
+    toast('Statut mis à jour');
+    loadAppointmentsList();
 }
 
-function setupAppointments() {
-    const appointmentForm = document.getElementById('appointment-form');
-    
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('appointment-date').min = today;
-    
-    appointmentForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const patientId = document.getElementById('appointment-patient-id').value;
-        const doctor = document.getElementById('appointment-doctor').value;
-        const date = document.getElementById('appointment-date').value;
-        const time = document.getElementById('appointment-time').value;
-        const reason = document.getElementById('appointment-reason').value;
-        
-        try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (!patient) {
-                showAlert('Patient non trouvé. Vérifiez le numéro.', 'warning');
-                return;
-            }
-            
-            const appointmentData = {
-                patientId: patientId,
-                patientName: patient.name,
-                doctor: doctor,
-                date: date,
-                time: time,
-                reason: reason,
-                createdBy: currentUser
-            };
-            
-            const result = await api.createAppointment(appointmentData);
-            
-            if (result.success) {
-                appointmentForm.reset();
-                await updateAppointmentsLists();
-                await updateDashboard();
-                showAlert('Rendez-vous planifié avec succès!', 'success');
-            } else {
-                showAlert('Erreur lors de la planification du rendez-vous', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de la planification', 'danger');
-            console.error('Create appointment error:', error);
-        }
-    });
-    
-    // Charger les rendez-vous au chargement
-    updateAppointmentsLists();
-}
-
-async function updateAppointmentsLists() {
+// Carte patient (print)
+async function printPatientCard(patientId) {
     try {
-        const appointments = await api.getAppointments();
-        const upcomingList = document.getElementById('upcoming-appointments-list');
-        const pastList = document.getElementById('past-appointments-list');
-        
-        upcomingList.innerHTML = '';
-        pastList.innerHTML = '';
-        
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        
-        const upcoming = appointments.filter(apt => {
-            const aptDate = new Date(apt.date);
-            return aptDate >= today && apt.status === 'scheduled';
+        const p = await API.getPatient(patientId);
+        const s = state.hospitalSettings;
+        document.getElementById('card-hospital-name').textContent    = s.name    || 'Hôpital';
+        document.getElementById('card-hospital-address').textContent = s.address || '';
+        document.getElementById('card-patient-name').textContent     = p.full_name;
+        document.getElementById('card-patient-id').textContent       = p.id;
+        document.getElementById('card-patient-dob').textContent      = formatDate(p.birth_date);
+        document.getElementById('card-patient-phone').textContent    = p.phone;
+        document.getElementById('card-issue-date').textContent       = new Date().toLocaleDateString('fr-FR');
+        const typeEl = document.getElementById('card-patient-type');
+        const typeMap = { urgence: ['URGENCE','emergency-patient-tag'], pediatrie: ['PÉDIATRIE','pediatric-tag'], externe: ['EXTERNE','external-patient-tag'] };
+        const [txt, cls] = typeMap[p.type] || ['STANDARD',''];
+        typeEl.textContent  = p.vip ? txt + ' VIP' : p.sponsored ? txt + ` SPONSORISÉ (${p.discount_percentage}%)` : txt;
+        typeEl.className    = cls + (p.vip ? ' vip-tag' : '');
+        document.getElementById('patient-card-container').classList.remove('hidden');
+        setTimeout(() => { window.print(); document.getElementById('patient-card-container').classList.add('hidden'); }, 400);
+    } catch(e) {}
+}
+
+// ─── CAISSE ───────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-cashier-patient').addEventListener('click', async () => {
+        const search = document.getElementById('cashier-patient-search').value.trim();
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            state.currentCashierPatient = p;
+            document.getElementById('cashier-patient-name').textContent = p.full_name;
+            document.getElementById('cashier-patient-id').textContent   = p.id;
+            document.getElementById('cashier-patient-details').classList.remove('hidden');
+            await loadServicesForPayment(p);
+        } catch(e) {}
+    });
+
+    document.getElementById('amount-given').addEventListener('input', function () {
+        const total = parseFloat(document.getElementById('total-to-pay').textContent);
+        const given = parseFloat(this.value);
+        const el    = document.getElementById('change-result');
+        if (isNaN(given)) { el.textContent = 'Monnaie: 0 Gdes'; el.style.color=''; return; }
+        if (given < total) { el.textContent = `Manquant: ${(total-given).toFixed(2)} Gdes`; el.style.color='#dc3545'; return; }
+        el.textContent = `Monnaie: ${(given-total).toFixed(2)} Gdes`;
+        el.style.color = '#28a745';
+    });
+
+    document.querySelectorAll('.payment-method').forEach(m => {
+        m.addEventListener('click', function () {
+            document.querySelectorAll('.payment-method').forEach(x => x.classList.remove('active'));
+            this.classList.add('active');
         });
-        
-        const past = appointments.filter(apt => {
-            const aptDate = new Date(apt.date);
-            return aptDate < today || apt.status !== 'scheduled';
-        });
-        
-        upcoming.sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
-        past.sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
-        
-        if (upcoming.length === 0) {
-            upcomingList.innerHTML = '<p class="text-center">Aucun rendez-vous à venir</p>';
-        } else {
-            upcoming.forEach(appointment => {
-                const isToday = appointment.date === todayStr;
-                const card = document.createElement('div');
-                card.className = `appointment-card ${isToday ? 'urgent' : ''}`;
-                card.innerHTML = `
-                    <div class="d-flex justify-between">
-                        <div>
-                            <h4>${appointment.patientName} <small>(${appointment.patientId})</small></h4>
-                            <p><strong>Docteur:</strong> ${appointment.doctor}</p>
-                            <p><strong>Raison:</strong> ${appointment.reason || 'Non spécifiée'}</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="appointment-time">${appointment.time}</div>
-                            <div>${new Date(appointment.date).toLocaleDateString('fr-FR')}</div>
-                            ${isToday ? '<div class="text-danger"><strong>Aujourd\'hui</strong></div>' : ''}
-                        </div>
-                    </div>
-                    <div class="text-right mt-2">
-                        <button class="btn btn-secondary" onclick="cancelAppointment('${appointment.id}')">
-                            <i class="fas fa-times"></i> Annuler
-                        </button>
-                        <button class="btn" onclick="completeAppointment('${appointment.id}')">
-                            <i class="fas fa-check"></i> Terminer
-                        </button>
-                    </div>
-                `;
-                upcomingList.appendChild(card);
-            });
-        }
-        
-        if (past.length === 0) {
-            pastList.innerHTML = '<p class="text-center">Aucun rendez-vous passé</p>';
-        } else {
-            past.forEach(appointment => {
-                const card = document.createElement('div');
-                card.className = 'appointment-card past';
-                card.innerHTML = `
-                    <div class="d-flex justify-between">
-                        <div>
-                            <h4>${appointment.patientName} <small>(${appointment.patientId})</small></h4>
-                            <p><strong>Docteur:</strong> ${appointment.doctor}</p>
-                            <p><strong>Raison:</strong> ${appointment.reason || 'Non spécifiée'}</p>
-                            <p><strong>Statut:</strong> ${appointment.status === 'completed' ? 'Terminé' : 'Annulé'}</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="appointment-time">${appointment.time}</div>
-                            <div>${new Date(appointment.date).toLocaleDateString('fr-FR')}</div>
-                        </div>
-                    </div>
-                `;
-                pastList.appendChild(card);
-            });
-        }
-        
-        await updateDashboard();
-    } catch (error) {
-        console.error('Error loading appointments:', error);
-        showAlert('Erreur de chargement des rendez-vous', 'danger');
-    }
-}
+    });
 
-async function updateDoctorAppointmentsDashboard() {
-    try {
-        const appointments = await api.getAppointments();
-        const today = new Date().toISOString().split('T')[0];
-        const doctorAppointments = appointments.filter(apt => 
-            apt.date === today && 
-            apt.status === 'scheduled' &&
-            (apt.doctor === currentUser || currentRole === 'admin')
-        );
-        
-        const list = document.getElementById('today-appointments-list');
-        list.innerHTML = '';
-        
-        if (doctorAppointments.length === 0) {
-            list.innerHTML = '<p class="text-center">Aucun rendez-vous aujourd\'hui</p>';
-        } else {
-            doctorAppointments.forEach(appointment => {
-                const card = document.createElement('div');
-                card.className = 'appointment-card urgent';
-                card.innerHTML = `
-                    <div class="d-flex justify-between">
-                        <div>
-                            <h4>${appointment.patientName}</h4>
-                            <p><strong>Heure:</strong> ${appointment.time}</p>
-                            <p><strong>Raison:</strong> ${appointment.reason || 'Non spécifiée'}</p>
-                        </div>
-                        <div class="text-right">
-                            <button class="btn" onclick="startConsultationFromAppointment('${appointment.patientId}')">
-                                <i class="fas fa-stethoscope"></i> Commencer
-                            </button>
-                        </div>
-                    </div>
-                `;
-                list.appendChild(card);
-            });
-        }
-    } catch (error) {
-        console.error('Error loading doctor appointments:', error);
-    }
-}
-
-function startConsultationFromAppointment(patientId) {
-    document.getElementById('search-patient-id').value = patientId;
-    document.getElementById('search-patient-btn').click();
-    
-    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelector('[data-target="consultation"]').classList.add('active');
-    showContent('consultation');
-}
-
-async function cancelAppointment(appointmentId) {
-    try {
-        const result = await api.updateAppointment(appointmentId, 'cancelled');
-        if (result.success) {
-            await updateAppointmentsLists();
-            await updateDoctorAppointmentsDashboard();
-            showAlert('Rendez-vous annulé', 'info');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de l\'annulation', 'danger');
-        console.error('Cancel appointment error:', error);
-    }
-}
-
-async function completeAppointment(appointmentId) {
-    try {
-        const result = await api.updateAppointment(appointmentId, 'completed');
-        if (result.success) {
-            await updateAppointmentsLists();
-            await updateDoctorAppointmentsDashboard();
-            showAlert('Rendez-vous marqué comme terminé', 'success');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de la mise à jour', 'danger');
-        console.error('Complete appointment error:', error);
-    }
-}
-
-function setupLaboratory() {
-    const searchBtn = document.getElementById('lab-search-btn');
-    
-    searchBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('lab-patient-id').value;
+    document.getElementById('mark-as-paid').addEventListener('click', async () => {
+        if (!state.selectedServices.length) { toast('Aucun service sélectionné', 'error'); return; }
+        const given = parseFloat(document.getElementById('amount-given').value);
+        const total = parseFloat(document.getElementById('total-to-pay').textContent);
+        if (isNaN(given) || given < total) { toast('Montant insuffisant', 'error'); return; }
+        const method = document.querySelector('.payment-method.active').dataset.method;
+        const ids = state.selectedServices.map(s => s.id);
         try {
-            const patient = await api.getPatientById(patientId);
-            if (patient) {
-                await displayLabResults(patient);
-            } else {
-                showAlert('Patient non trouvé. Vérifiez le numéro.', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur de recherche du patient', 'danger');
-            console.error('Lab search error:', error);
-        }
-    });
-    
-    // Charger les analyses au chargement
-    updateLaboratoryTable();
-}
-
-async function displayLabResults(patient) {
-    const container = document.getElementById('lab-results-container');
-    
-    try {
-        const analyses = await api.getAnalyses();
-        const patientAnalyses = analyses.filter(a => a.patientId === patient.id && (a.status === 'paid' || patient.emergency));
-        
-        if (patientAnalyses.length === 0) {
-            // Si aucune analyse, vérifier s'il y a des analyses en attente de paiement
-            const pendingAnalyses = analyses.filter(a => a.patientId === patient.id && a.status === 'pending-payment');
-            if (pendingAnalyses.length > 0 && !patient.emergency) {
-                container.innerHTML = '<div class="alert alert-warning">Les analyses sont en attente de paiement. Veuillez payer à la caisse d\'abord.</div>';
-            } else {
-                container.innerHTML = '<div class="alert alert-info">Aucune analyse trouvée pour ce patient.</div>';
-            }
-        } else {
-            let html = '<div class="card"><h3>Analyses du Patient</h3>';
-            
-            for (const analysis of patientAnalyses) {
-                const isEmergency = analysis.emergency || (patient && patient.emergency);
-                const emergencyTag = isEmergency ? '<span class="emergency-patient-tag">URGENCE</span>' : '';
-                
-                html += `
-                    <div class="mb-3">
-                        <h4>Analyse ${analysis.id} ${emergencyTag}</h4>
-                        <p><strong>Demandé par:</strong> ${analysis.doctor || 'N/A'}</p>
-                        <p><strong>Date:</strong> ${new Date(analysis.date).toLocaleDateString('fr-FR')}</p>
-                        <p><strong>Analyses demandées:</strong> ${analysis.analyses}</p>
-                        <p><strong>Statut paiement:</strong> ${analysis.status === 'paid' ? 'Payé' : 'En attente'}</p>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Résultats</label>
-                            <textarea class="form-control analysis-results" data-id="${analysis.id}" rows="3">${analysis.results || ''}</textarea>
-                        </div>
-                        <button class="btn btn-success save-results-btn" data-id="${analysis.id}">
-                            <i class="fas fa-save"></i> Enregistrer Résultats
-                        </button>
-                    </div>
-                    <hr>
-                `;
-            }
-            
-            html += '</div>';
-            container.innerHTML = html;
-            
-            document.querySelectorAll('.save-results-btn').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const analysisId = this.getAttribute('data-id');
-                    const results = document.querySelector(`.analysis-results[data-id="${analysisId}"]`).value;
-                    
-                    try {
-                        const result = await api.updateAnalysis(analysisId, results);
-                        if (result.success) {
-                            showAlert('Résultats enregistrés avec succès!', 'success');
-                        } else {
-                            showAlert('Erreur lors de l\'enregistrement', 'danger');
-                        }
-                    } catch (error) {
-                        showAlert('Erreur lors de l\'enregistrement', 'danger');
-                        console.error('Save results error:', error);
-                    }
-                });
-            });
-        }
-        
-        container.classList.remove('hidden');
-    } catch (error) {
-        showAlert('Erreur de chargement des analyses', 'danger');
-        console.error('Display lab results error:', error);
-    }
-}
-
-async function updateLaboratoryTable() {
-    try {
-        const analyses = await api.getAnalyses();
-        const tableBody = document.getElementById('pending-analyses-body');
-        tableBody.innerHTML = '';
-        
-        const pendingAnalyses = analyses.filter(a => (a.status === 'paid' || a.emergency) && !a.results);
-        
-        for (const analysis of pendingAnalyses) {
-            const patient = await api.getPatientById(analysis.patientId);
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${analysis.patientId}</td>
-                <td>${patient ? patient.name : 'N/A'}</td>
-                <td>${analysis.analyses}</td>
-                <td>${new Date(analysis.date).toLocaleDateString('fr-FR')}</td>
-                <td><span class="${analysis.status === 'paid' ? 'text-success' : 'text-warning'}">${analysis.status === 'paid' ? 'Payé' : 'En attente'}</span></td>
-                <td>
-                    <button class="btn btn-success" onclick="enterLabResults('${analysis.id}')">
-                        <i class="fas fa-edit"></i> Saisir Résultats
-                    </button>
-                </td>
-            `;
-            tableBody.appendChild(row);
-        }
-    } catch (error) {
-        console.error('Error loading laboratory table:', error);
-        showAlert('Erreur de chargement des analyses', 'danger');
-    }
-}
-
-async function enterLabResults(analysisId) {
-    try {
-        const analyses = await api.getAnalyses();
-        const analysis = analyses.find(a => a.id === analysisId);
-        if (analysis) {
-            document.getElementById('lab-patient-id').value = analysis.patientId;
-            document.getElementById('lab-search-btn').click();
-        }
-    } catch (error) {
-        showAlert('Erreur de chargement de l\'analyse', 'danger');
-        console.error('Enter lab results error:', error);
-    }
-}
-
-function setupPharmacy() {
-    const searchBtn = document.getElementById('pharmacy-search-btn');
-    const addMedicationBtn = document.getElementById('add-medication-btn');
-    
-    searchBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('pharmacy-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            if (patient) {
-                await displayPharmacyOrders(patient);
-            } else {
-                showAlert('Patient non trouvé. Vérifiez le numéro.', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur de recherche du patient', 'danger');
-            console.error('Pharmacy search error:', error);
-        }
-    });
-    
-    addMedicationBtn.addEventListener('click', function() {
-        if (currentRole !== 'admin') {
-            showAlert('Seul l\'administrateur peut ajouter des médicaments', 'warning');
-            return;
-        }
-        addMedicationToStock();
-    });
-    
-    // Charger les données au chargement
-    updatePharmacyTable();
-    updateStockTable();
-}
-
-async function displayPharmacyOrders(patient) {
-    const container = document.getElementById('pharmacy-results-container');
-    
-    try {
-        const prescriptions = await api.getPrescriptions();
-        const patientPrescriptions = prescriptions.filter(p => p.patientId === patient.id && (p.status === 'paid' || patient.emergency || p.emergency));
-        
-        if (patientPrescriptions.length === 0) {
-            // Si aucune prescription payée, vérifier s'il y a des prescriptions en attente de paiement
-            const pendingPrescriptions = prescriptions.filter(p => p.patientId === patient.id && p.status === 'pending-payment');
-            if (pendingPrescriptions.length > 0 && !patient.emergency) {
-                container.innerHTML = '<div class="alert alert-warning">Les prescriptions sont en attente de paiement. Veuillez payer à la caisse d\'abord.</div>';
-            } else {
-                container.innerHTML = '<div class="alert alert-info">Aucune ordonnance trouvée pour ce patient.</div>';
-            }
-        } else {
-            let html = '<div class="card"><h3>Ordonnances du Patient</h3>';
-            
-            const consultations = {};
-            patientPrescriptions.forEach(p => {
-                if (!consultations[p.consultationId]) {
-                    consultations[p.consultationId] = [];
-                }
-                consultations[p.consultationId].push(p);
-            });
-            
-            for (const [consultId, meds] of Object.entries(consultations)) {
-                const isEmergency = meds[0].emergency || (patient && patient.emergency);
-                const emergencyTag = isEmergency ? '<span class="emergency-patient-tag">URGENCE</span>' : '';
-                
-                html += `
-                    <div class="mb-3">
-                        <h4>Ordonnance ${consultId} ${emergencyTag}</h4>
-                        <p><strong>Prescrit par:</strong> ${meds[0].doctor || 'N/A'}</p>
-                        <p><strong>Date:</strong> ${new Date(meds[0].date).toLocaleDateString('fr-FR')}</p>
-                        <p><strong>Statut paiement:</strong> ${meds[0].status === 'paid' ? 'Payé' : 'En attente'}</p>
-                        
-                        <h5>Médicaments prescrits:</h5>
-                        <ul>
-                `;
-                
-                let allAvailable = true;
-                let missingMeds = [];
-                
-                const stock = await api.getStock();
-                
-                for (const prescription of meds) {
-                    const medInStock = stock.find(m => 
-                        prescription.prescription.toLowerCase().includes(m.medication.toLowerCase())
-                    );
-                    
-                    if (medInStock && medInStock.quantity > 0) {
-                        html += `<li>${prescription.prescription} <span class="text-success">(En stock: ${medInStock.quantity})</span></li>`;
-                    } else {
-                        html += `<li>${prescription.prescription} <span class="text-danger">(Stock épuisé)</span></li>`;
-                        allAvailable = false;
-                        missingMeds.push(prescription.prescription);
-                    }
-                }
-                
-                html += `</ul>`;
-                
-                if (!meds[0].delivered) {
-                    if (allAvailable) {
-                        html += `
-                            <button class="btn btn-success" onclick="dispenseMedication('${consultId}')">
-                                <i class="fas fa-pills"></i> Délivrer tous les médicaments
-                            </button>
-                        `;
-                    } else {
-                        html += `
-                            <div class="alert alert-warning">
-                                <p>Certains médicaments ne sont pas disponibles en stock.</p>
-                                <button class="btn btn-warning" onclick="printMissingMedsReceipt('${patient.id}', ${JSON.stringify(missingMeds).replace(/'/g, "\\'")})">
-                                    <i class="fas fa-print"></i> Imprimer reçu d'achat
-                                </button>
-                                <button class="btn btn-success" onclick="dispensePartialMedication('${consultId}')">
-                                    <i class="fas fa-pills"></i> Délivrer seulement les disponibles
-                                </button>
-                            </div>
-                        `;
-                    }
-                } else if (meds[0].delivered) {
-                    html += '<div class="alert alert-success">Médicaments déjà délivrés</div>';
-                }
-                
-                html += `<hr>`;
-            }
-            
-            html += '</div>';
-            container.innerHTML = html;
-        }
-        
-        container.classList.remove('hidden');
-    } catch (error) {
-        showAlert('Erreur de chargement des ordonnances', 'danger');
-        console.error('Display pharmacy orders error:', error);
-    }
-}
-
-async function dispenseMedication(consultationId) {
-    try {
-        const prescriptions = await api.getPrescriptions();
-        const consultationPrescriptions = prescriptions.filter(p => p.consultationId === consultationId);
-        
-        if (consultationPrescriptions.length === 0) return;
-        
-        const patient = await api.getPatientById(consultationPrescriptions[0].patientId);
-        const isEmergency = patient && patient.emergency;
-        const stock = await api.getStock();
-        
-        for (const prescription of consultationPrescriptions) {
-            // Marquer comme délivré
-            await api.updatePrescription(prescription.id, true);
-            
-            // Réduire le stock
-            const medInStock = stock.find(m => 
-                prescription.prescription.toLowerCase().includes(m.medication.toLowerCase())
+            await apiCall(() => API.payTransactions(ids, method));
+            toast('Paiement enregistré!');
+            await loadServicesForPayment(state.currentCashierPatient);
+            generateInvoice(total, given, method);
+            // Notifier les autres rôles
+            const msgs = ['secretary','doctor','nurse','lab','pharmacy'].map(r =>
+                API.sendMessage({ recipient: r, recipientRole: r, subject: 'Paiement effectué',
+                    content: `Paiement de ${state.currentCashierPatient.full_name}: ${total} Gdes (${method})`,
+                    type: 'payment_notification' }).catch(()=>{})
             );
-            
-            if (medInStock) {
-                const newQuantity = medInStock.quantity - 1;
-                await api.updateStock(medInStock.id, newQuantity);
-                
-                // Créer une transaction pour le médicament
-                const transactionData = {
-                    patientId: prescription.patientId,
-                    service: 'Médicament: ' + medInStock.medication,
-                    amount: medInStock.price,
-                    doctor: currentUser,
-                    emergency: isEmergency
-                };
-                await api.createTransaction(transactionData);
-            }
-        }
-        
-        showAlert('Médicaments délivrés avec succès!', 'success');
-        
-        const patientId = consultationPrescriptions[0].patientId;
-        document.getElementById('pharmacy-patient-id').value = patientId;
-        document.getElementById('pharmacy-search-btn').click();
-        
-        await updateStockTable();
-        await updateCashierTotals();
-        await updateEmployeeTodayTotal();
-    } catch (error) {
-        showAlert('Erreur lors de la délivrance', 'danger');
-        console.error('Dispense medication error:', error);
-    }
-}
-
-async function dispensePartialMedication(consultationId) {
-    try {
-        const prescriptions = await api.getPrescriptions();
-        const consultationPrescriptions = prescriptions.filter(p => p.consultationId === consultationId);
-        
-        if (consultationPrescriptions.length === 0) return;
-        
-        const patient = await api.getPatientById(consultationPrescriptions[0].patientId);
-        const isEmergency = patient && patient.emergency;
-        const stock = await api.getStock();
-        let deliveredCount = 0;
-        
-        for (const prescription of consultationPrescriptions) {
-            const medInStock = stock.find(m => 
-                prescription.prescription.toLowerCase().includes(m.medication.toLowerCase())
-            );
-            
-            if (medInStock && medInStock.quantity > 0) {
-                // Marquer comme délivré
-                await api.updatePrescription(prescription.id, true);
-                
-                // Réduire le stock
-                const newQuantity = medInStock.quantity - 1;
-                await api.updateStock(medInStock.id, newQuantity);
-                deliveredCount++;
-                
-                // Créer une transaction pour le médicament
-                const transactionData = {
-                    patientId: prescription.patientId,
-                    service: 'Médicament: ' + medInStock.medication,
-                    amount: medInStock.price,
-                    doctor: currentUser,
-                    emergency: isEmergency
-                };
-                await api.createTransaction(transactionData);
-            }
-        }
-        
-        showAlert(`${deliveredCount} médicament(s) délivré(s) avec succès!`, 'success');
-        
-        const patientId = consultationPrescriptions[0].patientId;
-        document.getElementById('pharmacy-patient-id').value = patientId;
-        document.getElementById('pharmacy-search-btn').click();
-        
-        await updateStockTable();
-        await updateCashierTotals();
-        await updateEmployeeTodayTotal();
-    } catch (error) {
-        showAlert('Erreur lors de la délivrance', 'danger');
-        console.error('Dispense partial medication error:', error);
-    }
-}
-
-async function updatePharmacyTable() {
-    // Cette fonction peut être utilisée pour mettre à jour d'autres données si nécessaire
-    await updateDashboard();
-}
-
-async function addMedicationToStock() {
-    if (currentRole !== 'admin') {
-        showAlert('Seul l\'administrateur peut ajouter des médicaments', 'warning');
-        return;
-    }
-    
-    const medication = prompt("Nom du médicament:");
-    if (!medication) return;
-    
-    const quantity = parseInt(prompt("Quantité en stock:", "100"));
-    if (isNaN(quantity)) return;
-    
-    const threshold = parseInt(prompt("Seuil d'alerte:", "20"));
-    if (isNaN(threshold)) return;
-    
-    const price = parseFloat(prompt("Prix unitaire (Gdes):", "50"));
-    if (isNaN(price)) return;
-    
-    const stockData = {
-        medication: medication,
-        quantity: quantity,
-        threshold: threshold,
-        price: price
-    };
-    
-    try {
-        const result = await api.createStockItem(stockData);
-        if (result.success) {
-            showAlert('Médicament ajouté au stock avec succès! Code: ' + result.medicationId, 'success');
-            await updateStockTable();
-        } else {
-            showAlert('Erreur lors de l\'ajout du médicament', 'danger');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de l\'ajout du médicament', 'danger');
-        console.error('Add medication error:', error);
-    }
-}
-
-async function updateStockTable() {
-    try {
-        const stock = await api.getStock();
-        const tableBody = document.getElementById('stock-table-body');
-        tableBody.innerHTML = '';
-        
-        stock.forEach(item => {
-            const lowStock = item.quantity <= item.threshold;
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item.id}</td>
-                <td>${item.medication}</td>
-                <td class="${lowStock ? 'text-danger' : ''}">${item.quantity} ${lowStock ? '(Stock bas!)' : ''}</td>
-                <td>${item.threshold}</td>
-                <td>${item.price.toFixed(2)} Gdes</td>
-                <td>
-                    ${currentRole === 'admin' ? 
-                        `<button class="btn btn-secondary" onclick="restockMedication('${item.id}')">
-                            <i class="fas fa-boxes"></i> Réapprovisionner
-                        </button>` :
-                        `<button class="btn btn-secondary" disabled>
-                            <i class="fas fa-eye"></i> Voir seulement
-                        </button>`
-                    }
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error('Error loading stock:', error);
-        showAlert('Erreur de chargement du stock', 'danger');
-    }
-}
-
-async function restockMedication(medicationId) {
-    if (currentRole !== 'admin') {
-        showAlert('Seul l\'administrateur peut réapprovisionner le stock', 'warning');
-        return;
-    }
-    
-    try {
-        const stock = await api.getStock();
-        const item = stock.find(m => m.id === medicationId);
-        
-        if (item) {
-            const amount = parseInt(prompt(`Quantité à ajouter pour ${item.medication}:`, "50"));
-            if (!isNaN(amount) && amount > 0) {
-                const newQuantity = item.quantity + amount;
-                const result = await api.updateStock(medicationId, newQuantity);
-                
-                if (result.success) {
-                    showAlert(`${amount} unités ajoutées au stock de ${item.medication}`, 'success');
-                    await updateStockTable();
-                } else {
-                    showAlert('Erreur lors du réapprovisionnement', 'danger');
-                }
-            }
-        }
-    } catch (error) {
-        showAlert('Erreur lors du réapprovisionnement', 'danger');
-        console.error('Restock medication error:', error);
-    }
-}
-
-function setupCashier() {
-    const searchBtn = document.getElementById('cashier-search-btn');
-    const printReceiptBtn = document.getElementById('print-receipt-btn');
-    const paymentMethodSelect = document.getElementById('payment-method-select');
-    const confirmPaymentBtn = document.getElementById('confirm-payment-btn');
-    const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
-    const addExternalServiceBtn = document.getElementById('add-external-service-btn');
-    const externalServiceCards = document.querySelectorAll('.external-service-card');
-    
-    // Gestion des services externes
-    externalServiceCards.forEach(card => {
-        card.addEventListener('click', function() {
-            externalServiceCards.forEach(c => c.classList.remove('selected'));
-            this.classList.add('selected');
-            
-            const service = this.getAttribute('data-service');
-            const price = this.getAttribute('data-price');
-            
-            document.getElementById('selected-service').value = service;
-            document.getElementById('selected-service-price').value = price;
-        });
+            await Promise.all(msgs);
+        } catch(e) {}
     });
-    
-    addExternalServiceBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('external-service-patient-id').value;
-        const service = document.getElementById('selected-service').value;
-        const price = document.getElementById('selected-service-price').value;
-        
-        if (!patientId) {
-            showAlert('Veuillez entrer le numéro du patient', 'warning');
-            return;
-        }
-        
-        if (!service) {
-            showAlert('Veuillez sélectionner un service', 'warning');
-            return;
-        }
-        
-        try {
-            const patient = await api.getPatientById(patientId);
-            if (!patient) {
-                showAlert('Patient non trouvé. Vérifiez le numéro.', 'warning');
-                return;
-            }
-            
-            const transactionData = {
-                patientId: patientId,
-                service: 'Service Externe: ' + service,
-                amount: parseFloat(price),
-                doctor: currentUser,
-                emergency: false
-            };
-            
-            const result = await api.createTransaction(transactionData);
-            
-            if (result.success) {
-                showAlert('Service externe ajouté avec succès! Montant: ' + price + ' Gdes', 'success');
-                
-                // Réinitialiser
-                document.getElementById('external-service-patient-id').value = '';
-                document.getElementById('selected-service').value = '';
-                document.getElementById('selected-service-price').value = '';
-                externalServiceCards.forEach(c => c.classList.remove('selected'));
-                
-                await updateTransactionsTable();
-                await updateCashierTotals();
-                await updateEmployeeTodayTotal();
-            } else {
-                showAlert('Erreur lors de l\'ajout du service', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'ajout du service', 'danger');
-            console.error('Add external service error:', error);
-        }
-    });
-    
-    searchBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('cashier-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            if (patient) {
-                await displayPatientTransactions(patient);
-            } else {
-                showAlert('Patient non trouvé. Vérifiez le numéro.', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur de recherche du patient', 'danger');
-            console.error('Cashier search error:', error);
-        }
-    });
-    
-    printReceiptBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('cashier-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            if (patient) {
-                await printPaymentReceipt(patient);
-            } else {
-                showAlert('Veuillez d\'abord rechercher un patient', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'impression', 'danger');
-            console.error('Print receipt error:', error);
-        }
-    });
-    
-    paymentMethodSelect.addEventListener('change', function() {
-        selectedPaymentMethod = this.value;
-        
-        // Cacher tous les détails de paiement
-        document.querySelectorAll('.payment-details').forEach(detail => {
-            detail.classList.add('hidden');
-        });
-        
-        // Afficher les détails appropriés
-        if (selectedPaymentMethod === 'cash') {
-            document.getElementById('cash-payment-details').classList.remove('hidden');
-            document.getElementById('cash-amount').value = '';
-            document.getElementById('cash-amount').focus();
-        } else if (selectedPaymentMethod === 'moncash' || selectedPaymentMethod === 'natcash') {
-            document.getElementById('mobile-payment-details').classList.remove('hidden');
-            document.getElementById('mobile-transaction-id').value = '';
-            
-            // Mettre à jour les liens de paiement
-            const moncashLink = document.getElementById('moncash-link');
-            const natcashLink = document.getElementById('natcash-link');
-            
-            if (currentPaymentTransaction && typeof currentPaymentTransaction === 'string' && !currentPaymentTransaction.startsWith('PA') && !currentPaymentTransaction.startsWith('URG')) {
-                const transaction = currentPaymentTransaction;
-                if (transaction) {
-                    const amount = currentPaymentTotal;
-                    moncashLink.href = `https://moncash.com/pay?amount=${amount}&transaction=${transaction}`;
-                    natcashLink.href = `https://natcash.com/pay?amount=${amount}&transaction=${transaction}`;
-                }
-            } else if (currentPaymentTransaction && (currentPaymentTransaction.startsWith('PA') || currentPaymentTransaction.startsWith('URG'))) {
-                const total = currentPaymentTotal;
-                moncashLink.href = `https://moncash.com/pay?amount=${total}&patient=${currentPaymentTransaction}`;
-                natcashLink.href = `https://natcash.com/pay?amount=${total}&patient=${currentPaymentTransaction}`;
-            }
-            
-            document.getElementById('mobile-transaction-id').focus();
-        } else if (selectedPaymentMethod === 'debit' || selectedPaymentMethod === 'credit' || selectedPaymentMethod === 'mastercard') {
-            document.getElementById('card-payment-details').classList.remove('hidden');
-            document.getElementById('card-number').focus();
-        } else if (selectedPaymentMethod === 'bank-transfer') {
-            document.getElementById('bank-transfer-details').classList.remove('hidden');
-            document.getElementById('transfer-reference').focus();
-        }
-        
-        // Activer le bouton de confirmation
-        confirmPaymentBtn.disabled = false;
-    });
-    
-    // Gérer le montant cash pour calculer la monnaie
-    document.getElementById('cash-amount')?.addEventListener('input', function() {
-        if (currentPaymentTotal > 0) {
-            const cashAmount = parseFloat(this.value) || 0;
-            const change = cashAmount - currentPaymentTotal;
-            document.getElementById('cash-change').textContent = 
-                `Monnaie à rendre: ${change >= 0 ? change.toFixed(2) : '0.00'} Gdes`;
-        }
-    });
-    
-    confirmPaymentBtn.addEventListener('click', async function() {
-        if (!selectedPaymentMethod) {
-            showAlert('Veuillez sélectionner un moyen de paiement', 'warning');
-            return;
-        }
-        
-        if (!currentPaymentTransaction) {
-            showAlert('Aucune transaction sélectionnée', 'warning');
-            return;
-        }
-        
-        // Validation des détails de paiement
-        let valid = true;
-        let paymentDetails = {};
-        
-        if (selectedPaymentMethod === 'cash') {
-            const cashAmount = parseFloat(document.getElementById('cash-amount').value);
-            if (!cashAmount || cashAmount < currentPaymentTotal) {
-                showAlert(`Le montant doit être au moins ${currentPaymentTotal.toFixed(2)} Gdes`, 'warning');
-                valid = false;
-            } else {
-                paymentDetails.cashAmount = cashAmount;
-                paymentDetails.change = cashAmount - currentPaymentTotal;
-            }
-        } else if (selectedPaymentMethod === 'moncash' || selectedPaymentMethod === 'natcash') {
-            const transactionId = document.getElementById('mobile-transaction-id').value;
-            if (!transactionId) {
-                showAlert('Veuillez entrer l\'ID de transaction', 'warning');
-                valid = false;
-            } else {
-                paymentDetails.transactionId = transactionId;
-            }
-        } else if (selectedPaymentMethod === 'debit' || selectedPaymentMethod === 'credit' || selectedPaymentMethod === 'mastercard') {
-            const cardNumber = document.getElementById('card-number').value;
-            const cardExpiry = document.getElementById('card-expiry').value;
-            const cardCVV = document.getElementById('card-cvv').value;
-            const cardHolder = document.getElementById('card-holder').value;
-            
-            if (!cardNumber || !cardExpiry || !cardCVV || !cardHolder) {
-                showAlert('Veuillez remplir tous les détails de la carte', 'warning');
-                valid = false;
-            } else {
-                paymentDetails.cardLast4 = cardNumber.slice(-4);
-            }
-        } else if (selectedPaymentMethod === 'bank-transfer') {
-            const transferRef = document.getElementById('transfer-reference').value;
-            if (!transferRef) {
-                showAlert('Veuillez entrer une référence de virement', 'warning');
-                valid = false;
-            } else {
-                paymentDetails.transferReference = transferRef;
-            }
-        }
-        
-        if (!valid) return;
-        
-        try {
-            await markAsPaidWithMethod(currentPaymentTransaction, selectedPaymentMethod, paymentDetails);
-            document.getElementById('payment-methods-container').classList.add('hidden');
-            paymentMethodSelect.value = '';
-            
-            // Réinitialiser les formulaires de détails
-            document.querySelectorAll('.payment-details input').forEach(input => {
-                input.value = '';
-            });
-            
-            selectedPaymentMethod = null;
-            currentPaymentTransaction = null;
-            currentPaymentTotal = 0;
-            
-            // Recharger la vue
-            const patientId = document.getElementById('cashier-patient-id').value;
-            if (patientId) {
-                const patient = await api.getPatientById(patientId);
-                if (patient) {
-                    await displayPatientTransactions(patient);
-                }
-            }
-        } catch (error) {
-            showAlert('Erreur lors du paiement', 'danger');
-            console.error('Confirm payment error:', error);
-        }
-    });
-    
-    cancelPaymentBtn.addEventListener('click', function() {
-        document.getElementById('payment-methods-container').classList.add('hidden');
-        paymentMethodSelect.value = '';
-        selectedPaymentMethod = null;
-        currentPaymentTransaction = null;
-        currentPaymentTotal = 0;
-        
-        // Réinitialiser les formulaires de détails
-        document.querySelectorAll('.payment-details input').forEach(input => {
-            input.value = '';
-        });
-    });
-    
-    // Charger les données initiales
-    updateTransactionsTable();
-    updateCashierTotals();
-}
 
-async function updateCashierTotals() {
-    try {
-        const transactions = await api.getTransactions();
-        const today = new Date().toISOString().split('T')[0];
-        const todayTransactions = transactions.filter(t => 
-            new Date(t.date).toISOString().split('T')[0] === today && 
-            t.status === 'paid'
-        );
-        
-        const todayTotal = todayTransactions.reduce((sum, t) => sum + t.amount, 0);
-        document.getElementById('today-total').textContent = `Total aujourd'hui: ${todayTotal.toFixed(2)} Gdes`;
-        
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const weekTransactions = transactions.filter(t => {
-            const transDate = new Date(t.date);
-            return transDate >= weekAgo && t.status === 'paid';
-        });
-        
-        const weekTotal = weekTransactions.reduce((sum, t) => sum + t.amount, 0);
-        document.getElementById('week-total').textContent = `Total cette semaine: ${weekTotal.toFixed(2)} Gdes`;
-    } catch (error) {
-        console.error('Error updating cashier totals:', error);
-    }
-}
+    document.getElementById('print-invoice').addEventListener('click', () => window.print());
+    document.getElementById('print-receipt').addEventListener('click', () => window.print());
+});
 
-async function displayPatientTransactions(patient) {
-    const container = document.getElementById('cashier-results-container');
-    
-    try {
-        const transactions = await api.getTransactions();
-        const patientTransactions = transactions.filter(t => t.patientId === patient.id);
-        
-        container.innerHTML = '';
-        
-        if (patientTransactions.length === 0) {
-            container.innerHTML = '<div class="alert alert-info">Aucune transaction trouvée pour ce patient.</div>';
-            document.getElementById('print-receipt-btn').disabled = true;
-        } else {
-            let html = '<div class="card"><h3>Transactions du Patient</h3>';
-            
-            let totalPending = 0;
-            let totalPaid = 0;
-            let hasPending = false;
-            
-            patientTransactions.forEach(transaction => {
-                if (transaction.status === 'pending') {
-                    hasPending = true;
-                    totalPending += transaction.amount;
-                    html += `
-                        <div class="d-flex justify-between mb-2">
-                            <div>
-                                <strong>${transaction.service}</strong>
-                                <div>${new Date(transaction.date).toLocaleDateString('fr-FR')} - ${transaction.id}</div>
-                                ${transaction.emergency ? '<span class="emergency-patient-tag">URGENCE</span>' : ''}
-                            </div>
-                            <div>
-                                <div class="text-right">${transaction.amount.toFixed(2)} Gdes</div>
-                                <button class="btn btn-success" onclick="showPaymentMethods('${transaction.id}', ${transaction.amount})">
-                                    <i class="fas fa-credit-card"></i> Payer
-                                </button>
-                            </div>
-                        </div>
-                        <hr>
-                    `;
-                } else {
-                    totalPaid += transaction.amount;
-                }
-            });
-            
-            // Vérifier les analyses en attente de paiement
-            const analyses = await api.getAnalyses();
-            const pendingAnalyses = analyses.filter(a => 
-                a.patientId === patient.id && 
-                (a.status === 'pending-payment' || a.status === 'pending') &&
-                !transactions.some(t => 
-                    t.patientId === patient.id && 
-                    (t.service === 'Analyse' || t.service === 'Analyse Urgence') &&
-                    t.status === 'pending'
-                )
-            );
-            
-            for (const analysis of pendingAnalyses) {
-                const analysisType = analysis.emergency ? 'Analyse Urgence' : 'Analyse';
-                const analysisAmount = analysis.emergency ? servicePrices['Analyse Urgence'] : servicePrices['Analyse'];
-                
-                html += `
-                    <div class="d-flex justify-between mb-2">
-                        <div>
-                            <strong>${analysisType}</strong>
-                            <div>${new Date(analysis.date).toLocaleDateString('fr-FR')} - Analyses demandées</div>
-                            ${analysis.emergency ? '<span class="emergency-patient-tag">URGENCE</span>' : ''}
-                        </div>
-                        <div>
-                            <div class="text-right">${analysisAmount.toFixed(2)} Gdes</div>
-                            <button class="btn btn-success" onclick="createAndPayAnalysis('${patient.id}', '${analysis.consultationId}', ${analysisAmount}, ${analysis.emergency})">
-                                <i class="fas fa-credit-card"></i> Payer
-                            </button>
-                        </div>
-                    </div>
-                    <hr>
-                `;
-                hasPending = true;
-                totalPending += analysisAmount;
-            }
-            
-            // Vérifier les prescriptions en attente de paiement
-            const prescriptions = await api.getPrescriptions();
-            const pendingPrescriptions = prescriptions.filter(p => 
-                p.patientId === patient.id && 
-                (p.status === 'pending-payment' || p.status === 'pending') &&
-                !p.delivered &&
-                !transactions.some(t => 
-                    t.patientId === patient.id && 
-                    t.service.includes('Médicament') &&
-                    t.status === 'pending'
-                )
-            );
-            
-            const stock = await api.getStock();
-            
-            for (const prescription of pendingPrescriptions) {
-                // Extraire le nom du médicament de la prescription
-                const medMatch = prescription.prescription.match(/^(.*?) -/);
-                const medName = medMatch ? medMatch[1] : 'Médicament';
-                
-                // Trouver le prix dans le stock
-                const stockItem = stock.find(s => 
-                    medName.toLowerCase().includes(s.medication.toLowerCase()) ||
-                    s.medication.toLowerCase().includes(medName.toLowerCase())
-                );
-                
-                const medAmount = stockItem ? stockItem.price : 50; // Prix par défaut
-                
-                html += `
-                    <div class="d-flex justify-between mb-2">
-                        <div>
-                            <strong>Médicament: ${medName}</strong>
-                            <div>${new Date(prescription.date).toLocaleDateString('fr-FR')} - Ordonnance</div>
-                            ${prescription.emergency ? '<span class="emergency-patient-tag">URGENCE</span>' : ''}
-                        </div>
-                        <div>
-                            <div class="text-right">${medAmount.toFixed(2)} Gdes</div>
-                            <button class="btn btn-success" onclick="createAndPayMedication('${patient.id}', '${prescription.id}', '${medName}', ${medAmount}, ${prescription.emergency})">
-                                <i class="fas fa-credit-card"></i> Payer
-                            </button>
-                        </div>
-                    </div>
-                    <hr>
-                `;
-                hasPending = true;
-                totalPending += medAmount;
-            }
-            
-            html += `
-                <div class="d-flex justify-between mt-3">
-                    <div><strong>Total en attente:</strong></div>
-                    <div><strong>${totalPending.toFixed(2)} Gdes</strong></div>
-                </div>
-                <div class="d-flex justify-between">
-                    <div><strong>Total déjà payé:</strong></div>
-                    <div><strong>${totalPaid.toFixed(2)} Gdes</strong></div>
-                </div>
-                <div class="d-flex justify-between mt-2">
-                    <div><strong>Total général:</strong></div>
-                    <div><strong>${(totalPending + totalPaid).toFixed(2)} Gdes</strong></div>
-                </div>
-                
-                ${hasPending ? `
-                    <div class="text-center mt-3">
-                        <button class="btn btn-success" onclick="showPaymentMethodsForAll('${patient.id}', ${totalPending})">
-                            <i class="fas fa-check-circle"></i> Tout Payer
-                        </button>
-                    </div>
-                ` : ''}
-            `;
-            
-            html += '</div>';
-            container.innerHTML = html;
-            
-            document.getElementById('print-receipt-btn').disabled = totalPaid === 0;
-        }
-        
-        container.classList.remove('hidden');
-    } catch (error) {
-        showAlert('Erreur de chargement des transactions', 'danger');
-        console.error('Display patient transactions error:', error);
-    }
-}
-
-async function createAndPayAnalysis(patientId, consultationId, amount, isEmergency) {
-    try {
-        const transactionData = {
-            patientId: patientId,
-            service: isEmergency ? 'Analyse Urgence' : 'Analyse',
-            amount: amount,
-            doctor: currentUser,
-            emergency: isEmergency
-        };
-        
-        const result = await api.createTransaction(transactionData);
-        
-        if (result.success) {
-            showPaymentMethods(result.transactionId, amount);
-        } else {
-            showAlert('Erreur lors de la création de la transaction', 'danger');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de la création de la transaction', 'danger');
-        console.error('Create and pay analysis error:', error);
-    }
-}
-
-async function createAndPayMedication(patientId, prescriptionId, medName, amount, isEmergency) {
-    try {
-        const transactionData = {
-            patientId: patientId,
-            service: 'Médicament: ' + medName,
-            amount: amount,
-            doctor: currentUser,
-            emergency: isEmergency
-        };
-        
-        const result = await api.createTransaction(transactionData);
-        
-        if (result.success) {
-            showPaymentMethods(result.transactionId, amount);
-        } else {
-            showAlert('Erreur lors de la création de la transaction', 'danger');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de la création de la transaction', 'danger');
-        console.error('Create and pay medication error:', error);
-    }
-}
-
-function showPaymentMethods(transactionId, amount) {
-    currentPaymentTransaction = transactionId;
-    currentPaymentTotal = amount;
-    
-    // Réinitialiser le formulaire
-    document.getElementById('payment-method-select').value = '';
-    document.querySelectorAll('.payment-details').forEach(detail => {
-        detail.classList.add('hidden');
-    });
-    
-    document.getElementById('payment-methods-container').classList.remove('hidden');
-    
-    // Faire défiler vers la section de paiement
-    setTimeout(() => {
-        document.getElementById('payment-methods-container').scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-        });
-    }, 100);
-}
-
-function showPaymentMethodsForAll(patientId, total) {
-    currentPaymentTransaction = patientId;
-    currentPaymentTotal = total;
-    
-    // Réinitialiser le formulaire
-    document.getElementById('payment-method-select').value = '';
-    document.querySelectorAll('.payment-details').forEach(detail => {
-        detail.classList.add('hidden');
-    });
-    
-    document.getElementById('payment-methods-container').classList.remove('hidden');
-    
-    // Faire défiler vers la section de paiement
-    setTimeout(() => {
-        document.getElementById('payment-methods-container').scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-        });
-    }, 100);
-}
-
-async function markAsPaidWithMethod(transactionId, paymentMethod, paymentDetails = {}) {
-    try {
-        if (transactionId.startsWith('PA') || transactionId.startsWith('URG') || transactionId.startsWith('PED')) {
-            await markAllAsPaidWithMethod(transactionId, paymentMethod, paymentDetails);
-        } else {
-            const result = await api.updateTransaction(transactionId, 'paid', paymentMethod, paymentDetails);
-            
-            if (result.success) {
-                showAlert('Transaction payée avec ' + getPaymentMethodName(paymentMethod) + '!', 'success');
-                
-                const patientId = result.transaction.patientId;
-                document.getElementById('cashier-patient-id').value = patientId;
-                document.getElementById('cashier-search-btn').click();
-                
-                await updateTransactionsTable();
-                await updateCashierTotals();
-                await updateDashboard();
-                
-                // Mettre à jour le statut d'urgence si le patient est en urgence et tout est payé
-                const patient = await api.getPatientById(patientId);
-                if (patient && patient.emergency) {
-                    const transactions = await api.getTransactions();
-                    const pendingTransactions = transactions.filter(t => t.patientId === patientId && t.status === 'pending');
-                    if (pendingTransactions.length === 0) {
-                        // Fermer le dossier d'urgence
-                        const emergencyPatients = await api.getEmergencyPatients();
-                        const emergencyRecord = emergencyPatients.find(ep => ep.patientId === patientId && ep.active);
-                        if (emergencyRecord) {
-                            const updateData = {
-                                active: false,
-                                dischargeTime: new Date().toISOString(),
-                                status: 'Payé et sorti'
-                            };
-                            await api.updateEmergencyPatient(emergencyRecord.id, updateData);
-                            await updateEmergencyPatientsTable();
-                        }
-                    }
-                }
-            } else {
-                showAlert('Erreur lors du paiement', 'danger');
-            }
-        }
-    } catch (error) {
-        showAlert('Erreur lors du paiement', 'danger');
-        console.error('Mark as paid error:', error);
-    }
-}
-
-async function markAllAsPaidWithMethod(patientId, paymentMethod, paymentDetails = {}) {
-    try {
-        const transactions = await api.getTransactions();
-        const pendingTransactions = transactions.filter(t => t.patientId === patientId && t.status === 'pending');
-        
-        for (const transaction of pendingTransactions) {
-            await api.updateTransaction(transaction.id, 'paid', paymentMethod, paymentDetails);
-        }
-        
-        showAlert('Toutes les transactions payées avec ' + getPaymentMethodName(paymentMethod) + '!', 'success');
-        document.getElementById('cashier-patient-id').value = patientId;
-        document.getElementById('cashier-search-btn').click();
-        
-        await updateTransactionsTable();
-        await updateCashierTotals();
-        await updateDashboard();
-        
-        // Mettre à jour le statut d'urgence
-        const patient = await api.getPatientById(patientId);
-        if (patient && patient.emergency) {
-            const emergencyPatients = await api.getEmergencyPatients();
-            const emergencyRecord = emergencyPatients.find(ep => ep.patientId === patientId && ep.active);
-            if (emergencyRecord) {
-                const updateData = {
-                    active: false,
-                    dischargeTime: new Date().toISOString(),
-                    status: 'Payé et sorti'
-                };
-                await api.updateEmergencyPatient(emergencyRecord.id, updateData);
-                await updateEmergencyPatientsTable();
-            }
-        }
-    } catch (error) {
-        showAlert('Erreur lors du paiement', 'danger');
-        console.error('Mark all as paid error:', error);
-    }
-}
-
-function getPaymentMethodName(methodId) {
-    const method = paymentMethods.find(m => m.id === methodId);
-    return method ? method.name : 'Inconnu';
-}
-
-async function printPaymentReceipt(patient) {
-    try {
-        const transactions = await api.getTransactions();
-        const paidTransactions = transactions.filter(t => t.patientId === patient.id && t.status === 'paid');
-        
-        if (paidTransactions.length === 0) {
-            showAlert('Aucune transaction payée pour ce patient', 'warning');
-            return;
-        }
-        
-        const receiptNumber = 'REC-' + Date.now().toString().slice(-6);
-        
-        let receiptHtml = `
-            <div class="receipt">
-                <div class="receipt-header">
-                    <h3>Hôpital Saint-Luc</h3>
-                    <p>Reçu de paiement</p>
-                    <p>Date: ${new Date().toLocaleDateString('fr-FR')}</p>
-                    <p>Reçu #: ${receiptNumber}</p>
-        `;
-        
-        const paymentMethod = paidTransactions[0].paymentMethod || 'Cash';
-        receiptHtml += `<p>Moyen de paiement: ${getPaymentMethodName(paymentMethod)}</p>`;
-        
-        receiptHtml += `
-                </div>
-                <div>
-                    <p><strong>Patient:</strong> ${patient.name}</p>
-                    <p><strong>Numéro:</strong> ${patient.id}</p>
-                    ${patient.emergency ? '<p><strong>Type:</strong> Patient Urgence</p>' : ''}
-                    ${patient.pediatric ? '<p><strong>Type:</strong> Patient Pédiatrique</p>' : ''}
-                </div>
-                <h4>Services payés:</h4>
-        `;
-        
-        let totalAmount = 0;
-        
-        paidTransactions.forEach(transaction => {
-            receiptHtml += `
-                <div class="receipt-item">
-                    <span>${transaction.service}</span>
-                    <span>${transaction.amount.toFixed(2)} Gdes</span>
-                </div>
-            `;
-            totalAmount += transaction.amount;
-        });
-        
-        receiptHtml += `
-                <div class="receipt-total">
-                    <span>Total payé:</span>
-                    <span>${totalAmount.toFixed(2)} Gdes</span>
-                </div>
-                <p class="text-center" style="margin-top: 15px; font-size: 0.9rem;">
-                    Merci pour votre visite
-                </p>
+async function loadServicesForPayment(patient) {
+    const txs = await API.getTransactions({ patientId: patient.id, status: 'unpaid' });
+    state.selectedServices = [];
+    let total = 0;
+    let html = '';
+    txs.forEach(t => {
+        let amount = parseFloat(t.amount);
+        if (patient.sponsored && patient.discount_percentage > 0) amount *= (1 - patient.discount_percentage / 100);
+        total += amount;
+        state.selectedServices.push({ ...t, finalAmount: amount });
+        html += `<div class="service-item">
+            <div>
+                <input type="checkbox" class="service-checkbox" data-id="${t.id}" checked>
+                <strong>${t.service}</strong>
+                ${patient.sponsored && patient.discount_percentage > 0 ?
+                    `<br><small>Réduction ${patient.discount_percentage}%: ${t.amount} → ${amount.toFixed(2)} Gdes</small>` : ''}
             </div>
-        `;
-        
-        printContentDirectly(receiptHtml, 'Reçu de Paiement');
-    } catch (error) {
-        showAlert('Erreur lors de l\'impression', 'danger');
-        console.error('Print payment receipt error:', error);
-    }
+            <div>${amount.toFixed(2)} Gdes</div>
+        </div>`;
+    });
+    document.getElementById('services-to-pay-list').innerHTML = html || '<p>Aucun service à payer.</p>';
+    document.getElementById('total-to-pay').textContent = total.toFixed(2);
+
+    document.querySelectorAll('.service-checkbox').forEach(cb => {
+        cb.addEventListener('change', function () {
+            const id = this.dataset.id;
+            if (this.checked) {
+                const t = txs.find(x => x.id === id);
+                if (t) { let a = parseFloat(t.amount); if (patient.sponsored) a *= (1 - patient.discount_percentage/100); state.selectedServices.push({...t,finalAmount:a}); }
+            } else {
+                state.selectedServices = state.selectedServices.filter(x => x.id !== id);
+            }
+            document.getElementById('total-to-pay').textContent = state.selectedServices.reduce((s,x)=>s+x.finalAmount,0).toFixed(2);
+        });
+    });
 }
 
-async function updateTransactionsTable() {
+function generateInvoice(total, given, method) {
+    const p = state.currentCashierPatient;
+    const s = state.hospitalSettings;
+    document.getElementById('invoice-hospital-name').textContent    = s.name    || 'Hôpital';
+    document.getElementById('invoice-hospital-address').textContent = s.address || '';
+    document.getElementById('invoice-hospital-phone').textContent   = s.phone   || '';
+    document.getElementById('invoice-patient-name').textContent     = p.full_name;
+    document.getElementById('invoice-patient-id').textContent       = p.id;
+    const now = new Date();
+    document.getElementById('invoice-date').textContent  = now.toLocaleDateString('fr-FR');
+    document.getElementById('invoice-time').textContent  = now.toLocaleTimeString('fr-FR');
+    document.getElementById('invoice-total-amount').textContent   = total.toFixed(2);
+    document.getElementById('invoice-amount-given').textContent   = given.toFixed(2) + ' Gdes';
+    document.getElementById('invoice-change').textContent         = (given-total).toFixed(2) + ' Gdes';
+    document.getElementById('invoice-payment-method').textContent = method;
+    document.getElementById('invoice-number').textContent         = 'INV-' + Date.now();
+    document.getElementById('invoice-services-list').innerHTML    = state.selectedServices.map(s =>
+        `<div class="receipt-item"><span>${s.service}</span><span>${s.finalAmount.toFixed(2)} Gdes</span></div>`
+    ).join('');
+    document.getElementById('invoice-container').classList.remove('hidden');
+}
+
+// ─── INFIRMIER ───────────────────────────────────────────────
+function updateVitalsInputs() {
+    const container = document.getElementById('vitals-inputs-container');
+    container.innerHTML = state.vitalTypes.filter(v => v.active).map(v => `
+        <div class="vital-item">
+            <label class="form-label">${v.name} (${v.unit})</label>
+            <input type="text" class="form-control vital-input" data-id="${v.id}" placeholder="Valeur">
+            <small class="text-muted">Norm: ${v.min} – ${v.max} ${v.unit}</small>
+        </div>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-nurse-patient').addEventListener('click', async () => {
+        const search = document.getElementById('nurse-patient-search').value.trim();
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            document.getElementById('nurse-patient-name').textContent = p.full_name;
+            document.getElementById('nurse-patient-id').textContent   = p.id;
+            const txs = await API.getTransactions({ patientId: p.id, status: 'unpaid' });
+            const unpaid = txs.length > 0;
+            document.getElementById('nurse-payment-status').textContent = unpaid ? 'Non payé' : 'Payé';
+            document.getElementById('nurse-payment-status').className   = `patient-status-badge ${unpaid?'status-unpaid':'status-paid'}`;
+            document.getElementById('nurse-patient-details').classList.remove('hidden');
+            loadVitalsHistory(p.id);
+        } catch(e) {}
+    });
+
+    document.getElementById('vitals-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const patientId = document.getElementById('nurse-patient-id').textContent;
+        const values = {};
+        document.querySelectorAll('.vital-input').forEach(input => {
+            const vital = state.vitalTypes.find(v => v.id == input.dataset.id);
+            if (vital && input.value.trim()) {
+                values[vital.name] = { value: input.value, unit: vital.unit, normalRange: `${vital.min} – ${vital.max}` };
+            }
+        });
+        try {
+            await apiCall(() => API.addVitals({ patientId, values }));
+            toast('Signes vitaux enregistrés!');
+            loadVitalsHistory(patientId);
+            e.target.reset();
+        } catch(e) {}
+    });
+});
+
+async function loadVitalsHistory(patientId) {
+    const vitals = await API.getVitals(patientId);
+    const container = document.getElementById('vitals-history');
+    if (!vitals.length) { container.innerHTML = '<p>Aucun signe vital.</p>'; return; }
+    const activeVitals = state.vitalTypes.filter(v => v.active);
+    container.innerHTML = `<div class="table-container"><table><thead><tr><th>Date/Heure</th>${activeVitals.map(v=>`<th>${v.name}</th>`).join('')}<th>Par</th></tr></thead><tbody>
+        ${vitals.map(r => `<tr><td>${r.date} ${r.time}</td>${activeVitals.map(v=>{const val=r.values[v.name];return`<td>${val?val.value+' '+val.unit:'-'}</td>`;}).join('')}<td>${r.taken_by}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ─── MÉDECIN ─────────────────────────────────────────────────
+function updateDoctorConsultationTypes() {
+    const sel = document.getElementById('doctor-consultation-type');
+    sel.innerHTML = '<option value="">Sélectionner...</option>';
+    state.consultationTypes.filter(ct => ct.active).forEach(ct => {
+        sel.innerHTML += `<option value="${ct.id}">${ct.name} — ${ct.price} Gdes</option>`;
+    });
+}
+
+function updateLabAnalysesSelect() {
+    const container = document.getElementById('lab-analyses-selection');
+    container.innerHTML = state.labAnalysisTypes.filter(a => a.active).map(a => `
+        <label style="display:block;margin-bottom:5px;">
+            <input type="checkbox" value="${a.id}" data-price="${a.price}">
+            ${a.name} (${a.price} Gdes)
+        </label>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-doctor-patient').addEventListener('click', async () => {
+        const search = document.getElementById('doctor-patient-search').value.trim();
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            state.currentDoctorPatient = p;
+            const birth = new Date(p.birth_date);
+            const age   = Math.floor((new Date() - birth) / (365.25*24*60*60*1000));
+            document.getElementById('doctor-patient-name').textContent  = p.full_name;
+            document.getElementById('doctor-patient-id').textContent    = p.id;
+            document.getElementById('doctor-patient-age').textContent   = age;
+            document.getElementById('doctor-patient-phone').textContent = p.phone;
+            document.getElementById('doctor-patient-type').textContent  = p.type;
+            const txs = await API.getTransactions({ patientId: p.id });
+            const unpaid = txs.filter(t => t.status==='unpaid').length;
+            const paid   = txs.filter(t => t.status==='paid').length;
+            let statusText = unpaid===0&&paid>0?'Tout payé':paid>0&&unpaid>0?'Partiel':'Non payé';
+            let statusClass= unpaid===0&&paid>0?'status-paid':paid>0&&unpaid>0?'status-partial':'status-unpaid';
+            document.getElementById('doctor-payment-status').textContent = statusText;
+            document.getElementById('doctor-payment-status').className   = `patient-status-badge ${statusClass}`;
+            // Consultation existante
+            const consult = txs.find(t => t.type==='consultation');
+            document.getElementById('current-consultation-info').innerHTML = consult ?
+                `<p><strong>Type:</strong> ${consult.service}</p><p><strong>Montant:</strong> ${consult.amount} Gdes</p><p><strong>Statut:</strong> <span class="${consult.status==='paid'?'status-paid':'status-unpaid'}">${consult.status==='paid'?'Payé':'Non payé'}</span></p>` :
+                '<p>Aucune consultation enregistrée.</p>';
+            document.getElementById('consultation-modification-section').classList.toggle('hidden', !consult || consult.status==='paid');
+            // Vitaux récents
+            const vitals = await API.getVitals(p.id);
+            const latest = vitals[0];
+            const vitalDisplay = document.getElementById('current-vitals-display');
+            if (latest) {
+                vitalDisplay.innerHTML = Object.entries(latest.values).map(([name, v]) =>
+                    `<p><strong>${name}:</strong> ${v.value} ${v.unit} <small>(Norm: ${v.normalRange})</small></p>`).join('');
+                vitalDisplay.dataset.vitalId = latest.id;
+            } else {
+                vitalDisplay.innerHTML = '<p>Aucun signe vital enregistré.</p>';
+            }
+            document.getElementById('doctor-patient-details').classList.remove('hidden');
+        } catch(e) {}
+    });
+
+    document.getElementById('edit-vitals-btn').addEventListener('click', () => {
+        const mod = document.getElementById('doctor-vitals-modification');
+        mod.classList.remove('hidden');
+        const container = document.getElementById('vitals-modification-inputs');
+        container.innerHTML = state.vitalTypes.filter(v=>v.active).map(v=>`
+            <div class="vital-item">
+                <label class="form-label">${v.name} (${v.unit})</label>
+                <input type="text" class="form-control vital-mod-input" data-id="${v.id}" placeholder="Valeur">
+            </div>`).join('');
+    });
+
+    document.getElementById('cancel-vitals-modification').addEventListener('click', () => {
+        document.getElementById('doctor-vitals-modification').classList.add('hidden');
+    });
+
+    document.getElementById('vitals-modification-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const patientId = document.getElementById('doctor-patient-id').textContent;
+        const vitalId   = document.getElementById('current-vitals-display').dataset.vitalId;
+        const values = {};
+        document.querySelectorAll('.vital-mod-input').forEach(input => {
+            const vital = state.vitalTypes.find(v => v.id == input.dataset.id);
+            if (vital && input.value.trim()) {
+                values[vital.name] = { value: input.value, unit: vital.unit, normalRange: `${vital.min} – ${vital.max}` };
+            }
+        });
+        try {
+            if (vitalId) { await apiCall(() => API.updateVitals(vitalId, { values })); }
+            else         { await apiCall(() => API.addVitals({ patientId, values })); }
+            toast('Signes vitaux modifiés!');
+            document.getElementById('doctor-vitals-modification').classList.add('hidden');
+            document.getElementById('search-doctor-patient').click();
+        } catch(e) {}
+    });
+
+    document.getElementById('update-consultation-type').addEventListener('click', async () => {
+        const typeId = parseInt(document.getElementById('doctor-consultation-type').value);
+        if (!typeId) { toast('Sélectionner un type', 'error'); return; }
+        const p = state.currentDoctorPatient;
+        const txs = await API.getTransactions({ patientId: p.id, type: 'consultation' });
+        if (!txs.length) { toast('Aucune consultation trouvée', 'error'); return; }
+        try {
+            await apiCall(() => API.updateConsultationType(txs[0].id, typeId));
+            toast('Type de consultation modifié. Le patient doit retourner à la caisse si le prix est plus élevé.');
+            document.getElementById('search-doctor-patient').click();
+        } catch(e) {}
+    });
+
+    // Analyses
+    document.getElementById('modify-analyses-btn').addEventListener('click', () => {
+        document.getElementById('lab-modification-panel').classList.toggle('hidden');
+    });
+    document.getElementById('save-modified-analysis').addEventListener('click', () => {
+        const name  = document.getElementById('modified-analysis-name').value;
+        const price = parseFloat(document.getElementById('modified-analysis-price').value);
+        if (!name || isNaN(price)) { toast('Remplir tous les champs', 'error'); return; }
+        state.currentModifiedAnalysis = { ...state.currentModifiedAnalysis, modifiedName: name, modifiedPrice: price };
+        document.getElementById('lab-modification-panel').classList.add('hidden');
+        toast('Analyse modifiée pour ce patient uniquement');
+    });
+    document.getElementById('cancel-analysis-modification').addEventListener('click', () => {
+        document.getElementById('lab-modification-panel').classList.add('hidden');
+        state.currentModifiedAnalysis = null;
+    });
+
+    // Médicament search
+    document.getElementById('medication-search').addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        const sug = document.getElementById('medication-suggestions');
+        if (q.length < 2) { sug.classList.add('hidden'); return; }
+        const matches = state.medications.filter(m => m.name.toLowerCase().includes(q) || (m.generic_name||'').toLowerCase().includes(q)).slice(0,5);
+        if (matches.length) {
+            sug.innerHTML = matches.map(m => `<div class="suggestion-item" style="padding:5px 10px;cursor:pointer;" onclick="addMedToPrescription('${m.id}')">${m.name} (${m.form}) — Stock: ${m.quantity}</div>`).join('');
+            sug.classList.remove('hidden');
+        } else { sug.classList.add('hidden'); }
+    });
+
+    // Formulaire consultation
+    document.getElementById('consultation-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!state.currentDoctorPatient) { toast('Sélectionner un patient', 'error'); return; }
+        const p        = state.currentDoctorPatient;
+        const diagnosis    = document.getElementById('consultation-diagnosis').value;
+        const followupDate = document.getElementById('followup-date').value;
+        const followupTime = document.getElementById('followup-time').value;
+
+        try {
+            // Enregistrer consultation
+            await apiCall(() => API.addConsultation({ patientId: p.id, patientName: p.full_name, diagnosis, followupDate, followupTime }));
+
+            // Enregistrer analyses demandées
+            const checkedAnalyses = document.querySelectorAll('#lab-analyses-selection input:checked');
+            for (const cb of checkedAnalyses) {
+                const aId = parseInt(cb.value);
+                const aType = state.labAnalysisTypes.find(a => a.id === aId);
+                if (!aType) continue;
+                let name  = state.currentModifiedAnalysis?.id === aId && state.currentModifiedAnalysis.modifiedName ? state.currentModifiedAnalysis.modifiedName : aType.name;
+                let price = state.currentModifiedAnalysis?.id === aId && state.currentModifiedAnalysis.modifiedPrice ? state.currentModifiedAnalysis.modifiedPrice : aType.price;
+                await API.addTransaction({ patientId: p.id, patientName: p.full_name, service: `Analyse: ${name}`, amount: price, type: 'lab', analysisId: aId });
+            }
+
+            // Enregistrer médicaments prescrits
+            const medRows = document.querySelectorAll('#prescription-medications-list tr');
+            for (const row of medRows) {
+                const medId  = row.querySelector('.quantity-input').dataset.medId;
+                const qty    = parseInt(row.querySelector('.quantity-input').value);
+                const dosage = row.querySelectorAll('input')[1].value;
+                const med    = state.medications.find(m => m.id === medId);
+                if (!med) continue;
+                if (qty > med.quantity) { toast(`Stock insuffisant pour ${med.name}`, 'error'); continue; }
+                await API.addTransaction({ patientId: p.id, patientName: p.full_name, service: `Médicament: ${med.name}`, amount: med.price * qty, type: 'medication', medicationId: med.id, dosage, quantity: qty });
+            }
+
+            toast('Consultation enregistrée!');
+            state.currentModifiedAnalysis = null;
+            e.target.reset();
+            document.getElementById('prescription-medications-list').innerHTML = '';
+            // Notifier
+            await API.sendMessage({ recipient: 'cashier', recipientRole: 'cashier', subject: 'Consultation enregistrée', content: `Consultation enregistrée pour ${p.full_name} (${p.id})`, type: 'notification' }).catch(()=>{});
+        } catch(e) {}
+    });
+});
+
+function addMedToPrescription(medId) {
+    const med = state.medications.find(m => m.id === medId);
+    if (!med) return;
+    const tbody = document.getElementById('prescription-medications-list');
+    const row   = document.createElement('tr');
+    row.innerHTML = `
+        <td>${med.name}</td>
+        <td><input type="text" class="form-control" value="1 comprimé 3x/jour"></td>
+        <td><input type="number" class="form-control quantity-input" data-med-id="${med.id}" value="10" min="1" max="${med.quantity}"></td>
+        <td>${med.quantity}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Supprimer</button></td>`;
+    tbody.appendChild(row);
+    document.getElementById('medication-suggestions').classList.add('hidden');
+    document.getElementById('medication-search').value = '';
+}
+
+async function loadDoctorAppointments() {
     try {
-        const transactions = await api.getTransactions();
-        const tableBody = document.getElementById('transactions-table-body');
-        tableBody.innerHTML = '';
-        
-        const recentTransactions = transactions.slice(-10).reverse();
-        
-        for (const transaction of recentTransactions) {
-            const patient = await api.getPatientById(transaction.patientId);
-            const paymentMethod = transaction.paymentMethod ? getPaymentMethodName(transaction.paymentMethod) : 'Non spécifié';
-            const emergencyTag = transaction.emergency ? '<span class="emergency-patient-tag">URGENCE</span>' : '';
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${transaction.patientId} ${emergencyTag}</td>
-                <td>${patient ? patient.name : 'N/A'}</td>
-                <td>${transaction.service}</td>
-                <td>${transaction.amount.toFixed(2)} Gdes</td>
-                <td>${new Date(transaction.date).toLocaleDateString('fr-FR')}</td>
-                <td>${paymentMethod}</td>
-                <td><span class="${transaction.status === 'paid' ? 'text-success' : 'text-danger'}">${transaction.status === 'paid' ? 'Payé' : 'En attente'}</span></td>
-            `;
-            tableBody.appendChild(row);
+        const today = new Date().toISOString().split('T')[0];
+        const apps = await API.getAppointments({ doctor: state.currentUser.username, fromDate: today });
+        const container = document.getElementById('doctor-appointments-list');
+        container.innerHTML = apps.map(a => `
+            <div class="appointment-item">
+                <strong>${a.patient_name}</strong> — ${a.date} à ${a.time}<br>
+                <small>Motif: ${a.reason||'-'}</small>
+                <span class="appointment-status status-${a.status==='scheduled'?'pending':a.status} ml-2">${a.status}</span>
+                <div class="appointment-actions">
+                    <button class="btn btn-sm btn-success" onclick="updateApptStatus('${a.id}','completed')">Terminé</button>
+                </div>
+            </div>`).join('') || '<p>Aucun rendez-vous.</p>';
+    } catch(e) {}
+}
+
+// ─── LABORATOIRE ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-lab-patient').addEventListener('click', async () => {
+        const search = document.getElementById('lab-patient-search').value.trim();
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            document.getElementById('lab-patient-name').textContent = p.full_name;
+            document.getElementById('lab-patient-id').textContent   = p.id;
+            const txs = await API.getTransactions({ patientId: p.id, type: 'lab' });
+            const unpaid = txs.filter(t => t.status==='unpaid').length;
+            const paid   = txs.filter(t => t.status==='paid').length;
+            let statusText = unpaid===0&&paid>0?'Tout payé':paid>0&&unpaid>0?'Partiellement payé':unpaid>0?'Non payé':'Aucune analyse';
+            let statusClass= unpaid===0&&paid>0?'status-paid':paid>0&&unpaid>0?'status-partial':unpaid>0?'status-unpaid':'';
+            document.getElementById('lab-payment-status').textContent = statusText;
+            document.getElementById('lab-payment-status').className   = `patient-status-badge ${statusClass}`;
+            const labList = document.getElementById('lab-analyses-list');
+            labList.innerHTML = txs.map(t => `
+                <div class="card mb-2">
+                    <div class="d-flex justify-between">
+                        <div>
+                            <h5>${t.service}</h5>
+                            <p>Statut paiement: <span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></p>
+                            <p>Analyse: <span class="${t.lab_status==='completed'?'status-paid':'status-unpaid'}">${t.lab_status||'En attente'}</span></p>
+                        </div>
+                        <div>
+                            ${t.status==='paid'&&t.lab_status!=='completed'?`<button class="btn btn-success" onclick="enterLabResult('${t.id}')">Saisir résultat</button>`:''}
+                            ${t.result?`<button class="btn btn-info" onclick="viewLabResult('${t.id}')">Voir résultat</button>`:''}
+                        </div>
+                    </div>
+                    ${t.result?`<div class="mt-2"><strong>Résultat:</strong><br><pre>${t.result.startsWith('data:')?`<img src="${t.result}" style="max-width:200px;">`:t.result}</pre></div>`:''}
+                </div>`).join('') || '<p>Aucune analyse.</p>';
+            document.getElementById('lab-patient-details').classList.remove('hidden');
+            updatePendingAnalysesList();
+        } catch(e) {}
+    });
+});
+
+async function updatePendingAnalysesList() {
+    try {
+        const txs = await API.getTransactions({ type: 'lab' });
+        const pending = txs.filter(t => t.status==='paid' && t.lab_status!=='completed');
+        const container = document.getElementById('pending-analyses-list');
+        container.innerHTML = pending.length ?
+            `<div class="table-container"><table><thead><tr><th>Patient</th><th>Analyse</th><th>Date</th><th>Action</th></tr></thead><tbody>
+                ${pending.map(t=>`<tr><td>${t.patient_name}</td><td>${t.service}</td><td>${t.date}</td>
+                <td><button class="btn btn-sm btn-success" onclick="enterLabResult('${t.id}')">Saisir</button></td></tr>`).join('')}
+            </tbody></table></div>` : '<p>Aucune analyse en attente.</p>';
+    } catch(e) {}
+}
+
+function enterLabResult(txId) {
+    const modal = document.createElement('div');
+    modal.id = 'lab-result-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML = `<div class="transaction-details-content">
+        <h4>Saisir résultat</h4>
+        <textarea id="lab-result-text" class="form-control" rows="5" placeholder="Résultat..."></textarea>
+        <div style="margin-top:10px;">
+            <label>Ou image: <input type="file" id="lab-result-image" accept="image/*"></label>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-success" onclick="saveLabResultFn('${txId}')">Enregistrer</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('lab-result-modal').remove()">Annuler</button>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+}
+
+async function saveLabResultFn(txId) {
+    const fileInput = document.getElementById('lab-result-image');
+    const textVal   = document.getElementById('lab-result-text').value;
+    try {
+        if (fileInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                await apiCall(() => API.saveLabResult(txId, e.target.result));
+                toast('Résultat image enregistré!');
+                document.getElementById('lab-result-modal').remove();
+                updatePendingAnalysesList();
+                // Notifier médecin
+                await API.sendMessage({ recipient: 'doctor', recipientRole: 'doctor', subject: 'Résultat disponible', content: `Résultat analyse disponible (${txId})`, type: 'lab_result' }).catch(()=>{});
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        } else {
+            if (!textVal.trim()) { toast('Entrer un résultat', 'error'); return; }
+            await apiCall(() => API.saveLabResult(txId, textVal));
+            toast('Résultat enregistré!');
+            document.getElementById('lab-result-modal').remove();
+            updatePendingAnalysesList();
+            await API.sendMessage({ recipient: 'doctor', recipientRole: 'doctor', subject: 'Résultat disponible', content: `Résultat analyse disponible (${txId})`, type: 'lab_result' }).catch(()=>{});
         }
-    } catch (error) {
-        console.error('Error loading transactions:', error);
-        showAlert('Erreur de chargement des transactions', 'danger');
+    } catch(e) {}
+}
+
+function viewLabResult(txId) {
+    // Affichage dans un modal — on relit depuis l'API
+    API.getTransactions({}).then(txs => {
+        const t = txs.find(x => x.id === txId);
+        if (!t || !t.result) return;
+        const modal = document.createElement('div');
+        modal.className = 'transaction-details-modal';
+        modal.innerHTML = `<div class="transaction-details-content">
+            <h4>${t.service}</h4>
+            ${t.result.startsWith('data:')?`<img src="${t.result}" style="max-width:100%;">`:`<pre>${t.result}</pre>`}
+            <button class="btn btn-secondary mt-3" onclick="this.closest('.transaction-details-modal').remove()">Fermer</button>
+        </div>`;
+        document.body.appendChild(modal);
+    });
+}
+
+// ─── PHARMACIE ───────────────────────────────────────────────
+async function updateMedicationStockDisplay() {
+    const meds = await API.getMedications().catch(()=>[]);
+    state.medications = meds;
+    const container = document.getElementById('medication-stock-list');
+    container.innerHTML = `<table><thead><tr><th>Médicament</th><th>Forme</th><th>Unité</th><th>Stock</th><th>Alerte</th><th>Prix</th><th>Statut</th></tr></thead><tbody>
+        ${meds.map(m=>`<tr class="${m.quantity===0?'out-of-stock':m.quantity<=m.alert_threshold?'low-stock':''}">
+            <td>${m.name}</td><td>${m.form||'-'}</td><td>${m.unit||'-'}</td>
+            <td>${m.quantity}</td><td>${m.alert_threshold}</td><td>${m.price} Gdes</td>
+            <td>${m.quantity===0?'<span class="status-unpaid">Rupture</span>':m.quantity<=m.alert_threshold?'<span class="status-partial">Stock faible</span>':'<span class="status-paid">OK</span>'}</td>
+        </tr>`).join('')}
+    </tbody></table>`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-pharmacy-patient').addEventListener('click', async () => {
+        const search = document.getElementById('pharmacy-patient-search').value.trim();
+        try {
+            const patients = await apiCall(() => API.getPatients({ search }));
+            if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+            const p = patients[0];
+            document.getElementById('pharmacy-patient-name').textContent = p.full_name;
+            document.getElementById('pharmacy-patient-id').textContent   = p.id;
+            const txs = await API.getTransactions({ patientId: p.id, type: 'medication' });
+            const unpaid = txs.filter(t => t.status==='unpaid').length;
+            const paid   = txs.filter(t => t.status==='paid').length;
+            let st = unpaid===0&&paid>0?'Tout payé':paid>0&&unpaid>0?'Partiellement payé':unpaid>0?'Non payé':'Aucun médicament';
+            let sc = unpaid===0&&paid>0?'status-paid':paid>0&&unpaid>0?'status-partial':unpaid>0?'status-unpaid':'';
+            document.getElementById('pharmacy-payment-status').textContent = st;
+            document.getElementById('pharmacy-payment-status').className   = `patient-status-badge ${sc}`;
+            document.getElementById('pharmacy-prescriptions-list').innerHTML = txs.map(t => `
+                <div class="card mb-2">
+                    <div class="d-flex justify-between">
+                        <div>
+                            <h5>${t.service}</h5>
+                            <p>Posologie: ${t.dosage||'-'}</p>
+                            <p>Paiement: <span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></p>
+                            <p>Livraison: <span class="${t.delivery_status==='delivered'?'status-paid':'status-unpaid'}">${t.delivery_status||'En attente'}</span></p>
+                        </div>
+                        <div>
+                            ${t.status==='paid'&&t.delivery_status!=='delivered'?`<button class="btn btn-success" onclick="deliverMed('${t.id}')">Délivrer</button>`:''}
+                            ${t.delivery_status==='delivered'?'<span class="text-success"><i class="fas fa-check"></i> Délivré</span>':''}
+                        </div>
+                    </div>
+                </div>`).join('') || '<p>Aucun médicament prescrit.</p>';
+            const hasDeliverable = txs.some(t => t.status==='paid' && t.delivery_status!=='delivered');
+            document.getElementById('deliver-medications').disabled = !hasDeliverable;
+            document.getElementById('pharmacy-patient-details').classList.remove('hidden');
+        } catch(e) {}
+    });
+
+    document.getElementById('deliver-medications').addEventListener('click', async () => {
+        const patientId = document.getElementById('pharmacy-patient-id').textContent;
+        const txs = await API.getTransactions({ patientId, type: 'medication' });
+        const deliverable = txs.filter(t => t.status==='paid' && t.delivery_status!=='delivered');
+        for (const t of deliverable) {
+            try { await apiCall(() => API.deliverMedication(t.id)); } catch(e) { break; }
+        }
+        toast('Médicaments délivrés!');
+        document.getElementById('search-pharmacy-patient').click();
+        await updateMedicationStockDisplay();
+        state.medications = await API.getMedications().catch(()=>[]);
+    });
+
+    document.getElementById('add-new-medication').addEventListener('click', () => {
+        document.getElementById('new-medication-form').style.display = 'block';
+    });
+    document.getElementById('cancel-new-medication').addEventListener('click', () => {
+        document.getElementById('new-medication-form').style.display = 'none';
+    });
+    document.getElementById('save-new-medication').addEventListener('click', async () => {
+        const name    = document.getElementById('new-med-name').value.trim();
+        const generic = document.getElementById('new-med-generic').value.trim();
+        const form    = document.getElementById('new-med-form').value;
+        const unit    = document.getElementById('new-med-unit').value.trim();
+        const qty     = parseInt(document.getElementById('new-med-quantity').value);
+        const alert   = parseInt(document.getElementById('new-med-alert').value);
+        const price   = parseFloat(document.getElementById('new-med-price').value);
+        if (!name || !form || !unit || isNaN(qty) || isNaN(alert) || isNaN(price)) { toast('Remplir tous les champs', 'error'); return; }
+        try {
+            const med = await apiCall(() => API.addMedication({ name, genericName: generic, form, unit, quantity: qty, alertThreshold: alert, price }));
+            state.medications.push(med);
+            toast('Médicament ajouté!');
+            document.getElementById('new-medication-form').style.display = 'none';
+            updateMedicationStockDisplay();
+        } catch(e) {}
+    });
+});
+
+async function deliverMed(txId) {
+    try {
+        await apiCall(() => API.deliverMedication(txId));
+        toast('Médicament délivré!');
+        document.getElementById('search-pharmacy-patient').click();
+        state.medications = await API.getMedications().catch(()=>[]);
+    } catch(e) {}
+}
+
+// ─── MESSAGERIE ──────────────────────────────────────────────
+let currentConversationPartner = null;
+
+async function checkUnreadMessages() {
+    try {
+        const data = await API.getUnreadCount();
+        const badge = document.getElementById('message-badge');
+        if (data.count > 0) { badge.textContent = data.count; badge.classList.remove('hidden'); }
+        else { badge.classList.add('hidden'); }
+    } catch(e) {}
+}
+
+async function loadConversations() {
+    const messages = await API.getMessages().catch(()=>[]);
+    // Regrouper par expéditeur
+    const convMap = {};
+    messages.forEach(m => {
+        const partner = m.sender === state.currentUser.username ? m.recipient : m.sender;
+        if (!convMap[partner]) convMap[partner] = { messages: [], unread: 0 };
+        convMap[partner].messages.push(m);
+        if (!m.read && m.recipient === state.currentUser.username) convMap[partner].unread++;
+    });
+    const list = document.getElementById('conversation-list');
+    list.innerHTML = Object.entries(convMap).map(([partner, data]) => `
+        <div class="conversation-item d-flex ${partner===currentConversationPartner?'active':''}" onclick="openConversation('${partner}')">
+            <div class="conversation-avatar">${partner[0].toUpperCase()}</div>
+            <div class="conversation-info">
+                <strong>${partner}</strong>
+                ${data.unread>0?`<span class="notification-badge" style="position:static;display:inline-flex;">${data.unread}</span>`:''}
+                <p class="conversation-last-message">${data.messages[data.messages.length-1]?.subject||''}</p>
+            </div>
+        </div>`).join('') || '<p>Aucune conversation.</p>';
+}
+
+async function openConversation(partner) {
+    currentConversationPartner = partner;
+    document.getElementById('compose-panel').classList.add('hidden');
+    document.getElementById('chat-panel').style.display = 'block';
+    const messages = await API.getMessages().catch(()=>[]);
+    const conv = messages.filter(m => m.sender === partner || m.recipient === partner);
+    // Marquer comme lus
+    for (const m of conv.filter(m => !m.read && m.recipient === state.currentUser.username)) {
+        await API.markRead(m.id).catch(()=>{});
     }
+    checkUnreadMessages();
+    const chatEl = document.getElementById('chat-messages');
+    chatEl.innerHTML = conv.map(m => {
+        const sent = m.sender === state.currentUser.username;
+        return `<div class="message-bubble ${sent?'sent':'received'}">
+            <div class="message-bubble-content">
+                ${m.subject?`<strong>${m.subject}</strong><br>`:''}${m.content}
+            </div>
+            <div class="message-bubble-time">${new Date(m.created_at).toLocaleString('fr-FR')}</div>
+        </div>`;
+    }).join('');
+    chatEl.scrollTop = chatEl.scrollHeight;
+    loadConversations();
 }
 
-function setupAdministration() {
-    // Les statistiques seront chargées lorsque la section administration sera active
-}
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('compose-message').addEventListener('click', async () => {
+        document.getElementById('compose-panel').classList.remove('hidden');
+        document.getElementById('chat-panel').style.display = 'none';
+        const users = await API.getUsers().catch(()=>[]);
+        const sel = document.getElementById('message-recipient');
+        sel.innerHTML = '<option value="">Destinataire...</option>';
+        users.filter(u => u.username !== state.currentUser.username && u.active).forEach(u => {
+            sel.innerHTML += `<option value="${u.username}" data-role="${u.role}">${u.name} (${u.role})</option>`;
+        });
+    });
 
+    document.getElementById('cancel-compose').addEventListener('click', () => {
+        document.getElementById('compose-panel').classList.add('hidden');
+    });
+
+    document.getElementById('send-message').addEventListener('click', async () => {
+        const sel     = document.getElementById('message-recipient');
+        const recip   = sel.value;
+        const role    = sel.options[sel.selectedIndex]?.dataset.role;
+        const subject = document.getElementById('message-subject').value;
+        const content = document.getElementById('message-content').value;
+        if (!recip || !content) { toast('Remplir tous les champs', 'error'); return; }
+        try {
+            await apiCall(() => API.sendMessage({ recipient: recip, recipientRole: role, subject, content, type: 'message' }));
+            toast('Message envoyé!');
+            document.getElementById('compose-panel').classList.add('hidden');
+            document.getElementById('message-subject').value = '';
+            document.getElementById('message-content').value = '';
+            loadConversations();
+        } catch(e) {}
+    });
+
+    document.getElementById('send-chat').addEventListener('click', async () => {
+        const content = document.getElementById('chat-input').value.trim();
+        if (!content || !currentConversationPartner) return;
+        try {
+            await apiCall(() => API.sendMessage({ recipient: currentConversationPartner, recipientRole: '', subject: '', content, type: 'message' }));
+            document.getElementById('chat-input').value = '';
+            openConversation(currentConversationPartner);
+        } catch(e) {}
+    });
+
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('send-chat').click();
+    });
+});
+
+// ─── ADMINISTRATION ──────────────────────────────────────────
 async function updateAdminStats() {
     try {
-        const stats = await api.getAdminStats();
-        
-        if (stats) {
-            document.getElementById('total-revenue').textContent = stats.totalRevenue.toFixed(2) + ' Gdes';
-            document.getElementById('total-patients').textContent = stats.totalPatients;
-            document.getElementById('total-appointments').textContent = stats.totalAppointments;
-            document.getElementById('total-analyses').textContent = stats.totalAnalyses;
-            
-            // Mettre à jour les autres tableaux si nécessaire
-        }
-    } catch (error) {
-        console.error('Error loading admin stats:', error);
-        showAlert('Erreur de chargement des statistiques', 'danger');
-    }
+        const stats = await apiCall(() => API.getStats());
+        document.getElementById('admin-total-revenue').textContent = stats.totalRevenue.toLocaleString('fr-FR') + ' Gdes';
+        const total = stats.totalPatients;
+        const paid  = stats.recentTransactions.filter(t=>t.status==='paid').length;
+        const unpaid= stats.recentTransactions.filter(t=>t.status==='unpaid').length;
+        const sum   = paid + unpaid || 1;
+        const pPct  = Math.round(paid/sum*100);
+        const uPct  = Math.round(unpaid/sum*100);
+        document.getElementById('paid-percentage').textContent   = pPct + '%';
+        document.getElementById('unpaid-percentage').textContent = uPct + '%';
+        document.getElementById('paid-chart-bar').style.width   = pPct + '%';
+        document.getElementById('unpaid-chart-bar').style.width = uPct + '%';
+
+        // Répartition par type (depuis les transactions récentes)
+        const txs = stats.recentTransactions;
+        const cCount = txs.filter(t=>t.type==='consultation').length;
+        const lCount = txs.filter(t=>t.type==='lab').length;
+        const mCount = txs.filter(t=>t.type==='medication').length;
+        const eCount = txs.filter(t=>t.type==='external').length;
+        const tCount = cCount+lCount+mCount+eCount||1;
+        document.getElementById('total-services-count').textContent    = tCount;
+        document.getElementById('consultations-percentage').textContent = Math.round(cCount/tCount*100)+'%';
+        document.getElementById('analyses-percentage').textContent      = Math.round(lCount/tCount*100)+'%';
+        document.getElementById('medications-percentage').textContent   = Math.round(mCount/tCount*100)+'%';
+        document.getElementById('external-percentage').textContent      = Math.round(eCount/tCount*100)+'%';
+        // Pie chart CSS (données réelles)
+        const c1 = Math.round(cCount/tCount*100), c2 = c1+Math.round(lCount/tCount*100),
+              c3 = c2+Math.round(mCount/tCount*100);
+        document.getElementById('pie-chart-visual').style.background =
+            `conic-gradient(#1a6bca 0% ${c1}%, #28a745 ${c1}% ${c2}%, #ffc107 ${c2}% ${c3}%, #17a2b8 ${c3}% 100%)`;
+
+        updateRecentTransactionsTable(stats.recentTransactions);
+    } catch(e) {}
 }
 
-async function updateEmployeeTodayTotal() {
-    if (currentRole === 'admin') return;
-    
+function updateRecentTransactionsTable(txs) {
+    document.getElementById('recent-transactions-list').innerHTML = txs.map(t => `
+        <tr>
+            <td>${t.date} ${t.time||''}</td>
+            <td>${t.patient_name}<br><small>${t.patient_id}</small></td>
+            <td>${t.service}</td>
+            <td>${t.amount} Gdes</td>
+            <td>${t.payment_method||'-'}</td>
+            <td>${t.created_by||'-'}</td>
+            <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td>
+        </tr>`).join('');
+}
+
+// Recherche admin (patient avec privilèges)
+function setupAdminSearch() {
+    document.getElementById('search-admin-patient').addEventListener('click', searchAdminPatient);
+}
+
+async function searchAdminPatient() {
+    const search = document.getElementById('admin-patient-search').value.trim();
     try {
-        const transactions = await api.getTransactions();
-        const today = new Date().toISOString().split('T')[0];
-        const employeeTransactions = transactions.filter(t => 
-            new Date(t.date).toISOString().split('T')[0] === today && 
-            t.status === 'paid' && 
-            t.doctor === currentUser
-        );
-        
-        const total = employeeTransactions.reduce((sum, t) => sum + t.amount, 0);
-        const count = employeeTransactions.length;
-        
-        document.getElementById('employee-service-total').textContent = 
-            `${count} service(s) - Total: ${total.toFixed(2)} Gdes`;
-    } catch (error) {
-        console.error('Error updating employee total:', error);
-    }
+        const patients = await apiCall(() => API.getPatients({ search }));
+        const container = document.getElementById('admin-patient-result');
+        if (!patients.length) { container.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>'; container.classList.remove('hidden'); return; }
+        const p = patients[0];
+        container.innerHTML = `
+            <div class="card">
+                <h4>${p.full_name} — ${p.id}</h4>
+                <p>Type: ${p.type} | ${p.vip?'<span class="vip-tag">VIP</span>':p.sponsored?`Sponsorisé ${p.discount_percentage}%`:''}</p>
+                <div class="privilege-container mt-3">
+                    <h5>Modifier les privilèges</h5>
+                    <select id="privilege-type" class="form-control" style="width:200px;display:inline-block;">
+                        <option value="">Aucun</option>
+                        <option value="vip" ${p.vip?'selected':''}>VIP (gratuit)</option>
+                        <option value="sponsored" ${p.sponsored?'selected':''}>Sponsorisé (réduction)</option>
+                    </select>
+                    <div class="sponsored-discount mt-2">
+                        <label>Réduction %: <input type="number" id="discount-percentage" class="form-control" style="width:100px;display:inline-block;" value="${p.discount_percentage||0}" min="0" max="100"></label>
+                    </div>
+                    <button class="btn btn-success mt-2" onclick="savePrivileges('${p.id}')">Enregistrer</button>
+                </div>
+            </div>`;
+        container.classList.remove('hidden');
+    } catch(e) {}
 }
 
-function setupEmployees() {
-    const checkInBtn = document.getElementById('check-in-btn');
-    const checkOutBtn = document.getElementById('check-out-btn');
-    const faceIdBtn = document.getElementById('face-id-btn');
-    const addEmployeeBtn = document.getElementById('add-employee-btn');
-    const cancelEmployeeFormBtn = document.getElementById('cancel-employee-form-btn');
-    const employeeForm = document.getElementById('employee-form');
-    
-    checkInBtn.addEventListener('click', async function() {
-        const employeeId = document.getElementById('employee-id').value;
-        const pin = document.getElementById('employee-pin').value;
-        
-        if (!employeeId || !pin) {
-            showAlert('Veuillez entrer l\'ID employé et le code PIN', 'warning');
-            return;
-        }
-        
-        const attendanceData = {
-            employeeId: employeeId,
-            checkIn: new Date().toISOString()
-        };
-        
-        try {
-            const result = await api.createAttendance(attendanceData);
-            if (result.success) {
-                await updateAttendanceTable();
-                showAlert('Pointage d\'entrée enregistré pour ' + employeeId, 'success');
-                document.getElementById('employee-id').value = '';
-                document.getElementById('employee-pin').value = '';
-            } else {
-                showAlert('Erreur lors du pointage', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur lors du pointage', 'danger');
-            console.error('Check in error:', error);
-        }
-    });
-    
-    checkOutBtn.addEventListener('click', async function() {
-        const employeeId = document.getElementById('employee-id').value;
-        const pin = document.getElementById('employee-pin').value;
-        
-        if (!employeeId || !pin) {
-            showAlert('Veuillez entrer l\'ID employé et le code PIN', 'warning');
-            return;
-        }
-        
-        try {
-            const attendanceRecords = await api.getAttendance();
-            const today = new Date().toISOString().split('T')[0];
-            const record = attendanceRecords.find(a => 
-                a.employeeId === employeeId && 
-                new Date(a.checkIn).toISOString().split('T')[0] === today && 
-                !a.checkOut
-            );
-            
-            if (record) {
-                const result = await api.updateAttendance(record.id, new Date().toISOString());
-                if (result.success) {
-                    await updateAttendanceTable();
-                    showAlert('Pointage de sortie enregistré pour ' + employeeId, 'success');
-                    document.getElementById('employee-id').value = '';
-                    document.getElementById('employee-pin').value = '';
-                } else {
-                    showAlert('Erreur lors du pointage', 'danger');
-                }
-            } else {
-                showAlert('Aucun pointage d\'entrée trouvé pour cet employé aujourd\'hui', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur lors du pointage', 'danger');
-            console.error('Check out error:', error);
-        }
-    });
-    
-    faceIdBtn.addEventListener('click', function() {
-        const demoEmployees = ['EMP001', 'EMP002', 'EMP003', 'EMP004', 'EMP005', 'EMP006'];
-        const randomEmployee = demoEmployees[Math.floor(Math.random() * demoEmployees.length)];
-        
-        document.getElementById('employee-id').value = randomEmployee;
-        document.getElementById('employee-pin').value = '1234';
-        showAlert('Face ID simulé. ID employé: ' + randomEmployee, 'info');
-    });
-    
-    addEmployeeBtn.addEventListener('click', function() {
-        document.getElementById('employee-form-title').textContent = 'Ajouter un Employé';
-        document.getElementById('employee-edit-id').value = '';
-        document.getElementById('employee-form').reset();
-        document.getElementById('employee-management-form').classList.remove('hidden');
-    });
-    
-    cancelEmployeeFormBtn.addEventListener('click', function() {
-        document.getElementById('employee-management-form').classList.add('hidden');
-        employeeForm.reset();
-    });
-    
-    employeeForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const employeeId = document.getElementById('employee-form-id').value;
-        const name = document.getElementById('employee-form-name').value;
-        const role = document.getElementById('employee-form-role').value;
-        const pin = document.getElementById('employee-form-pin').value;
-        const email = document.getElementById('employee-form-email').value;
-        const phone = document.getElementById('employee-form-phone').value;
-        const access = document.getElementById('employee-form-access').value;
-        const editId = document.getElementById('employee-edit-id').value;
-        
-        const employeeData = {
-            name: name,
-            role: role,
-            pin: pin,
-            email: email,
-            phone: phone,
-            access: access
-        };
-        
-        try {
-            let result;
-            if (editId) {
-                // Modifier un employé existant
-                result = await api.updateEmployee(editId, employeeData);
-            } else {
-                // Ajouter un nouvel employé
-                result = await api.createEmployee(employeeData);
-            }
-            
-            if (result.success) {
-                showAlert(editId ? 'Employé modifié avec succès!' : 'Employé ajouté avec succès!', 'success');
-                document.getElementById('employee-management-form').classList.add('hidden');
-                employeeForm.reset();
-                await updateEmployeesTable();
-            } else {
-                showAlert('Erreur lors de l\'enregistrement', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'enregistrement', 'danger');
-            console.error('Save employee error:', error);
-        }
-    });
-    
-    // Charger les données initiales
-    updateAttendanceTable();
-    updateEmployeesTable();
-}
-
-async function editEmployee(employeeId) {
+async function savePrivileges(patientId) {
+    const privilegeType      = document.getElementById('privilege-type').value;
+    const discountPercentage = parseInt(document.getElementById('discount-percentage').value)||0;
     try {
-        const employees = await api.getEmployees();
-        const employee = employees.find(e => e.id === employeeId);
-        
-        if (employee) {
-            document.getElementById('employee-form-title').textContent = 'Modifier un Employé';
-            document.getElementById('employee-edit-id').value = employee.id;
-            document.getElementById('employee-form-id').value = employee.id;
-            document.getElementById('employee-form-name').value = employee.name;
-            document.getElementById('employee-form-role').value = employee.role;
-            document.getElementById('employee-form-pin').value = employee.pin;
-            document.getElementById('employee-form-email').value = employee.email;
-            document.getElementById('employee-form-phone').value = employee.phone;
-            document.getElementById('employee-form-access').value = employee.access;
-            
-            document.getElementById('employee-management-form').classList.remove('hidden');
-        }
-    } catch (error) {
-        showAlert('Erreur de chargement de l\'employé', 'danger');
-        console.error('Edit employee error:', error);
-    }
+        await apiCall(() => API.updatePrivilege(patientId, { privilegeType, discountPercentage }));
+        toast('Privilèges mis à jour!');
+        searchAdminPatient();
+    } catch(e) {}
 }
 
-async function deleteEmployee(employeeId) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet employé?')) {
-        try {
-            const result = await api.deleteEmployee(employeeId);
-            if (result.success) {
-                showAlert('Employé supprimé avec succès!', 'success');
-                await updateEmployeesTable();
-            } else {
-                showAlert('Erreur lors de la suppression', 'danger');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de la suppression', 'danger');
-            console.error('Delete employee error:', error);
-        }
-    }
+// ─── PARAMÈTRES ──────────────────────────────────────────────
+async function updateSettingsDisplay() {
+    // Types de consultation
+    document.getElementById('consultation-types-list').innerHTML = `
+        <table><thead><tr><th>Nom</th><th>Prix</th><th>Description</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
+        ${state.consultationTypes.map(ct=>`<tr>
+            <td>${ct.name}</td>
+            <td><input type="number" class="form-control" id="ct-price-${ct.id}" value="${ct.price}" style="width:100px;"></td>
+            <td><input type="text" class="form-control" id="ct-desc-${ct.id}" value="${ct.description||''}" style="width:200px;"></td>
+            <td><input type="checkbox" ${ct.active?'checked':''} onchange="toggleConsultationType(${ct.id},this.checked)"></td>
+            <td>
+                <button class="btn btn-sm btn-success" onclick="saveConsultationType(${ct.id})">Sauver</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteConsultationType(${ct.id})">Supprimer</button>
+            </td>
+        </tr>`).join('')}
+        </tbody></table>`;
+
+    // Types de signes vitaux
+    document.getElementById('vitals-types-list').innerHTML = `
+        <table><thead><tr><th>Nom</th><th>Unité</th><th>Min</th><th>Max</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
+        ${state.vitalTypes.map(v=>`<tr>
+            <td>${v.name}</td><td>${v.unit}</td><td>${v.min}</td><td>${v.max}</td>
+            <td><input type="checkbox" ${v.active?'checked':''} onchange="toggleVitalType(${v.id},this.checked)"></td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteVitalType(${v.id})">Supprimer</button></td>
+        </tr>`).join('')}
+        </tbody></table>`;
+
+    // Types d'analyses
+    document.getElementById('lab-analyses-types-list').innerHTML = `
+        <table><thead><tr><th>Nom</th><th>Prix</th><th>Type</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
+        ${state.labAnalysisTypes.map(a=>`<tr>
+            <td>${a.name}</td>
+            <td><input type="number" class="form-control" id="la-price-${a.id}" value="${a.price}" style="width:100px;"></td>
+            <td>${a.result_type==='image'?'Image':'Texte'}</td>
+            <td><input type="checkbox" ${a.active?'checked':''} onchange="toggleLabAnalysisType(${a.id},this.checked)"></td>
+            <td>
+                <button class="btn btn-sm btn-success" onclick="saveLabAnalysisType(${a.id})">Sauver</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteLabAnalysisType(${a.id})">Supprimer</button>
+            </td>
+        </tr>`).join('')}
+        </tbody></table>`;
+
+    // Services externes
+    document.getElementById('external-services-types-list').innerHTML = `
+        <table><thead><tr><th>Nom</th><th>Prix</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
+        ${state.externalServiceTypes.map(s=>`<tr>
+            <td>${s.name}</td><td>${s.price} Gdes</td>
+            <td><input type="checkbox" ${s.active?'checked':''} onchange="toggleExternalServiceType(${s.id},this.checked)"></td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteExternalServiceType(${s.id})">Supprimer</button></td>
+        </tr>`).join('')}
+        </tbody></table>`;
 }
 
-async function updateAttendanceTable() {
-    try {
-        const attendance = await api.getAttendance();
-        const tableBody = document.getElementById('presence-table-body');
-        tableBody.innerHTML = '';
-        
-        const today = new Date().toISOString().split('T')[0];
-        const todayAttendance = attendance.filter(a => 
-            new Date(a.checkIn).toISOString().split('T')[0] === today
-        );
-        
-        if (todayAttendance.length === 0) {
-            const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="5" class="text-center">Aucun pointage aujourd\'hui</td>';
-            tableBody.appendChild(row);
-        } else {
-            for (const record of todayAttendance) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${record.employeeId}</td>
-                    <td>${getEmployeeServiceById(record.employeeId)}</td>
-                    <td>${new Date(record.checkIn).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</td>
-                    <td>${record.checkOut ? new Date(record.checkOut).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : 'En cours...'}</td>
-                    <td><span class="${record.checkOut ? 'text-success' : 'text-warning'}">${record.checkOut ? 'Terminé' : 'En service'}</span></td>
-                `;
-                tableBody.appendChild(row);
-            }
-        }
-    } catch (error) {
-        console.error('Error loading attendance:', error);
-        showAlert('Erreur de chargement de la présence', 'danger');
-    }
-}
-
-function getEmployeeServiceById(employeeId) {
-    const services = {
-        'EMP001': 'Consultation',
-        'EMP002': 'Consultation',
-        'EMP003': 'Laboratoire',
-        'EMP004': 'Pharmacie',
-        'EMP005': 'Réception',
-        'EMP006': 'Caisse'
-    };
-    return services[employeeId] || 'Non spécifié';
-}
-
-async function updateEmployeesTable() {
-    try {
-        const employees = await api.getEmployees();
-        const tableBody = document.getElementById('employees-table-body');
-        tableBody.innerHTML = '';
-        
-        employees.forEach(emp => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${emp.id}</td>
-                <td>${emp.name}</td>
-                <td>${getRoleName(emp.role)}</td>
-                <td>${emp.email}</td>
-                <td>${emp.phone}</td>
-                <td>${emp.access}</td>
+async function updateMedicationsSettingsList() {
+    const meds = await API.getMedications().catch(()=>[]);
+    document.getElementById('medications-settings-list').innerHTML = meds.map(m=>`
+        <tr>
+            <td>${m.name}</td><td>${m.price} Gdes</td><td>${m.quantity}</td><td>${m.alert_threshold}</td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteMedicationSettings('${m.id}')">Supprimer</button></td>
+        </tr>`).join('');
+    // Userslist
+    if (state.currentRole === 'admin') {
+        const users = await API.getUsers().catch(()=>[]);
+        document.getElementById('users-list').innerHTML = users.map(u=>`
+            <tr>
+                <td>${u.name}</td><td>${u.role}</td><td>${u.username}</td>
+                <td>${u.active?'✅':'❌'}</td>
                 <td>
-                    <button class="btn btn-secondary" onclick="editEmployee('${emp.id}')">
-                        <i class="fas fa-edit"></i> Modifier
-                    </button>
-                    <button class="btn btn-danger" onclick="deleteEmployee('${emp.id}')">
-                        <i class="fas fa-trash"></i> Supprimer
-                    </button>
+                    <button class="btn btn-sm ${u.active?'btn-warning':'btn-success'}" onclick="toggleUser(${u.id},${!u.active},'${u.name}')">${u.active?'Désactiver':'Activer'}</button>
                 </td>
-            `;
-            tableBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error('Error loading employees:', error);
-        showAlert('Erreur de chargement des employés', 'danger');
+            </tr>`).join('');
     }
 }
 
-function setupEmergency() {
-    const searchBtn = document.getElementById('emergency-search-btn');
-    const consultationBtn = document.getElementById('emergency-consultation-btn');
-    const labBtn = document.getElementById('emergency-lab-btn');
-    const pharmacyBtn = document.getElementById('emergency-pharmacy-btn');
-    const saveRecordBtn = document.getElementById('save-emergency-record-btn');
-    const printBillBtn = document.getElementById('print-emergency-bill-btn');
-    
-    searchBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('emergency-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            if (patient && patient.emergency) {
-                await displayEmergencyPatient(patient);
-            } else {
-                showAlert('Patient d\'urgence non trouvé. Vérifiez le numéro (doit commencer par URG).', 'warning');
-            }
-        } catch (error) {
-            showAlert('Erreur de recherche du patient', 'danger');
-            console.error('Emergency search error:', error);
-        }
+// Fonctions paramètres
+async function saveConsultationType(id) {
+    const price = parseFloat(document.getElementById(`ct-price-${id}`).value);
+    const desc  = document.getElementById(`ct-desc-${id}`).value;
+    const ct    = state.consultationTypes.find(c=>c.id===id);
+    await apiCall(() => API.updateConsultationType(id, { name: ct.name, price, description: desc, active: ct.active }));
+    Object.assign(ct, { price, description: desc });
+    toast('Type de consultation sauvegardé');
+}
+async function toggleConsultationType(id, active) {
+    const ct = state.consultationTypes.find(c=>c.id===id);
+    await apiCall(() => API.updateConsultationType(id, { ...ct, active }));
+    ct.active = active;
+}
+async function deleteConsultationType(id) {
+    if (!confirm('Supprimer ce type?')) return;
+    await apiCall(() => API.deleteConsultationType(id));
+    state.consultationTypes = state.consultationTypes.filter(c=>c.id!==id);
+    updateSettingsDisplay();
+    toast('Type supprimé');
+}
+async function toggleVitalType(id, active) {
+    const vt = state.vitalTypes.find(v=>v.id===id);
+    await apiCall(() => API.updateVitalType(id, { ...vt, active }));
+    vt.active = active;
+    updateVitalsInputs();
+}
+async function deleteVitalType(id) {
+    if (!confirm('Supprimer ce signe vital?')) return;
+    await apiCall(() => API.deleteVitalType(id));
+    state.vitalTypes = state.vitalTypes.filter(v=>v.id!==id);
+    updateSettingsDisplay();
+    updateVitalsInputs();
+    toast('Signe vital supprimé');
+}
+async function saveLabAnalysisType(id) {
+    const price = parseFloat(document.getElementById(`la-price-${id}`).value);
+    const at = state.labAnalysisTypes.find(a=>a.id===id);
+    await apiCall(() => API.updateLabAnalysisType(id, { ...at, price }));
+    at.price = price;
+    toast('Analyse sauvegardée');
+}
+async function toggleLabAnalysisType(id, active) {
+    const at = state.labAnalysisTypes.find(a=>a.id===id);
+    await apiCall(() => API.updateLabAnalysisType(id, { ...at, active }));
+    at.active = active;
+    updateLabAnalysesSelect();
+}
+async function deleteLabAnalysisType(id) {
+    if (!confirm('Supprimer cette analyse?')) return;
+    await apiCall(() => API.deleteLabAnalysisType(id));
+    state.labAnalysisTypes = state.labAnalysisTypes.filter(a=>a.id!==id);
+    updateSettingsDisplay(); updateLabAnalysesSelect();
+    toast('Analyse supprimée');
+}
+async function toggleExternalServiceType(id, active) {
+    const st = state.externalServiceTypes.find(s=>s.id===id);
+    await apiCall(() => API.updateExternalServiceType(id, { ...st, active }));
+    st.active = active;
+    updateExternalServicesOptions(); updateExternalServicesSelect();
+}
+async function deleteExternalServiceType(id) {
+    if (!confirm('Supprimer ce service?')) return;
+    await apiCall(() => API.deleteExternalServiceType(id));
+    state.externalServiceTypes = state.externalServiceTypes.filter(s=>s.id!==id);
+    updateSettingsDisplay(); updateExternalServicesOptions(); updateExternalServicesSelect();
+    toast('Service supprimé');
+}
+async function deleteMedicationSettings(id) {
+    if (!confirm('Supprimer ce médicament?')) return;
+    await apiCall(() => API.deleteMedication(id));
+    state.medications = state.medications.filter(m=>m.id!==id);
+    updateMedicationsSettingsList();
+    toast('Médicament supprimé');
+}
+async function toggleUser(id, active, name) {
+    await apiCall(() => API.updateUser(id, { name, active }));
+    toast(`Utilisateur ${active?'activé':'désactivé'}`);
+    updateMedicationsSettingsList();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Boutons ajout dans paramètres
+    document.getElementById('add-consultation-type').addEventListener('click', async () => {
+        const name  = document.getElementById('new-consultation-type-name').value.trim();
+        const price = parseFloat(document.getElementById('new-consultation-type-price').value);
+        const desc  = document.getElementById('new-consultation-type-description').value;
+        if (!name || isNaN(price)) { toast('Remplir nom et prix', 'error'); return; }
+        const ct = await apiCall(() => API.addConsultationType({ name, price, description: desc }));
+        state.consultationTypes.push(ct);
+        updateSettingsDisplay(); updateConsultationTypesSelect(); updateDoctorConsultationTypes();
+        document.getElementById('new-consultation-type-name').value = '';
+        document.getElementById('new-consultation-type-price').value = '';
+        document.getElementById('new-consultation-type-description').value = '';
+        toast('Type de consultation ajouté!');
     });
-    
-    consultationBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('emergency-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (patient && patient.emergency) {
-                const consultationData = {
-                    patientId: patient.id,
-                    doctor: currentUser,
-                    diagnosis: 'Consultation d\'urgence',
-                    emergency: true
-                };
-                
-                const result = await api.createConsultation(consultationData);
-                
-                if (result.success) {
-                    const transactionData = {
-                        patientId: patient.id,
-                        service: 'Consultation Urgence',
-                        amount: servicePrices['Consultation Urgence'],
-                        doctor: currentUser,
-                        emergency: true
-                    };
-                    await api.createTransaction(transactionData);
-                    
-                    await updateEmergencyTransactions(patient.id);
-                    showAlert('Consultation d\'urgence ajoutée avec succès!', 'success');
-                }
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'ajout de la consultation', 'danger');
-            console.error('Emergency consultation error:', error);
-        }
+
+    document.getElementById('add-vital-type').addEventListener('click', async () => {
+        const name = document.getElementById('new-vital-name').value.trim();
+        const unit = document.getElementById('new-vital-unit').value.trim();
+        const min  = parseFloat(document.getElementById('new-vital-min').value);
+        const max  = parseFloat(document.getElementById('new-vital-max').value);
+        if (!name || !unit || isNaN(min) || isNaN(max)) { toast('Remplir tous les champs', 'error'); return; }
+        const vt = await apiCall(() => API.addVitalType({ name, unit, min, max }));
+        state.vitalTypes.push(vt);
+        updateSettingsDisplay(); updateVitalsInputs();
+        toast('Signe vital ajouté!');
     });
-    
-    labBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('emergency-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (patient && patient.emergency) {
-                const analysisData = {
-                    patientId: patient.id,
-                    analyses: 'Analyses d\'urgence complètes',
-                    emergency: true
-                };
-                
-                const result = await api.createAnalysis(analysisData);
-                
-                if (result.success) {
-                    const transactionData = {
-                        patientId: patient.id,
-                        service: 'Analyse Urgence',
-                        amount: servicePrices['Analyse Urgence'],
-                        doctor: currentUser,
-                        emergency: true
-                    };
-                    await api.createTransaction(transactionData);
-                    
-                    await updateEmergencyTransactions(patient.id);
-                    showAlert('Analyses d\'urgence ajoutées avec succès!', 'success');
-                }
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'ajout des analyses', 'danger');
-            console.error('Emergency lab error:', error);
-        }
+
+    document.getElementById('add-lab-analysis-type').addEventListener('click', async () => {
+        const name  = document.getElementById('new-lab-analysis-name').value.trim();
+        const price = parseFloat(document.getElementById('new-lab-analysis-price').value);
+        const resultType = document.getElementById('new-lab-analysis-type').value;
+        if (!name || isNaN(price)) { toast('Remplir nom et prix', 'error'); return; }
+        const at = await apiCall(() => API.addLabAnalysisType({ name, price, resultType }));
+        state.labAnalysisTypes.push(at);
+        updateSettingsDisplay(); updateLabAnalysesSelect();
+        toast('Analyse ajoutée!');
     });
-    
-    pharmacyBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('emergency-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (patient && patient.emergency) {
-                const meds = ['Paracétamol 1000mg', 'Anti-inflammatoire', 'Antibiotique large spectre'];
-                
-                for (const med of meds) {
-                    const prescriptionData = {
-                        patientId: patient.id,
-                        prescription: med + ' - Posologie d\'urgence',
-                        emergency: true
-                    };
-                    await api.createPrescription(prescriptionData);
-                }
-                
-                await updateEmergencyTransactions(patient.id);
-                showAlert('Médicaments d\'urgence ajoutés avec succès!', 'success');
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'ajout des médicaments', 'danger');
-            console.error('Emergency pharmacy error:', error);
-        }
+
+    document.getElementById('add-external-service-type').addEventListener('click', async () => {
+        const name  = document.getElementById('new-external-service-type-name').value.trim();
+        const price = parseFloat(document.getElementById('new-external-service-type-price').value);
+        if (!name || isNaN(price)) { toast('Remplir nom et prix', 'error'); return; }
+        const st = await apiCall(() => API.addExternalServiceType({ name, price }));
+        state.externalServiceTypes.push(st);
+        updateSettingsDisplay(); updateExternalServicesOptions(); updateExternalServicesSelect();
+        toast('Service externe ajouté!');
     });
-    
-    saveRecordBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('emergency-patient-id').value;
-        try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (patient && patient.emergency) {
-                const notes = document.getElementById('emergency-notes').value;
-                
-                const emergencyPatients = await api.getEmergencyPatients();
-                const emergencyRecord = emergencyPatients.find(ep => ep.patientId === patientId && ep.active);
-                
-                if (emergencyRecord) {
-                    const updateData = {
-                        notes: notes,
-                        status: 'Traitement terminé - En attente de paiement'
-                    };
-                    await api.updateEmergencyPatient(emergencyRecord.id, updateData);
-                }
-                
-                showAlert('Dossier d\'urgence enregistré avec succès!', 'success');
-                await updateEmergencyPatientsTable();
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'enregistrement', 'danger');
-            console.error('Save emergency record error:', error);
-        }
+
+    document.getElementById('add-medication-settings').addEventListener('click', async () => {
+        const name  = document.getElementById('new-medication-name').value.trim();
+        const price = parseFloat(document.getElementById('new-medication-price').value);
+        const qty   = parseInt(document.getElementById('new-medication-quantity').value);
+        const alert = parseInt(document.getElementById('new-medication-alert').value);
+        if (!name || isNaN(price) || isNaN(qty) || isNaN(alert)) { toast('Remplir tous les champs', 'error'); return; }
+        const med = await apiCall(() => API.addMedication({ name, genericName: name, form: 'Comprimé', unit: 'comprimés', quantity: qty, alertThreshold: alert, price }));
+        state.medications.push(med);
+        updateMedicationsSettingsList();
+        document.getElementById('new-medication-name').value = '';
+        document.getElementById('new-medication-price').value = '';
+        document.getElementById('new-medication-quantity').value = '';
+        document.getElementById('new-medication-alert').value = '';
+        toast('Médicament ajouté!');
     });
-    
-    printBillBtn.addEventListener('click', async function() {
-        const patientId = document.getElementById('emergency-patient-id').value;
+
+    document.getElementById('add-user').addEventListener('click', async () => {
+        const name     = document.getElementById('new-user-name').value.trim();
+        const role     = document.getElementById('new-user-role').value;
+        const username = document.getElementById('new-user-username').value.trim();
+        const password = document.getElementById('new-user-password').value;
+        if (!name || !role || !username || !password) { toast('Remplir tous les champs', 'error'); return; }
         try {
-            const patient = await api.getPatientById(patientId);
-            
-            if (patient && patient.emergency) {
-                await printEmergencyBill(patient);
-            }
-        } catch (error) {
-            showAlert('Erreur lors de l\'impression', 'danger');
-            console.error('Print emergency bill error:', error);
-        }
+            await apiCall(() => API.addUser({ name, role, username, password }));
+            toast(`Utilisateur ${username} créé!`);
+            updateMedicationsSettingsList();
+            document.getElementById('new-user-name').value = '';
+            document.getElementById('new-user-username').value = '';
+            document.getElementById('new-user-password').value = '';
+        } catch(e) {}
     });
-    
-    // Charger les données initiales
-    updateEmergencyPatientsTable();
-}
 
-async function displayEmergencyPatient(patient) {
-    const detailsContainer = document.getElementById('emergency-patient-details');
-    
-    try {
-        const emergencyPatients = await api.getEmergencyPatients();
-        const emergencyRecord = emergencyPatients.find(ep => ep.patientId === patient.id && ep.active);
-        
-        detailsContainer.innerHTML = `
-            <div class="patient-info-item">
-                <div class="patient-info-label">Numéro patient:</div>
-                <div>${patient.id} <span class="emergency-patient-tag">URGENCE</span> ${patient.pediatric ? '<span class="pediatric-tag">PÉDIATRIE</span>' : ''}</div>
-            </div>
-            <div class="patient-info-item">
-                <div class="patient-info-label">Nom:</div>
-                <div>${patient.name}</div>
-            </div>
-            <div class="patient-info-item">
-                <div class="patient-info-label">Date de naissance:</div>
-                <div>${new Date(patient.dob).toLocaleDateString('fr-FR')}</div>
-            </div>
-            <div class="patient-info-item">
-                <div class="patient-info-label">Téléphone:</div>
-                <div>${patient.phone || 'N/A'}</div>
-            </div>
-            ${emergencyRecord ? `
-                <div class="patient-info-item">
-                    <div class="patient-info-label">Heure d'admission:</div>
-                    <div>${new Date(emergencyRecord.admissionTime).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</div>
-                </div>
-                <div class="patient-info-item">
-                    <div class="patient-info-label">Statut:</div>
-                    <div>${emergencyRecord.status}</div>
-                </div>
-            ` : ''}
-        `;
-        
-        document.getElementById('emergency-patient-info').classList.remove('hidden');
-        document.getElementById('emergency-services-container').classList.remove('hidden');
-        
-        await updateEmergencyTransactions(patient.id);
-    } catch (error) {
-        showAlert('Erreur de chargement du patient d\'urgence', 'danger');
-        console.error('Display emergency patient error:', error);
-    }
-}
+    // Infos hôpital
+    document.getElementById('hospital-logo').addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('logo-preview').src = e.target.result;
+            document.getElementById('logo-preview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    });
 
-async function updateEmergencyTransactions(patientId) {
-    const container = document.getElementById('emergency-transactions-list');
-    
-    try {
-        const transactions = await api.getTransactions();
-        const patientTransactions = transactions.filter(t => t.patientId === patientId);
-        
-        container.innerHTML = '';
-        
-        if (patientTransactions.length === 0) {
-            container.innerHTML = '<p class="text-center">Aucune transaction pour ce patient d\'urgence</p>';
-            return;
-        }
-        
-        let total = 0;
-        
-        patientTransactions.forEach(transaction => {
-            const item = document.createElement('div');
-            item.className = 'd-flex justify-between mb-2';
-            item.innerHTML = `
-                <div>
-                    <strong>${transaction.service}</strong>
-                    <div>${new Date(transaction.date).toLocaleDateString('fr-FR')} - ${transaction.status === 'paid' ? '<span class="text-success">Payé</span>' : '<span class="text-warning">En attente</span>'}</div>
-                </div>
-                <div class="text-right">
-                    ${transaction.amount.toFixed(2)} Gdes
-                </div>
-            `;
-            container.appendChild(item);
-            total += transaction.amount;
-        });
-        
-        const totalDiv = document.createElement('div');
-        totalDiv.className = 'd-flex justify-between mt-3 pt-3 border-top';
-        totalDiv.innerHTML = `
-            <div><strong>Total dû:</strong></div>
-            <div><strong>${total.toFixed(2)} Gdes</strong></div>
-        `;
-        container.appendChild(totalDiv);
-    } catch (error) {
-        console.error('Error updating emergency transactions:', error);
-    }
-}
+    document.getElementById('save-hospital-info-btn').addEventListener('click', async () => {
+        const name    = document.getElementById('hospital-name').value;
+        const address = document.getElementById('hospital-address').value;
+        const phone   = document.getElementById('hospital-phone').value;
+        const logo    = document.getElementById('logo-preview').src || null;
+        try {
+            await apiCall(() => API.saveSettings({ name, address, phone, logo }));
+            Object.assign(state.hospitalSettings, { name, address, phone, logo });
+            applyHospitalSettings();
+            toast('Paramètres sauvegardés!');
+        } catch(e) {}
+    });
 
-async function updateEmergencyPatientsTable() {
-    try {
-        const emergencyPatients = await api.getEmergencyPatients();
-        const tableBody = document.getElementById('emergency-patients-body');
-        tableBody.innerHTML = '';
-        
-        const activeEmergencies = emergencyPatients.filter(ep => ep.active);
-        
-        if (activeEmergencies.length === 0) {
-            const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="6" class="text-center">Aucun patient en urgence actif</td>';
-            tableBody.appendChild(row);
-        } else {
-            for (const emergency of activeEmergencies) {
-                const patient = await api.getPatientById(emergency.patientId);
-                const transactions = await api.getTransactions();
-                const patientTransactions = transactions.filter(t => t.patientId === emergency.patientId && t.status === 'pending');
-                const totalDue = patientTransactions.reduce((sum, t) => sum + t.amount, 0);
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${emergency.patientId}</td>
-                    <td>${patient ? patient.name : 'N/A'}</td>
-                    <td>${new Date(emergency.admissionTime).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</td>
-                    <td>${emergency.status}</td>
-                    <td>${totalDue.toFixed(2)} Gdes</td>
-                    <td>
-                        <button class="btn btn-secondary" onclick="viewEmergencyPatient('${emergency.patientId}')">
-                            <i class="fas fa-eye"></i> Voir
-                        </button>
-                        <button class="btn btn-success" onclick="processEmergencyPayment('${emergency.patientId}')">
-                            <i class="fas fa-credit-card"></i> Payer
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            }
-        }
-    } catch (error) {
-        console.error('Error loading emergency patients:', error);
-        showAlert('Erreur de chargement des patients d\'urgence', 'danger');
-    }
-}
+    // Fermer modale transaction
+    document.getElementById('close-transaction-details')?.addEventListener('click', () => {
+        document.getElementById('transaction-details-modal').classList.add('hidden');
+    });
 
-function viewEmergencyPatient(patientId) {
-    document.getElementById('emergency-patient-id').value = patientId;
-    document.getElementById('emergency-search-btn').click();
-    
-    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelector('[data-target="emergency"]').classList.add('active');
-    showContent('emergency');
-}
+    // Init setup type patient
+    setupPatientTypeChange();
+    setupAdminSearch();
 
-function processEmergencyPayment(patientId) {
-    document.getElementById('cashier-patient-id').value = patientId;
-    
-    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelector('[data-target="cashier"]').classList.add('active');
-    showContent('cashier');
-    
-    // Déclencher la recherche automatique
-    setTimeout(() => {
-        document.getElementById('cashier-search-btn').click();
-    }, 100);
-}
-
-async function printEmergencyBill(patient) {
-    try {
-        const transactions = await api.getTransactions();
-        const patientTransactions = transactions.filter(t => t.patientId === patient.id);
-        const totalDue = patientTransactions.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.amount, 0);
-        const totalPaid = patientTransactions.filter(t => t.status === 'paid').reduce((sum, t) => sum + t.amount, 0);
-        
-        let billHtml = `
-            <div class="receipt">
-                <div class="receipt-header">
-                    <h3>Hôpital Saint-Luc</h3>
-                    <p>FACTURE D'URGENCE</p>
-                    <p>Date: ${new Date().toLocaleDateString('fr-FR')}</p>
-                    <p>Facture #: URG-${Date.now().toString().slice(-6)}</p>
-                </div>
-                <div>
-                    <p><strong>Patient:</strong> ${patient.name}</p>
-                    <p><strong>Numéro:</strong> ${patient.id}</p>
-                    <p><strong>Type:</strong> PATIENT URGENCE ${patient.pediatric ? '(PÉDIATRIE)' : ''}</p>
-                    <p><strong>Date d'admission:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
-                </div>
-                <h4>Services d'urgence:</h4>
-        `;
-        
-        patientTransactions.forEach(transaction => {
-            billHtml += `
-                <div class="receipt-item">
-                    <span>${transaction.service}</span>
-                    <span>${transaction.amount.toFixed(2)} Gdes</span>
-                    <span>${transaction.status === 'paid' ? 'PAYÉ' : 'EN ATTENTE'}</span>
-                </div>
-            `;
-        });
-        
-        billHtml += `
-                <div class="receipt-total">
-                    <span>Total dû:</span>
-                    <span>${totalDue.toFixed(2)} Gdes</span>
-                </div>
-                <div class="receipt-item">
-                    <span>Total payé:</span>
-                    <span>${totalPaid.toFixed(2)} Gdes</span>
-                </div>
-                <div class="receipt-total" style="border-top: 2px solid #dc3545;">
-                    <span>SOLDE À PAYER:</span>
-                    <span style="color: #dc3545;">${totalDue.toFixed(2)} Gdes</span>
-                </div>
-                <p class="text-center" style="margin-top: 15px; font-size: 0.9rem; color: #dc3545;">
-                    PRIORITÉ URGENCE - À RÉGLER AVANT LA SORTIE
-                </p>
-            </div>
-        `;
-        
-        printContentDirectly(billHtml, 'Facture Urgence');
-    } catch (error) {
-        showAlert('Erreur lors de l\'impression', 'danger');
-        console.error('Print emergency bill error:', error);
-    }
-}
-
-async function updateDashboard() {
-    try {
-        const stats = await api.getDashboardStats();
-        
-        if (stats) {
-            document.getElementById('stat-patients').textContent = stats.totalPatients;
-            document.getElementById('stat-consultations').textContent = stats.todayConsultations;
-            document.getElementById('stat-appointments').textContent = stats.todayAppointments;
-            document.getElementById('stat-analyses').textContent = stats.pendingAnalyses;
-        }
-        
-        updateNotifications();
-        
-        if (currentRole === 'doctor' || currentRole === 'admin') {
-            await updateDoctorAppointmentsDashboard();
-        }
-        
-        if (document.getElementById('administration').classList.contains('active')) {
-            await updateAdminStats();
-        }
-    } catch (error) {
-        console.error('Error updating dashboard:', error);
-        showAlert('Erreur de chargement du tableau de bord', 'danger');
-    }
-}
-
-function updateNotifications() {
-    const notificationsList = document.getElementById('notifications-list');
-    notificationsList.innerHTML = '';
-    
-    // Pour l'instant, afficher un message générique
-    // Dans une version complète, on récupérerait les notifications depuis l'API
-    notificationsList.innerHTML = `
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> Bienvenue dans le système de gestion hospitalier
-        </div>
-    `;
-}
+    // Rafraîchir messages toutes les 30s
+    setInterval(() => {
+        if (state.currentUser) checkUnreadMessages();
+    }, 30000);
+});
