@@ -1,19 +1,16 @@
 // ============================================================
-//  FICHIER DE CONFIGURATION — À REMPLIR AVANT LE DÉPLOIEMENT
+//  FICHIER DE CONFIGURATION
 // ============================================================
 
 const CONFIG = {
-    // URL de votre serveur backend (Render.com ou local)
-    https://novacare-ceic.onrender.com
-    // Exemple local  : "http://localhost:3000"
-    API_URL: "http://localhost:3000",
+    // En production (Render), l'API est sur le même domaine.
+    // En local, changer par "http://localhost:3000"
+    API_URL: window.location.origin === 'null' || window.location.origin === ''
+        ? 'http://localhost:3000'
+        : window.location.origin,
 
-    // Nom affiché de l'hôpital (valeur par défaut, modifiable dans Paramètres)
-    HOSPITAL_NAME: "Hôpital Saint-Luc",
-
-    // Délai en ms avant que les requêtes réseau affichent un spinner
+    HOSPITAL_NAME: "NovaCare",
     LOADING_DELAY: 300,
 };
 
-// NE PAS MODIFIER — export pour les autres fichiers JS
 if (typeof module !== "undefined") module.exports = CONFIG;
