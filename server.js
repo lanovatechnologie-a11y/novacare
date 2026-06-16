@@ -23,16 +23,6 @@ const pool = new Pool({
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));   // 10mb pour les images base64
 
-// ─── Servir les fichiers frontend statiques ───────────────────
-// Les fichiers index.html, styles.css, app.js, api.js, config.js
-// doivent être dans le même dossier que server.js
-const path = require('path');
-app.use(express.static(path.join(__dirname)));
-// Route racine → index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
 // ─── Auth middleware ──────────────────────────────────────────
 function auth(req, res, next) {
     const header = req.headers['authorization'];

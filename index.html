@@ -15,38 +15,38 @@
 <div id="login-screen" class="login-container">
     <div class="login-box">
         <div class="text-center mb-3">
-            <img id="login-logo" src="" alt="Logo" class="certificate-logo" style="display:none;">
-            <i class="fas fa-hospital-alt fa-3x" style="color: #1a6bca;" id="login-icon"></i>
-            <h2 style="color: #1a6bca;" id="hospital-name-login">Hôpital Saint-Luc</h2>
+            <img id="login-logo" src="" alt="Logo" class="certificate-logo" style="display:none; max-height:80px; margin-bottom:10px;">
+            <i class="fas fa-hospital-alt fa-3x" style="color:#1a6bca;" id="login-icon"></i>
+            <h2 class="login-hospital-title mt-2" id="hospital-name-login">Hôpital Saint-Luc</h2>
+            <p class="login-hospital-sub">Système de Gestion Hospitalier</p>
         </div>
+        <div class="login-divider"></div>
 
+        <p style="font-size:.82rem;color:#6c757d;text-align:center;margin-bottom:10px;font-weight:600;">SÉLECTIONNER VOTRE RÔLE</p>
         <div class="login-buttons">
             <div class="login-role-btn active" data-role="admin"><i class="fas fa-user-shield"></i><p>Admin</p></div>
+            <div class="login-role-btn" data-role="sub_admin"><i class="fas fa-user-cog"></i><p>Sous-Admin</p></div>
             <div class="login-role-btn" data-role="secretary"><i class="fas fa-user-tie"></i><p>Secrétariat</p></div>
             <div class="login-role-btn" data-role="cashier"><i class="fas fa-cash-register"></i><p>Caisse</p></div>
             <div class="login-role-btn" data-role="nurse"><i class="fas fa-user-nurse"></i><p>Infirmier</p></div>
             <div class="login-role-btn" data-role="doctor"><i class="fas fa-user-md"></i><p>Médecin</p></div>
-            <div class="login-role-btn" data-role="lab"><i class="fas fa-flask"></i><p>Laboratoire</p></div>
+            <div class="login-role-btn" data-role="lab"><i class="fas fa-flask"></i><p>Labo</p></div>
             <div class="login-role-btn" data-role="pharmacy"><i class="fas fa-pills"></i><p>Pharmacie</p></div>
         </div>
 
         <form id="login-form">
             <div class="form-group">
-                <label class="form-label">Nom d'utilisateur</label>
-                <input type="text" id="username" class="form-control" required autocomplete="username">
+                <label class="form-label"><i class="fas fa-user" style="color:#1a6bca;"></i> Nom d'utilisateur</label>
+                <input type="text" id="username" class="form-control" required autocomplete="username" placeholder="Votre identifiant">
             </div>
             <div class="form-group">
-                <label class="form-label">Mot de passe</label>
-                <input type="password" id="password" class="form-control" required autocomplete="current-password">
+                <label class="form-label"><i class="fas fa-lock" style="color:#1a6bca;"></i> Mot de passe</label>
+                <input type="password" id="password" class="form-control" required autocomplete="current-password" placeholder="••••••••">
             </div>
-            <button type="submit" class="btn" style="width: 100%;">
+            <button type="submit" class="btn" style="width:100%;padding:13px;font-size:1rem;border-radius:10px;">
                 <i class="fas fa-sign-in-alt"></i> Se Connecter
             </button>
         </form>
-
-        <div class="mt-3 text-center">
-            <p><small>Compte admin de test : <strong>admin / Admin1234!</strong></small></p>
-        </div>
     </div>
 </div>
 
@@ -57,23 +57,41 @@
     <div class="container">
 
         <!-- En-tête -->
-        <header class="header">
+        <header class="header no-print">
             <div class="logo">
                 <img id="header-logo" src="" alt="Logo" class="logo-img" style="display:none;">
-                <i class="fas fa-hospital-alt" id="header-icon"></i>
+                <i class="fas fa-hospital-alt" id="header-icon" style="color:#fff;"></i>
                 <div>
                     <h1 id="hospital-name-header">Hôpital Saint-Luc</h1>
                     <p id="hospital-address-header">Système de Gestion</p>
                 </div>
             </div>
-            <div class="user-info">
-                <div>
-                    <p id="current-user-role">Administrateur</p>
-                    <p><strong id="current-username">User</strong></p>
+            <div class="header-actions">
+                <!-- Cloche de notifications -->
+                <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span id="notif-count-badge" class="notif-count-badge hidden">0</span>
+                </button>
+                <div class="user-info">
+                    <div>
+                        <p id="current-user-role" style="opacity:.75;font-size:.78rem;"></p>
+                        <strong id="current-username" style="font-size:.95rem;"></strong>
+                    </div>
+                    <button id="logout-btn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
                 </div>
-                <button id="logout-btn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
             </div>
         </header>
+
+        <!-- Panneau de notifications -->
+        <div id="notif-panel" class="notif-panel no-print">
+            <div class="notif-header">
+                <h4><i class="fas fa-bell"></i> Notifications</h4>
+                <button id="mark-all-read-btn" class="btn btn-sm btn-outline" style="font-size:.75rem;padding:4px 10px;">Tout lire</button>
+            </div>
+            <div class="notif-list" id="notif-list">
+                <div class="notif-empty"><i class="fas fa-check-circle" style="font-size:1.5rem;color:#28a745;display:block;margin-bottom:6px;"></i>Aucune notification</div>
+            </div>
+        </div>
 
         <!-- Navigation par onglets -->
         <nav class="nav-tabs no-print">
@@ -94,18 +112,18 @@
 
         <!-- ─── TABLEAU DE BORD ─────────────────────────── -->
         <section id="dashboard" class="content active">
-            <h2 class="section-title">Tableau de Bord — <span id="dashboard-role">Administrateur</span></h2>
+            <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Tableau de Bord — <span id="dashboard-role">Administrateur</span></h2>
             <div id="role-dashboard-content"></div>
         </section>
 
         <!-- ─── SECRÉTARIAT ────────────────────────────── -->
         <section id="secretary" class="content">
-            <h2 class="section-title">Secrétariat</h2>
+            <h2 class="section-title"><i class="fas fa-user-tie"></i> Secrétariat</h2>
 
             <div class="card">
                 <h3><i class="fas fa-user-plus"></i> Nouveau Patient</h3>
                 <form id="patient-registration-form">
-                    <div class="d-flex" style="gap:20px; margin-bottom:15px;">
+                    <div class="d-flex gap-20" style="margin-bottom:15px;">
                         <div style="flex:2">
                             <label class="form-label">Nom complet *</label>
                             <input type="text" id="patient-fullname" class="form-control" required>
@@ -115,7 +133,7 @@
                             <input type="date" id="patient-birthdate" class="form-control" required>
                         </div>
                     </div>
-                    <div class="d-flex" style="gap:20px; margin-bottom:15px;">
+                    <div class="d-flex gap-20" style="margin-bottom:15px;">
                         <div style="flex:1">
                             <label class="form-label">Adresse</label>
                             <input type="text" id="patient-address" class="form-control">
@@ -129,14 +147,14 @@
                         <label class="form-label">Personne responsable (si mineur)</label>
                         <input type="text" id="patient-responsible" class="form-control">
                     </div>
-                    <div class="d-flex" style="gap:20px; margin-bottom:20px;">
+                    <div class="d-flex gap-20" style="margin-bottom:20px;">
                         <div style="flex:1">
                             <label class="form-label">Type de patient</label>
-                            <div>
+                            <div style="display:flex;gap:15px;flex-wrap:wrap;margin-top:8px;">
                                 <label><input type="radio" name="patient-type" id="patient-normal" value="normal" checked> Normal</label>
-                                <label style="margin-left:20px;"><input type="radio" name="patient-type" id="patient-emergency" value="urgence"> Urgence</label>
-                                <label style="margin-left:20px;"><input type="radio" name="patient-type" id="patient-pediatric" value="pediatrie"> Enfant</label>
-                                <label style="margin-left:20px;"><input type="radio" name="patient-type" id="patient-external" value="externe"> Externe</label>
+                                <label><input type="radio" name="patient-type" id="patient-emergency" value="urgence"> Urgence</label>
+                                <label><input type="radio" name="patient-type" id="patient-pediatric" value="pediatrie"> Enfant</label>
+                                <label><input type="radio" name="patient-type" id="patient-external" value="externe"> Externe</label>
                             </div>
                             <div class="mt-2">
                                 <label><input type="checkbox" id="external-only"> Service externe uniquement</label>
@@ -163,7 +181,7 @@
 
                     <div id="consultation-modification-secretary" class="type-modification-panel hidden">
                         <h4><i class="fas fa-edit"></i> Modification du type de consultation</h4>
-                        <div class="d-flex" style="gap:15px;">
+                        <div class="d-flex gap-15">
                             <input type="text" id="modified-consultation-name" class="form-control" placeholder="Nom modifié">
                             <input type="number" id="modified-consultation-price" class="form-control" placeholder="Prix (Gdes)" min="0">
                             <button type="button" id="save-modified-consultation" class="btn btn-success">Enregistrer</button>
@@ -172,9 +190,9 @@
                         <small class="text-muted">Cette modification s'applique uniquement au patient en cours</small>
                     </div>
 
-                    <div class="d-flex" style="gap:15px;">
+                    <div class="d-flex gap-15 flex-wrap">
                         <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer le dossier</button>
-                        <button type="button" id="generate-patient-id-card" class="btn btn-secondary"><i class="fas fa-id-card"></i> Générer la carte patient</button>
+                        <button type="button" id="generate-patient-id-card" class="btn btn-secondary"><i class="fas fa-id-card"></i> Carte patient</button>
                         <button type="button" id="generate-medical-certificate" class="btn btn-info"><i class="fas fa-file-medical"></i> Certificat médical</button>
                     </div>
                 </form>
@@ -183,7 +201,7 @@
             <!-- Rendez-vous -->
             <div class="card">
                 <h3><i class="fas fa-calendar-alt"></i> Gestion des Rendez-vous</h3>
-                <div class="d-flex" style="gap:15px; margin-bottom:15px;">
+                <div class="d-flex gap-15" style="margin-bottom:15px;">
                     <input type="text" id="appointment-patient-search" class="form-control" placeholder="ID patient">
                     <button id="search-appointment-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
@@ -196,7 +214,7 @@
                         <label class="form-label">Médecin</label>
                         <select id="appointment-doctor" class="form-control"><option value="">Sélectionner un médecin</option></select>
                     </div>
-                    <button id="schedule-appointment" class="btn btn-success"><i class="fas fa-calendar-plus"></i> Programmer le rendez-vous</button>
+                    <button id="schedule-appointment" class="btn btn-success"><i class="fas fa-calendar-plus"></i> Programmer</button>
                 </div>
                 <div class="mt-3"><h4>Rendez-vous programmés</h4><div id="appointments-list"></div></div>
             </div>
@@ -204,7 +222,7 @@
             <!-- Services externes -->
             <div class="card">
                 <h3><i class="fas fa-file-invoice-dollar"></i> Facturation Services Externes</h3>
-                <div class="d-flex" style="gap:15px; margin-bottom:15px;">
+                <div class="d-flex gap-15" style="margin-bottom:15px;">
                     <input type="text" id="external-service-search" class="form-control" placeholder="ID patient ou nom">
                     <button id="search-external-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
@@ -213,7 +231,7 @@
                     <div id="external-services-list"></div>
                     <div class="mt-3">
                         <h5>Ajouter un service</h5>
-                        <div class="d-flex" style="gap:10px;">
+                        <div class="d-flex gap-10">
                             <select id="external-service-select" class="form-control"><option value="">Choisir un service</option></select>
                             <input type="number" id="new-external-service-price" class="form-control" placeholder="Prix (Gdes)" min="0">
                             <button id="add-external-service" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
@@ -239,50 +257,38 @@
             <!-- Carte patient (printable) -->
             <div id="patient-card-container" class="hidden printable">
                 <div class="patient-card">
-                    <div class="patient-card-header text-center">
-                        <img id="card-logo" src="" alt="Logo" style="max-width:80px;margin:0 auto 10px;display:none;">
+                    <div class="patient-card-header">
+                        <img id="card-logo" src="" alt="Logo" style="max-width:70px;margin:0 auto 8px;display:none;">
                         <h3 id="card-hospital-name">Hôpital Saint-Luc</h3>
                         <p id="card-hospital-address">Port-au-Prince, Haïti</p>
                     </div>
-                    <div class="patient-photo"><i class="fas fa-user fa-3x" style="color:#666;"></i></div>
+                    <div class="patient-photo"><i class="fas fa-user fa-3x" style="color:#aaa;"></i></div>
                     <div class="text-center">
                         <h4 id="card-patient-name"></h4>
                         <p><strong>ID:</strong> <span id="card-patient-id"></span></p>
                         <p><strong>Date Naissance:</strong> <span id="card-patient-dob"></span></p>
                         <p><strong>Téléphone:</strong> <span id="card-patient-phone"></span></p>
-                        <p><strong>Date d'émission:</strong> <span id="card-issue-date"></span></p>
-                        <div class="mt-3"><span id="card-patient-type"></span></div>
-                    </div>
-                    <div class="text-center mt-3">
-                        <p><small>Cette carte doit être présentée à chaque visite</small></p>
+                        <p><strong>Émise le:</strong> <span id="card-issue-date"></span></p>
+                        <div style="margin-top:10px;"><span id="card-patient-type" class="emergency-patient-tag">STANDARD</span></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Certificat médical (printable) -->
+            <!-- Certificat médical printable -->
             <div id="medical-certificate-container" class="hidden printable">
-                <div class="medical-certificate">
+                <div class="medical-certificate-container">
                     <div class="certificate-header">
                         <img id="certificate-logo" src="" alt="Logo" class="certificate-logo" style="display:none;">
                         <h2 id="certificate-hospital-name">Hôpital Saint-Luc</h2>
                         <p id="certificate-hospital-address">Port-au-Prince, Haïti</p>
-                        <p id="certificate-hospital-phone">Tél: (509) 1234-5678</p>
-                        <h3 style="margin-top:20px;">CERTIFICAT MÉDICAL</h3>
+                        <h3 style="margin-top:20px; color:#1a6bca;">CERTIFICAT MÉDICAL</h3>
                     </div>
                     <div class="certificate-body">
-                        <p style="text-align:right;">N°: <span id="certificate-number">CM-001</span></p>
-                        <p>Le directeur de l'établissement <strong id="certificate-hospital-name-text">Hôpital Saint-Luc</strong>,</p>
-                        <p style="text-align:center;margin:30px 0;font-size:1.2em;"><strong>CERTIFIE</strong></p>
-                        <p>Que <strong id="certificate-patient-name"></strong>, né(e) le <span id="certificate-patient-dob"></span>,</p>
-                        <p>demeurant à <span id="certificate-patient-address"></span>,</p>
-                        <p>a été examiné(e) dans notre établissement le <span id="certificate-consultation-date"></span>.</p>
-                        <div style="margin:30px 0;">
-                            <p><strong>Diagnostic:</strong></p>
-                            <div id="certificate-diagnosis" style="padding:15px;background:#f8f9fa;border-radius:5px;margin-top:10px;"></div>
-                        </div>
-                        <p>En conséquence, nous attestons que l'intéressé(e) nécessite:</p>
+                        <p>Je soussigné(e), médecin à l'<strong id="certificate-hospital-inline">Hôpital Saint-Luc</strong>, certifie avoir examiné :</p>
+                        <p style="margin:20px 0; font-size:1.1rem;"><strong id="certificate-patient-name">-</strong>, né(e) le <strong id="certificate-patient-dob">-</strong></p>
+                        <p>J'atteste que son état de santé nécessite :</p>
                         <div style="margin:20px 0;">
-                            <p><input type="radio" name="rest-type" value="indetermine" checked> Un repos d'une durée indéterminée</p>
+                            <p><input type="radio" name="rest-type" value="repos"> Un repos total</p>
                             <p><input type="radio" name="rest-type" value="determine"> Un repos de <input type="number" id="rest-days" value="7" style="width:60px;"> jours</p>
                         </div>
                         <p>Le présent certificat est délivré à la demande de l'intéressé(e) pour faire valoir ce que de droit.</p>
@@ -303,45 +309,74 @@
 
         <!-- ─── CAISSE ──────────────────────────────────── -->
         <section id="cashier" class="content">
-            <h2 class="section-title">Caisse</h2>
+            <h2 class="section-title"><i class="fas fa-cash-register"></i> Caisse</h2>
+
+            <!-- Sélecteur de devise -->
+            <div class="exchange-banner">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Taux de change : <strong id="exchange-rate-display">130 HTG = 1 USD</strong></span>
+                <div style="margin-left:auto;" class="currency-switcher">
+                    <button class="currency-btn active" id="currency-gdes" data-currency="HTG">Gourdes (HTG)</button>
+                    <button class="currency-btn" id="currency-usd" data-currency="USD">Dollars (USD)</button>
+                </div>
+            </div>
+
             <div class="card">
                 <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
-                <div class="d-flex" style="gap:15px;">
+                <div class="d-flex gap-15">
                     <input type="text" id="cashier-patient-search" class="form-control" placeholder="ID patient ou nom">
                     <button id="search-cashier-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
             </div>
+
             <div id="cashier-patient-details" class="hidden">
                 <div class="card">
-                    <h3>Détails: <span id="cashier-patient-name"></span> (<span id="cashier-patient-id"></span>)</h3>
+                    <h3><i class="fas fa-user"></i> <span id="cashier-patient-name"></span> <small class="text-muted">(#<span id="cashier-patient-id"></span>)</small></h3>
                     <div class="mt-3">
                         <h4>Services à payer</h4>
                         <div id="services-to-pay-list"></div>
-                        <div class="cashier-total"><h3>Total: <span id="total-to-pay">0</span> Gdes</h3></div>
+                        <div class="cashier-total">
+                            <div class="total-both">
+                                <div class="total-currency">
+                                    <span>Gourdes</span>
+                                    <strong><span id="total-to-pay">0.00</span> HTG</strong>
+                                </div>
+                                <div style="color:#bbb;font-size:1.2rem;">≈</div>
+                                <div class="total-currency">
+                                    <span>Dollars</span>
+                                    <strong id="total-to-pay-usd">0.00 USD</strong>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="change-money-container">
-                        <h4>Calcul de monnaie</h4>
-                        <div class="d-flex" style="gap:15px;align-items:center;">
-                            <label>Montant donné:</label>
-                            <input type="number" id="amount-given" class="form-control" style="width:150px;" placeholder="Gdes" min="0">
-                            <div class="change-money-result" id="change-result">Monnaie: 0 Gdes</div>
+                        <h4 style="margin-bottom:10px;"><i class="fas fa-calculator"></i> Calcul de monnaie</h4>
+                        <div class="d-flex gap-15 align-center flex-wrap">
+                            <label style="font-weight:600;white-space:nowrap;">Montant donné:</label>
+                            <input type="number" id="amount-given" class="form-control" style="width:160px;" placeholder="0.00" min="0">
+                            <select id="payment-currency-select" class="form-control" style="width:120px;">
+                                <option value="HTG">HTG (Gdes)</option>
+                                <option value="USD">USD ($)</option>
+                            </select>
+                            <div class="change-money-result" id="change-result" style="min-width:180px;">Monnaie: 0.00</div>
                         </div>
                     </div>
                     <div class="mt-3">
                         <h4>Moyen de paiement</h4>
                         <div class="payment-method-selector">
-                            <div class="payment-method active" data-method="cash"><i class="fas fa-money-bill-wave fa-2x"></i><p>Espèces</p></div>
-                            <div class="payment-method" data-method="moncash"><i class="fas fa-mobile-alt fa-2x"></i><p>MonCash</p></div>
-                            <div class="payment-method" data-method="natcash"><i class="fas fa-wallet fa-2x"></i><p>NatCash</p></div>
-                            <div class="payment-method" data-method="card"><i class="fas fa-credit-card fa-2x"></i><p>Carte bancaire</p></div>
+                            <div class="payment-method active" data-method="cash"><i class="fas fa-money-bill-wave"></i><p>Espèces</p></div>
+                            <div class="payment-method" data-method="moncash"><i class="fas fa-mobile-alt"></i><p>MonCash</p></div>
+                            <div class="payment-method" data-method="natcash"><i class="fas fa-wallet"></i><p>NatCash</p></div>
+                            <div class="payment-method" data-method="card"><i class="fas fa-credit-card"></i><p>Carte</p></div>
                         </div>
                     </div>
-                    <div class="d-flex justify-between mt-3">
-                        <button id="mark-as-paid" class="btn btn-success"><i class="fas fa-check-circle"></i> Marquer comme payé</button>
+                    <div class="d-flex justify-between flex-wrap gap-15 mt-3">
+                        <button id="mark-as-paid" class="btn btn-success"><i class="fas fa-check-circle"></i> Valider le paiement</button>
                         <button id="print-invoice" class="btn btn-warning"><i class="fas fa-print"></i> Imprimer facture</button>
-                        <button id="print-receipt" class="btn btn-info"><i class="fas fa-receipt"></i> Imprimer reçu</button>
+                        <button id="print-receipt" class="btn btn-info"><i class="fas fa-receipt"></i> Reçu</button>
                     </div>
                 </div>
+
                 <!-- Facture printable -->
                 <div id="invoice-container" class="hidden printable">
                     <div class="print-receipt">
@@ -354,47 +389,47 @@
                         <hr>
                         <div>
                             <p><strong>Patient:</strong> <span id="invoice-patient-name"></span></p>
-                            <p><strong>ID Patient:</strong> <span id="invoice-patient-id"></span></p>
-                            <p><strong>Date:</strong> <span id="invoice-date"></span></p>
-                            <p><strong>Heure:</strong> <span id="invoice-time"></span></p>
+                            <p><strong>ID:</strong> <span id="invoice-patient-id"></span></p>
+                            <p><strong>Date:</strong> <span id="invoice-date"></span> — <span id="invoice-time"></span></p>
+                            <p><strong>Facture:</strong> #<span id="invoice-number"></span></p>
                         </div>
                         <hr>
                         <div id="invoice-services-list"></div>
                         <hr>
-                        <div class="receipt-item"><span><strong>TOTAL:</strong></span><span><strong id="invoice-total-amount">0</strong> Gdes</span></div>
-                        <div class="receipt-item"><span>Montant donné:</span><span id="invoice-amount-given">0 Gdes</span></div>
-                        <div class="receipt-item"><span>Monnaie rendue:</span><span id="invoice-change">0 Gdes</span></div>
-                        <div class="receipt-item"><span>Moyen de paiement:</span><span id="invoice-payment-method">Espèces</span></div>
+                        <div class="receipt-item"><span><strong>TOTAL HTG:</strong></span><span><strong><span id="invoice-total-amount">0</span> Gdes</strong></span></div>
+                        <div class="receipt-item"><span><strong>TOTAL USD:</strong></span><span><strong id="invoice-total-usd">0.00 $</strong></span></div>
+                        <div class="receipt-item"><span>Montant donné:</span><span id="invoice-amount-given">0</span></div>
+                        <div class="receipt-item"><span>Monnaie rendue:</span><span id="invoice-change">0</span></div>
+                        <div class="receipt-item"><span>Paiement:</span><span id="invoice-payment-method">Espèces</span></div>
                         <hr>
-                        <div class="text-center"><p>Merci pour votre confiance!</p><p><small>Facture #<span id="invoice-number"></span></small></p></div>
+                        <div class="text-center"><p>Merci pour votre confiance!</p></div>
                     </div>
                 </div>
             </div>
+
             <div id="external-medications-container" class="hidden card mt-3">
                 <h3><i class="fas fa-exclamation-triangle"></i> Médicaments à acheter ailleurs</h3>
                 <div id="external-medications-list"></div>
-                <div class="print-controls">
-                    <button id="print-external-meds" class="btn btn-warning"><i class="fas fa-print"></i> Imprimer la liste</button>
-                </div>
+                <button id="print-external-meds" class="btn btn-warning mt-2"><i class="fas fa-print"></i> Imprimer la liste</button>
             </div>
         </section>
 
         <!-- ─── INFIRMIER ───────────────────────────────── -->
         <section id="nurse" class="content">
-            <h2 class="section-title">Infirmier — Signes Vitaux</h2>
+            <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier — Signes Vitaux</h2>
             <div class="card">
                 <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
-                <div class="d-flex" style="gap:15px;">
+                <div class="d-flex gap-15">
                     <input type="text" id="nurse-patient-search" class="form-control" placeholder="ID patient ou nom">
                     <button id="search-nurse-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
             </div>
             <div id="nurse-patient-details" class="hidden">
                 <div class="card">
-                    <h3>Patient: <span id="nurse-patient-name"></span> (<span id="nurse-patient-id"></span>)</h3>
+                    <h3>Patient: <span id="nurse-patient-name"></span> <small class="text-muted">(#<span id="nurse-patient-id"></span>)</small></h3>
                     <p><strong>Statut paiement:</strong> <span id="nurse-payment-status" class="patient-status-badge status-unpaid">Non payé</span></p>
                     <div class="vitals-form mt-3">
-                        <h4><i class="fas fa-heartbeat"></i> Signes Vitaux</h4>
+                        <h4><i class="fas fa-heartbeat"></i> Saisir les Signes Vitaux</h4>
                         <form id="vitals-form">
                             <div id="vitals-inputs-container" class="vitals-grid"></div>
                             <button type="submit" class="btn btn-success mt-3"><i class="fas fa-save"></i> Enregistrer</button>
@@ -407,26 +442,20 @@
 
         <!-- ─── MÉDECIN ─────────────────────────────────── -->
         <section id="doctor" class="content">
-            <h2 class="section-title">Médecin — Consultation</h2>
+            <h2 class="section-title"><i class="fas fa-user-md"></i> Médecin — Consultation</h2>
             <div class="card">
                 <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
-                <div class="d-flex" style="gap:15px;">
+                <div class="d-flex gap-15">
                     <input type="text" id="doctor-patient-search" class="form-control" placeholder="ID patient ou nom">
                     <button id="search-doctor-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
             </div>
             <div id="doctor-patient-details" class="hidden">
                 <div class="card">
-                    <h3>Patient: <span id="doctor-patient-name"></span> (<span id="doctor-patient-id"></span>)</h3>
-                    <div class="d-flex" style="gap:20px;margin-bottom:20px;">
-                        <div style="flex:1">
-                            <p><strong>Âge:</strong> <span id="doctor-patient-age"></span> ans</p>
-                            <p><strong>Téléphone:</strong> <span id="doctor-patient-phone"></span></p>
-                        </div>
-                        <div style="flex:1">
-                            <p><strong>Type:</strong> <span id="doctor-patient-type"></span></p>
-                            <p><strong>Statut:</strong> <span id="doctor-payment-status" class="patient-status-badge"></span></p>
-                        </div>
+                    <h3>Patient: <span id="doctor-patient-name"></span> <small class="text-muted">(#<span id="doctor-patient-id"></span>)</small></h3>
+                    <div class="d-flex gap-20" style="margin-bottom:16px;flex-wrap:wrap;">
+                        <div style="flex:1"><p><strong>Âge:</strong> <span id="doctor-patient-age"></span> ans</p><p><strong>Téléphone:</strong> <span id="doctor-patient-phone"></span></p></div>
+                        <div style="flex:1"><p><strong>Type:</strong> <span id="doctor-patient-type"></span></p><p><strong>Statut:</strong> <span id="doctor-payment-status" class="patient-status-badge"></span></p></div>
                     </div>
 
                     <div id="current-consultation-display" class="consultation-display">
@@ -434,7 +463,7 @@
                         <div id="current-consultation-info"></div>
                         <div id="consultation-modification-section" class="hidden mt-3">
                             <h5>Modifier la consultation</h5>
-                            <div class="d-flex" style="gap:10px;">
+                            <div class="d-flex gap-10">
                                 <select id="doctor-consultation-type" class="form-control"><option value="">Sélectionner un type</option></select>
                                 <button id="update-consultation-type" class="btn btn-warning">Modifier</button>
                             </div>
@@ -442,18 +471,18 @@
                         </div>
                     </div>
 
-                    <div id="doctor-patient-vitals" class="vitals-form">
+                    <div id="doctor-patient-vitals" class="vitals-form mt-3">
                         <h4><i class="fas fa-heartbeat"></i> Signes Vitaux Récents</h4>
                         <div id="current-vitals-display"></div>
-                        <button id="edit-vitals-btn" class="btn btn-warning mt-2"><i class="fas fa-edit"></i> Modifier</button>
+                        <button id="edit-vitals-btn" class="btn btn-warning btn-sm mt-2"><i class="fas fa-edit"></i> Modifier</button>
                     </div>
 
-                    <div class="doctor-modification-form hidden" id="doctor-vitals-modification">
+                    <div class="doctor-modification-form hidden mt-3" id="doctor-vitals-modification">
                         <h4><i class="fas fa-edit"></i> Modification des signes vitaux</h4>
                         <form id="vitals-modification-form">
                             <div id="vitals-modification-inputs"></div>
                             <button type="submit" class="btn btn-success mt-2"><i class="fas fa-save"></i> Enregistrer</button>
-                            <button type="button" id="cancel-vitals-modification" class="btn btn-secondary mt-2">Annuler</button>
+                            <button type="button" id="cancel-vitals-modification" class="btn btn-secondary mt-2 ms-2">Annuler</button>
                         </form>
                     </div>
 
@@ -472,7 +501,7 @@
                                 <div id="lab-analyses-selection"></div>
                                 <div id="lab-modification-panel" class="type-modification-panel hidden">
                                     <h4><i class="fas fa-edit"></i> Modifier une analyse</h4>
-                                    <div class="d-flex" style="gap:15px;">
+                                    <div class="d-flex gap-15">
                                         <input type="text" id="modified-analysis-name" class="form-control" placeholder="Nom modifié">
                                         <input type="number" id="modified-analysis-price" class="form-control" placeholder="Prix (Gdes)" min="0">
                                         <button type="button" id="save-modified-analysis" class="btn btn-success">Enregistrer</button>
@@ -484,7 +513,7 @@
                                 <label class="form-label">Prescription médicaments</label>
                                 <div style="position:relative;">
                                     <input type="text" id="medication-search" class="form-control" placeholder="Rechercher un médicament...">
-                                    <div id="medication-suggestions" class="hidden" style="position:absolute;background:white;border:1px solid #ddd;border-radius:5px;width:100%;z-index:100;box-shadow:0 4px 8px rgba(0,0,0,0.1);"></div>
+                                    <div id="medication-suggestions" class="hidden" style="position:absolute;background:#fff;border:1px solid #e2ecf8;border-radius:8px;width:100%;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.12);"></div>
                                 </div>
                                 <div id="stock-warnings" class="mt-2"></div>
                                 <table class="medication-prescription-table mt-2">
@@ -494,7 +523,7 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Suivi</label>
-                                <div class="d-flex" style="gap:15px;">
+                                <div class="d-flex gap-15">
                                     <input type="date" id="followup-date" class="form-control">
                                     <input type="time" id="followup-time" class="form-control">
                                 </div>
@@ -503,7 +532,6 @@
                         </form>
                     </div>
 
-                    <!-- Rendez-vous médecin -->
                     <div class="mt-3">
                         <h4><i class="fas fa-calendar-alt"></i> Mes Rendez-vous</h4>
                         <div id="doctor-appointments-list"></div>
@@ -514,17 +542,17 @@
 
         <!-- ─── LABORATOIRE ─────────────────────────────── -->
         <section id="laboratory" class="content">
-            <h2 class="section-title">Laboratoire</h2>
+            <h2 class="section-title"><i class="fas fa-flask"></i> Laboratoire</h2>
             <div class="card">
                 <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
-                <div class="d-flex" style="gap:15px;">
+                <div class="d-flex gap-15">
                     <input type="text" id="lab-patient-search" class="form-control" placeholder="ID patient ou nom">
                     <button id="search-lab-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
             </div>
             <div id="lab-patient-details" class="hidden">
                 <div class="card">
-                    <h3>Patient: <span id="lab-patient-name"></span> (<span id="lab-patient-id"></span>)</h3>
+                    <h3>Patient: <span id="lab-patient-name"></span> <small class="text-muted">(#<span id="lab-patient-id"></span>)</small></h3>
                     <p><strong>Statut paiement:</strong> <span id="lab-payment-status" class="patient-status-badge"></span></p>
                     <div class="mt-3" id="lab-analyses-list"></div>
                 </div>
@@ -537,45 +565,49 @@
 
         <!-- ─── PHARMACIE ───────────────────────────────── -->
         <section id="pharmacy" class="content">
-            <h2 class="section-title">Pharmacie</h2>
+            <h2 class="section-title"><i class="fas fa-pills"></i> Pharmacie</h2>
             <div class="card">
                 <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
-                <div class="d-flex" style="gap:15px;">
+                <div class="d-flex gap-15">
                     <input type="text" id="pharmacy-patient-search" class="form-control" placeholder="ID patient ou nom">
                     <button id="search-pharmacy-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
             </div>
             <div id="pharmacy-patient-details" class="hidden">
                 <div class="card">
-                    <h3>Patient: <span id="pharmacy-patient-name"></span> (<span id="pharmacy-patient-id"></span>)</h3>
+                    <h3>Patient: <span id="pharmacy-patient-name"></span> <small class="text-muted">(#<span id="pharmacy-patient-id"></span>)</small></h3>
                     <p><strong>Statut:</strong> <span id="pharmacy-payment-status" class="patient-status-badge"></span></p>
                     <div id="pharmacy-prescriptions-list" class="mt-3"></div>
-                    <button id="deliver-medications" class="btn btn-success mt-3" disabled><i class="fas fa-pills"></i> Délivrer tous</button>
+                    <button id="deliver-medications" class="btn btn-success mt-3" disabled><i class="fas fa-pills"></i> Délivrer tous les médicaments</button>
                 </div>
             </div>
             <div class="card mt-3">
                 <h3><i class="fas fa-warehouse"></i> Stock Médicaments</h3>
                 <button id="add-new-medication" class="btn btn-success mb-3"><i class="fas fa-plus"></i> Ajouter médicament</button>
                 <div id="new-medication-form" style="display:none;" class="card mb-3">
-                    <h4>Nouveau médicament</h4>
-                    <div class="d-flex" style="gap:15px;flex-wrap:wrap;">
-                        <input type="text" id="new-med-name" class="form-control" placeholder="Nom commercial" style="flex:1;">
-                        <input type="text" id="new-med-generic" class="form-control" placeholder="Nom générique" style="flex:1;">
-                        <select id="new-med-form" class="form-control" style="flex:1;">
-                            <option value="">Forme</option>
-                            <option value="Comprimé">Comprimé</option>
-                            <option value="Capsule">Capsule</option>
-                            <option value="Sirop">Sirop</option>
-                            <option value="Injection">Injection</option>
-                            <option value="Crème">Crème</option>
-                        </select>
-                        <input type="text" id="new-med-unit" class="form-control" placeholder="Unité (comprimés…)" style="flex:1;">
-                        <input type="number" id="new-med-quantity" class="form-control" placeholder="Quantité" min="0" style="flex:1;">
-                        <input type="number" id="new-med-alert" class="form-control" placeholder="Seuil alerte" min="0" style="flex:1;">
-                        <input type="number" id="new-med-price" class="form-control" placeholder="Prix unitaire (Gdes)" min="0" style="flex:1;">
+                    <h4><i class="fas fa-plus-circle" style="color:var(--success);"></i> Nouveau médicament</h4>
+                    <div class="add-form-grid" style="margin-top:10px;">
+                        <div><label class="form-label">Nom commercial *</label><input type="text" id="new-med-name" class="form-control" placeholder="Ex: Amoxicilline 500mg"></div>
+                        <div><label class="form-label">Nom générique</label><input type="text" id="new-med-generic" class="form-control" placeholder="Nom générique"></div>
+                        <div><label class="form-label">Forme *</label>
+                            <select id="new-med-form" class="form-control">
+                                <option value="">Choisir...</option>
+                                <option value="Comprimé">Comprimé</option>
+                                <option value="Capsule">Capsule</option>
+                                <option value="Sirop">Sirop</option>
+                                <option value="Injection">Injection</option>
+                                <option value="Crème">Crème</option>
+                                <option value="Pommade">Pommade</option>
+                                <option value="Suppositoire">Suppositoire</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">Unité *</label><input type="text" id="new-med-unit" class="form-control" placeholder="comprimés, ml…"></div>
+                        <div><label class="form-label">Quantité *</label><input type="number" id="new-med-quantity" class="form-control" placeholder="0" min="0"></div>
+                        <div><label class="form-label">Seuil alerte *</label><input type="number" id="new-med-alert" class="form-control" placeholder="10" min="0"></div>
+                        <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-med-price" class="form-control" placeholder="0.00" min="0"></div>
                     </div>
-                    <div class="mt-2">
-                        <button id="save-new-medication" class="btn btn-success">Enregistrer</button>
+                    <div class="mt-3 d-flex gap-10">
+                        <button id="save-new-medication" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer</button>
                         <button id="cancel-new-medication" class="btn btn-secondary">Annuler</button>
                     </div>
                 </div>
@@ -585,10 +617,10 @@
 
         <!-- ─── MESSAGERIE ──────────────────────────────── -->
         <section id="messaging" class="content">
-            <h2 class="section-title">Messagerie Interne</h2>
+            <h2 class="section-title"><i class="fas fa-comments"></i> Messagerie Interne</h2>
             <div class="messaging-container">
                 <div>
-                    <div class="d-flex justify-between mb-2">
+                    <div class="d-flex justify-between align-center mb-2">
                         <h4>Conversations</h4>
                         <button id="compose-message" class="btn btn-sm btn-success"><i class="fas fa-pen"></i> Nouveau</button>
                     </div>
@@ -596,24 +628,31 @@
                 </div>
                 <div id="message-panel">
                     <div id="compose-panel" class="hidden">
-                        <h4>Nouveau message</h4>
+                        <h4 style="margin-bottom:14px;"><i class="fas fa-pen" style="color:var(--primary);"></i> Nouveau message</h4>
                         <div class="form-group">
                             <label class="form-label">Destinataire</label>
                             <select id="message-recipient" class="form-control"></select>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Sujet</label>
-                            <input type="text" id="message-subject" class="form-control">
+                            <input type="text" id="message-subject" class="form-control" placeholder="Objet du message">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Message</label>
-                            <textarea id="message-content" class="form-control" rows="5"></textarea>
+                            <textarea id="message-content" class="form-control" rows="5" placeholder="Votre message..."></textarea>
                         </div>
-                        <button id="send-message" class="btn btn-success"><i class="fas fa-paper-plane"></i> Envoyer</button>
-                        <button id="cancel-compose" class="btn btn-secondary">Annuler</button>
+                        <div class="d-flex gap-10">
+                            <button id="send-message" class="btn btn-success"><i class="fas fa-paper-plane"></i> Envoyer</button>
+                            <button id="cancel-compose" class="btn btn-secondary">Annuler</button>
+                        </div>
                     </div>
                     <div id="chat-panel">
-                        <div class="chat-messages" id="chat-messages"></div>
+                        <div class="chat-messages" id="chat-messages">
+                            <div style="text-align:center;padding:40px;color:#bbb;">
+                                <i class="fas fa-comments" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+                                Sélectionner une conversation
+                            </div>
+                        </div>
                         <div class="chat-input-container">
                             <input type="text" id="chat-input" class="form-control" placeholder="Écrire un message...">
                             <button id="send-chat" class="btn btn-success"><i class="fas fa-paper-plane"></i></button>
@@ -625,23 +664,32 @@
 
         <!-- ─── ADMINISTRATION ──────────────────────────── -->
         <section id="administration" class="content">
-            <h2 class="section-title">Administration</h2>
+            <h2 class="section-title"><i class="fas fa-chart-bar"></i> Administration</h2>
 
-            <!-- Recherche patient (admin) -->
+            <!-- Sélecteur de devise pour rapports -->
+            <div class="exchange-banner mb-3">
+                <i class="fas fa-file-alt"></i>
+                <span>Rapports en :</span>
+                <div class="currency-switcher" style="margin-left:10px;">
+                    <button class="currency-btn active" id="report-currency-gdes" data-currency="HTG">Gourdes</button>
+                    <button class="currency-btn" id="report-currency-usd" data-currency="USD">Dollars USD</button>
+                </div>
+            </div>
+
             <div class="card admin-search-section">
                 <h3><i class="fas fa-search"></i> Rechercher un Patient</h3>
-                <div class="d-flex" style="gap:15px;">
+                <div class="d-flex gap-15">
                     <input type="text" id="admin-patient-search" class="form-control" placeholder="ID ou nom du patient">
                     <button id="search-admin-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
                 </div>
                 <div id="admin-patient-result" class="hidden mt-3"></div>
             </div>
 
-            <!-- Stats globales -->
             <div class="admin-stats-grid" id="admin-stats-grid">
-                <div class="admin-stat-card clickable-stat" id="stat-revenue-card">
+                <div class="admin-stat-card">
                     <h3><i class="fas fa-money-bill-wave"></i> Revenus Totaux</h3>
-                    <h2 id="admin-total-revenue">0 Gdes</h2>
+                    <h2 id="admin-total-revenue">0 HTG</h2>
+                    <p id="admin-total-revenue-usd" style="color:#2e7d32;font-weight:600;font-size:.9rem;"></p>
                     <div class="chart-bar-container mt-2">
                         <div class="chart-bar-label"><span>Payés</span><span id="paid-percentage">0%</span></div>
                         <div class="chart-bar-bg"><div id="paid-chart-bar" class="chart-bar-fill" style="width:0%"></div></div>
@@ -653,19 +701,14 @@
                 </div>
                 <div class="admin-stat-card">
                     <h3><i class="fas fa-chart-pie"></i> Répartition des Services</h3>
-                    <div id="services-pie-chart" class="mt-2" style="height:150px;position:relative;">
-                        <div style="display:flex;justify-content:center;align-items:center;height:100%;">
-                            <div id="pie-chart-visual" style="width:120px;height:120px;border-radius:50%;background:conic-gradient(#1a6bca 0% 25%, #28a745 25% 50%, #ffc107 50% 75%, #17a2b8 75% 100%);"></div>
-                        </div>
-                        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
-                            <h4 id="total-services-count">0</h4><small>Services</small>
-                        </div>
+                    <div id="services-pie-chart" class="mt-2" style="height:150px;position:relative;display:flex;align-items:center;justify-content:center;">
+                        <div id="pie-chart-visual" style="width:120px;height:120px;border-radius:50%;background:conic-gradient(#1a6bca 0% 25%, #28a745 25% 50%, #ffc107 50% 75%, #17a2b8 75% 100%);"></div>
                     </div>
-                    <div class="mt-2">
-                        <div><span class="percentage-badge" style="background:#1a6bca">Consultations</span> <span id="consultations-percentage">0%</span></div>
-                        <div><span class="percentage-badge" style="background:#28a745">Analyses</span> <span id="analyses-percentage">0%</span></div>
-                        <div><span class="percentage-badge" style="background:#ffc107">Médicaments</span> <span id="medications-percentage">0%</span></div>
-                        <div><span class="percentage-badge" style="background:#17a2b8">Externes</span> <span id="external-percentage">0%</span></div>
+                    <div class="mt-2" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+                        <div><span class="badge badge-primary">Consultations</span> <span id="consultations-percentage">0%</span></div>
+                        <div><span class="badge badge-success">Analyses</span> <span id="analyses-percentage">0%</span></div>
+                        <div><span class="badge badge-warning">Médicaments</span> <span id="medications-percentage">0%</span></div>
+                        <div><span class="badge" style="background:var(--info-light);color:var(--info);">Externes</span> <span id="external-percentage">0%</span></div>
                     </div>
                 </div>
             </div>
@@ -674,7 +717,7 @@
                 <h3><i class="fas fa-history"></i> Transactions Récentes</h3>
                 <div class="table-container">
                     <table>
-                        <thead><tr><th>Date/Heure</th><th>Patient</th><th>Service</th><th>Montant</th><th>Méthode</th><th>Agent</th><th>Statut</th></tr></thead>
+                        <thead><tr><th>Date/Heure</th><th>Patient</th><th>Service</th><th>Montant (HTG)</th><th>Montant (USD)</th><th>Méthode</th><th>Agent</th><th>Statut</th></tr></thead>
                         <tbody id="recent-transactions-list"></tbody>
                     </table>
                 </div>
@@ -684,7 +727,7 @@
                 <div class="transaction-details-content">
                     <h3>Détails de la transaction</h3>
                     <div id="transaction-details-content"></div>
-                    <div class="mt-3">
+                    <div class="mt-3 d-flex gap-10">
                         <button id="close-transaction-details" class="btn btn-secondary">Fermer</button>
                         <button id="edit-transaction" class="btn btn-warning">Modifier</button>
                     </div>
@@ -696,105 +739,208 @@
         <section id="settings" class="content">
             <h2 class="section-title"><i class="fas fa-cog"></i> Paramètres du Système</h2>
 
+            <!-- Infos hôpital -->
             <div class="card">
                 <h3><i class="fas fa-hospital"></i> Informations de l'Hôpital</h3>
-                <div class="hospital-info-form">
+                <div class="add-form-grid" style="margin-top:10px;">
                     <div class="form-group"><label class="form-label">Nom de l'Hôpital</label><input type="text" id="hospital-name" class="form-control" value="Hôpital Saint-Luc"></div>
                     <div class="form-group"><label class="form-label">Adresse</label><input type="text" id="hospital-address" class="form-control" value="Port-au-Prince, Haïti"></div>
                     <div class="form-group"><label class="form-label">Téléphone</label><input type="text" id="hospital-phone" class="form-control" value="(509) 1234-5678"></div>
-                    <div class="form-group">
-                        <label class="form-label">Logo</label>
+                    <div class="form-group"><label class="form-label">Logo</label>
                         <input type="file" id="hospital-logo" class="form-control" accept="image/*">
-                        <img id="logo-preview" src="" alt="Logo" class="logo-preview" style="display:none;">
+                        <img id="logo-preview" src="" alt="Logo" class="logo-preview" style="display:none;margin-top:8px;">
                     </div>
-                    <button type="button" id="save-hospital-info-btn" class="btn btn-success">Enregistrer</button>
+                </div>
+                <button type="button" id="save-hospital-info-btn" class="btn btn-success mt-3"><i class="fas fa-save"></i> Enregistrer</button>
+            </div>
+
+            <!-- Taux de change -->
+            <div class="card">
+                <h3><i class="fas fa-dollar-sign"></i> Taux de Change (HTG / USD)</h3>
+                <p class="text-muted" style="margin-bottom:14px;">Définissez le taux utilisé pour les conversions dans l'application.</p>
+                <div class="add-form-grid" style="margin-top:0;">
+                    <div>
+                        <label class="form-label">Taux (HTG pour 1 USD)</label>
+                        <input type="number" id="exchange-rate-input" class="form-control" value="130" min="1" step="0.01">
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button id="save-exchange-rate-btn" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer le taux</button>
+                    </div>
+                    <div style="grid-column:1/-1;" id="exchange-preview" class="exchange-banner" style="margin-top:8px;margin-bottom:0;">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Taux actuel : <strong>130 HTG = 1 USD</strong></span>
+                    </div>
                 </div>
             </div>
 
+            <!-- Médicaments -->
             <div class="card">
                 <h3><i class="fas fa-pills"></i> Gestion des Médicaments</h3>
-                <div class="d-flex" style="gap:15px;margin-top:15px;">
-                    <input type="text" id="new-medication-name" class="form-control" placeholder="Nom">
-                    <input type="number" id="new-medication-price" class="form-control" placeholder="Prix (Gdes)" min="0">
-                    <input type="number" id="new-medication-quantity" class="form-control" placeholder="Quantité" min="0">
-                    <input type="number" id="new-medication-alert" class="form-control" placeholder="Seuil alerte" min="0">
-                    <button type="button" id="add-medication-settings" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
-                </div>
-                <div class="table-container mt-3">
+                <div class="table-container mt-2">
                     <table>
-                        <thead><tr><th>Médicament</th><th>Prix</th><th>Quantité</th><th>Seuil alerte</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Médicament</th><th>Prix (Gdes)</th><th>Quantité</th><th>Seuil alerte</th><th>Actions</th></tr></thead>
                         <tbody id="medications-settings-list"></tbody>
                     </table>
                 </div>
-            </div>
-
-            <div class="card"><h3><i class="fas fa-stethoscope"></i> Types de Consultation</h3><div id="consultation-types-list"></div>
-                <div class="d-flex" style="gap:15px;margin-top:15px;">
-                    <input type="text" id="new-consultation-type-name" class="form-control" placeholder="Nom">
-                    <input type="number" id="new-consultation-type-price" class="form-control" placeholder="Prix (Gdes)" min="0">
-                    <textarea id="new-consultation-type-description" class="form-control" placeholder="Description" rows="1"></textarea>
-                    <button type="button" id="add-consultation-type" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom *</label><input type="text" id="new-medication-name" class="form-control" placeholder="Nom du médicament"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-medication-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div><label class="form-label">Quantité *</label><input type="number" id="new-medication-quantity" class="form-control" placeholder="0" min="0"></div>
+                    <div><label class="form-label">Seuil alerte *</label><input type="number" id="new-medication-alert" class="form-control" placeholder="10" min="0"></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-medication-settings" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="card"><h3><i class="fas fa-heartbeat"></i> Signes Vitaux</h3><div id="vitals-types-list"></div>
-                <div class="d-flex" style="gap:15px;margin-top:15px;">
-                    <input type="text" id="new-vital-name" class="form-control" placeholder="Nom">
-                    <input type="text" id="new-vital-unit" class="form-control" placeholder="Unité (°C, bpm…)">
-                    <input type="number" id="new-vital-min" class="form-control" placeholder="Min">
-                    <input type="number" id="new-vital-max" class="form-control" placeholder="Max">
-                    <button type="button" id="add-vital-type" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
+            <!-- Types de consultation -->
+            <div class="card">
+                <h3><i class="fas fa-stethoscope"></i> Types de Consultation</h3>
+                <div id="consultation-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom *</label><input type="text" id="new-consultation-type-name" class="form-control" placeholder="Ex: Consultation générale"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-consultation-type-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div style="grid-column:span 2"><label class="form-label">Description</label><textarea id="new-consultation-type-description" class="form-control" placeholder="Description du type de consultation" rows="2"></textarea></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-consultation-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="card"><h3><i class="fas fa-flask"></i> Analyses de Laboratoire</h3><div id="lab-analyses-types-list"></div>
-                <div class="d-flex" style="gap:15px;margin-top:15px;">
-                    <input type="text" id="new-lab-analysis-name" class="form-control" placeholder="Nom de l'analyse">
-                    <input type="number" id="new-lab-analysis-price" class="form-control" placeholder="Prix (Gdes)" min="0">
-                    <select id="new-lab-analysis-type" class="form-control">
-                        <option value="text">Résultat texte</option>
-                        <option value="image">Résultat image</option>
-                    </select>
-                    <button type="button" id="add-lab-analysis-type" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
+            <!-- Signes vitaux -->
+            <div class="card">
+                <h3><i class="fas fa-heartbeat"></i> Types de Signes Vitaux</h3>
+                <div id="vitals-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom *</label><input type="text" id="new-vital-name" class="form-control" placeholder="Ex: Tension artérielle"></div>
+                    <div><label class="form-label">Unité *</label><input type="text" id="new-vital-unit" class="form-control" placeholder="Ex: mmHg, °C, bpm"></div>
+                    <div><label class="form-label">Valeur min *</label><input type="number" id="new-vital-min" class="form-control" placeholder="0"></div>
+                    <div><label class="form-label">Valeur max *</label><input type="number" id="new-vital-max" class="form-control" placeholder="200"></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-vital-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="card"><h3><i class="fas fa-external-link-alt"></i> Services Externes</h3><div id="external-services-types-list"></div>
-                <div class="d-flex" style="gap:15px;margin-top:15px;">
-                    <input type="text" id="new-external-service-type-name" class="form-control" placeholder="Nom du service">
-                    <input type="number" id="new-external-service-type-price" class="form-control" placeholder="Prix (Gdes)" min="0">
-                    <button type="button" id="add-external-service-type" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
+            <!-- Analyses de laboratoire -->
+            <div class="card">
+                <h3><i class="fas fa-flask"></i> Analyses de Laboratoire</h3>
+                <div id="lab-analyses-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom de l'analyse *</label><input type="text" id="new-lab-analysis-name" class="form-control" placeholder="Ex: Numération formule sanguine"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-lab-analysis-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div><label class="form-label">Type de résultat</label>
+                        <select id="new-lab-analysis-type" class="form-control">
+                            <option value="text">Résultat texte</option>
+                            <option value="image">Résultat image</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-lab-analysis-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
                 </div>
             </div>
 
+            <!-- Services externes -->
+            <div class="card">
+                <h3><i class="fas fa-external-link-alt"></i> Services Externes</h3>
+                <div id="external-services-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom du service *</label><input type="text" id="new-external-service-type-name" class="form-control" placeholder="Ex: Radiologie"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-external-service-type-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-external-service-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gestion des utilisateurs -->
             <div class="card">
                 <h3><i class="fas fa-users"></i> Gestion des Utilisateurs</h3>
                 <div class="table-container">
                     <table>
-                        <thead><tr><th>Nom</th><th>Rôle</th><th>Identifiant</th><th>Actif</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Nom</th><th>Rôle</th><th>Identifiant</th><th>Actif</th><th>Permissions</th><th>Actions</th></tr></thead>
                         <tbody id="users-list"></tbody>
                     </table>
                 </div>
                 <div class="mt-3">
-                    <h4>Ajouter un utilisateur</h4>
-                    <div class="d-flex" style="gap:15px;">
-                        <input type="text" id="new-user-name" class="form-control" placeholder="Nom complet">
-                        <select id="new-user-role" class="form-control">
-                            <option value="">Sélectionner rôle</option>
-                            <option value="admin">Administrateur</option>
-                            <option value="secretary">Secrétariat</option>
-                            <option value="cashier">Caisse</option>
-                            <option value="nurse">Infirmier</option>
-                            <option value="doctor">Médecin</option>
-                            <option value="lab">Laboratoire</option>
-                            <option value="pharmacy">Pharmacie</option>
-                        </select>
-                        <input type="text" id="new-user-username" class="form-control" placeholder="Identifiant">
-                        <input type="password" id="new-user-password" class="form-control" placeholder="Mot de passe">
-                        <button type="button" id="add-user" class="btn btn-success">Ajouter</button>
+                    <h4 style="margin-bottom:12px;"><i class="fas fa-user-plus"></i> Ajouter un utilisateur</h4>
+                    <div class="add-form-grid">
+                        <div><label class="form-label">Nom complet *</label><input type="text" id="new-user-name" class="form-control" placeholder="Prénom et Nom"></div>
+                        <div><label class="form-label">Rôle *</label>
+                            <select id="new-user-role" class="form-control">
+                                <option value="">Sélectionner rôle</option>
+                                <option value="sub_admin">Sous-Administrateur</option>
+                                <option value="secretary">Secrétariat</option>
+                                <option value="cashier">Caisse</option>
+                                <option value="nurse">Infirmier</option>
+                                <option value="doctor">Médecin</option>
+                                <option value="lab">Laboratoire</option>
+                                <option value="pharmacy">Pharmacie</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">Identifiant *</label><input type="text" id="new-user-username" class="form-control" placeholder="login"></div>
+                        <div><label class="form-label">Mot de passe *</label><input type="password" id="new-user-password" class="form-control" placeholder="••••••••"></div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button type="button" id="add-user" class="btn btn-success" style="width:100%;"><i class="fas fa-user-plus"></i> Créer</button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Permissions sous-admin (visible seulement pour admin) -->
+            <div class="card" id="sub-admin-permissions-card">
+                <h3><i class="fas fa-shield-alt"></i> Permissions des Sous-Administrateurs</h3>
+                <p class="text-muted" style="margin-bottom:14px;">Définissez les sections et fonctionnalités accessibles aux sous-administrateurs.</p>
+                <div class="permissions-grid" id="sub-admin-permissions-grid">
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-secretary" checked>
+                        <label for="perm-secretary"><i class="fas fa-user-tie" style="color:var(--primary);"></i> Secrétariat</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-cashier" checked>
+                        <label for="perm-cashier"><i class="fas fa-cash-register" style="color:var(--success);"></i> Caisse</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-nurse" checked>
+                        <label for="perm-nurse"><i class="fas fa-user-nurse" style="color:#17a2b8;"></i> Infirmier</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-doctor" checked>
+                        <label for="perm-doctor"><i class="fas fa-user-md" style="color:#6f42c1;"></i> Médecin</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-laboratory" checked>
+                        <label for="perm-laboratory"><i class="fas fa-flask" style="color:var(--warning);"></i> Laboratoire</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-pharmacy" checked>
+                        <label for="perm-pharmacy"><i class="fas fa-pills" style="color:var(--danger);"></i> Pharmacie</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-messaging" checked>
+                        <label for="perm-messaging"><i class="fas fa-comments" style="color:var(--info);"></i> Messagerie</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-administration" checked>
+                        <label for="perm-administration"><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Administration</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-settings">
+                        <label for="perm-settings"><i class="fas fa-cog" style="color:var(--secondary);"></i> Paramètres</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-users">
+                        <label for="perm-users"><i class="fas fa-users" style="color:var(--primary);"></i> Gestion utilisateurs</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-exchange-rate">
+                        <label for="perm-exchange-rate"><i class="fas fa-dollar-sign" style="color:var(--success);"></i> Modifier taux de change</label>
+                    </div>
+                </div>
+                <button id="save-sub-admin-permissions" class="btn btn-success mt-3"><i class="fas fa-save"></i> Enregistrer les permissions</button>
+            </div>
+
         </section>
 
     </div><!-- /container -->
@@ -805,7 +951,7 @@
     <div class="spinner"></div>
 </div>
 
-<!-- Toast notifications -->
+<!-- Toast notifications container -->
 <div id="toast-container"></div>
 
 <!-- Scripts -->
