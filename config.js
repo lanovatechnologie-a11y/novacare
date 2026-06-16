@@ -4,7 +4,7 @@
 
 const CONFIG = {
     // URL de votre serveur backend (Render.com ou local)
-    // Exemple Render : "https://mon-hopital-api.onrender.com"
+    // Exemple Render : "https://novacare-1-lkux.onrender.com"
     // Exemple local  : "http://localhost:3000"
     API_URL: "http://localhost:3000",
 
