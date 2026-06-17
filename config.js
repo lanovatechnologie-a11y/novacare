@@ -4,9 +4,9 @@
 
 const CONFIG = {
     // URL de votre serveur backend (Render.com ou local)
-    // Exemple Render : "https://novacare-1-lkux.onrender.com"
-    // Exemple local  : "http://localhost:3000"
-    API_URL: "http://localhost:3000",
+    // Exemple Render : "https://mon-hopital-api.onrender.com"
+    // Exemple local  : "https://novacare-1-lkux.onrender.com"
+    API_URL: "https://novacare-1-lkux.onrender.com",
 
     // Nom affiché de l'hôpital (valeur par défaut, modifiable dans Paramètres)
     HOSPITAL_NAME: "Hôpital Saint-Luc",
