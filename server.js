@@ -14,10 +14,31 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── Connexion Neon PostgreSQL ────────────────────────────────
+// On nettoie l'URL pour retirer channel_binding qui cause des erreurs
+function buildConnectionString() {
+    const raw = process.env.DATABASE_URL || '';
+    if (!raw) { console.error('❌ DATABASE_URL non définie!'); process.exit(1); }
+    // Retirer channel_binding=require et reconstruire proprement
+    try {
+        const url = new URL(raw);
+        url.searchParams.delete('channel_binding');
+        url.searchParams.set('sslmode', 'require');
+        return url.toString();
+    } catch(e) {
+        // Fallback si URL invalide
+        return raw.replace(/[?&]channel_binding=[^&]*/g, '').replace(/[?&]sslmode=[^&]*/g, '') + '?sslmode=require';
+    }
+}
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }   // obligatoire pour Neon
+    connectionString: buildConnectionString(),
+    ssl: { rejectUnauthorized: false }
 });
+
+pool.connect()
+    .then(client => { console.log('✅ Connexion PostgreSQL réussie'); client.release(); })
+    .catch(err  => { console.error('❌ Erreur PostgreSQL:', err.message); });
+
 
 // ─── Middlewares ──────────────────────────────────────────────
 app.use(cors({ origin: '*' }));
