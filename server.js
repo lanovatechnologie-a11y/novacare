@@ -42,6 +42,7 @@ pool.connect()
 
 // ─── Middlewares ──────────────────────────────────────────────
 app.use(cors({ origin: '*' }));
+app.use(express.static(__dirname));   // Sert index.html et fichiers frontend
 app.use(express.json({ limit: '10mb' }));   // 10mb pour les images base64
 
 // ─── Auth middleware ──────────────────────────────────────────
@@ -706,6 +707,13 @@ app.get('/stats', auth, adminOnly, async (req, res) => {
 });
 
 // ─── Démarrage ────────────────────────────────────────────────
+// Fallback → renvoie index.html pour toutes les routes non-API
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/auth') && !req.path.startsWith('/patients') && !req.path.startsWith('/transactions') && !req.path.startsWith('/settings') && !req.path.startsWith('/users') && !req.path.startsWith('/medications') && !req.path.startsWith('/vitals') && !req.path.startsWith('/consultations') && !req.path.startsWith('/messages') && !req.path.startsWith('/stats') && !req.path.startsWith('/appointments')) {
+        res.sendFile(__dirname + '/index.html');
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`✅ Serveur démarré sur le port ${PORT}`);
     pool.query('SELECT NOW()').then(() => console.log('✅ Base de données Neon connectée'));
