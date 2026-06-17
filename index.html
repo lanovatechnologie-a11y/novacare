@@ -494,6 +494,10 @@
                                 <textarea id="consultation-diagnosis" class="form-control" rows="3" placeholder="Entrez le diagnostic..."></textarea>
                             </div>
                             <div class="form-group">
+                                <label class="form-label"><i class="fas fa-sticky-note" style="color:#ffc107;"></i> Note supplémentaire pour le patient</label>
+                                <textarea id="consultation-extra-note" class="form-control" rows="2" placeholder="Conseils, recommandations, instructions spéciales..."></textarea>
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">
                                     Analyses demandées
                                     <button type="button" id="modify-analyses-btn" class="btn btn-warning btn-sm modify-analysis-btn"><i class="fas fa-edit"></i> Modifier</button>
@@ -506,6 +510,16 @@
                                         <input type="number" id="modified-analysis-price" class="form-control" placeholder="Prix (Gdes)" min="0">
                                         <button type="button" id="save-modified-analysis" class="btn btn-success">Enregistrer</button>
                                         <button type="button" id="cancel-analysis-modification" class="btn btn-secondary">Annuler</button>
+                                    </div>
+                                </div>
+                                <div class="add-form-grid" style="margin-top:12px;background:#fff8e1;border-color:#ffc107;">
+                                    <div>
+                                        <label class="form-label"><i class="fas fa-plus-circle" style="color:#ffc107;"></i> Analyse hors liste</label>
+                                        <input type="text" id="custom-analysis-name" class="form-control" placeholder="Nom de l'analyse">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Prix (Gdes)</label>
+                                        <input type="number" id="custom-analysis-price" class="form-control" placeholder="0.00" min="0">
                                     </div>
                                 </div>
                             </div>

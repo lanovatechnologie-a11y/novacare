@@ -936,36 +936,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const ids = state.selectedServices.map(s => s.id);
         try {
             await apiCall(() => API.payTransactions(ids, method));
-            toast('Paiement enregistré!', 'success');
-            await loadServicesForPayment(state.currentCashierPatient);
             generateInvoice(totalHTG, givenHTG, payCurrency, method);
 
             // ── Notifications cross-département ciblées ──
             const txTypes = state.selectedServices.map(s => s.type);
             const patientName = state.currentCashierPatient.full_name;
-
-            // Médicaments → pharmacie
             if (txTypes.includes('medication')) {
                 await notifyDepartment('pharmacy', '💊 Médicaments payés',
                     `${patientName} a payé ses médicaments. Prêt pour la délivrance.`, '#28a745');
             }
-            // Analyses → labo
             if (txTypes.includes('lab')) {
                 await notifyDepartment('lab', '🧪 Analyses payées',
                     `${patientName} a payé ses analyses. À traiter en priorité.`, '#ffc107');
             }
-            // Consultation → médecin
             if (txTypes.includes('consultation')) {
                 await notifyDepartment('doctor', '🩺 Consultation payée',
                     `${patientName} a réglé sa consultation.`, '#6f42c1');
                 await notifyDepartment('nurse', '📋 Patient à accueillir',
                     `${patientName} a payé sa consultation. Signes vitaux à prendre.`, '#17a2b8');
             }
+            // Notification administration pour chaque transaction
+            await notifyAdmin('💰 Paiement reçu',
+                `${patientName} — ${totalHTG.toFixed(2)} HTG ($${htgToUsd(totalHTG)}) via ${method||'espèces'}. Agent: ${state.currentUser.name}`);
+
+            // Afficher modal impression
+            showPrintModal(totalHTG, givenHTG, payCurrency, method);
         } catch(e) {}
     });
-
-    document.getElementById('print-invoice')?.addEventListener('click', () => window.print());
-    document.getElementById('print-receipt')?.addEventListener('click', () => window.print());
 });
 
 async function loadServicesForPayment(patient) {
@@ -1081,9 +1078,10 @@ document.addEventListener('DOMContentLoaded', () => {
             toast('Signes vitaux enregistrés!');
             loadVitalsHistory(patientId);
             e.target.reset();
-            // Notification → médecin
             await notifyDepartment('doctor', '❤️ Signes vitaux disponibles',
                 `Signes vitaux de ${patientName} enregistrés. Patient prêt pour consultation.`, '#dc3545');
+            await notifyAdmin('❤️ Signes vitaux enregistrés',
+                `${state.currentUser.name} a pris les signes vitaux de ${patientName}.`);
         } catch(e) {}
     });
 });
@@ -1239,12 +1237,17 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         if (!state.currentDoctorPatient) { toast('Sélectionner un patient', 'error'); return; }
         const p         = state.currentDoctorPatient;
-        const diagnosis = document.getElementById('consultation-diagnosis').value;
+        const diagnosis   = document.getElementById('consultation-diagnosis').value;
+        const extraNote   = document.getElementById('consultation-extra-note').value;
         const followupDate = document.getElementById('followup-date').value;
         const followupTime = document.getElementById('followup-time').value;
 
         try {
-            await apiCall(() => API.addConsultation({ patientId: p.id, patientName: p.full_name, diagnosis, followupDate, followupTime }));
+            await apiCall(() => API.addConsultation({
+                patientId: p.id, patientName: p.full_name,
+                diagnosis: diagnosis + (extraNote ? '\n\n📝 Note supplémentaire: ' + extraNote : ''),
+                followupDate, followupTime
+            }));
 
             const checkedAnalyses = document.querySelectorAll('#lab-analyses-selection input:checked');
             for (const cb of checkedAnalyses) {
@@ -1254,6 +1257,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 let name  = state.currentModifiedAnalysis?.id===aId&&state.currentModifiedAnalysis.modifiedName?state.currentModifiedAnalysis.modifiedName:aType.name;
                 let price = state.currentModifiedAnalysis?.id===aId&&state.currentModifiedAnalysis.modifiedPrice?state.currentModifiedAnalysis.modifiedPrice:aType.price;
                 await API.addTransaction({ patientId:p.id, patientName:p.full_name, service:`Analyse: ${name}`, amount:price, type:'lab', analysisId:aId });
+            }
+
+            // Analyse personnalisée (hors liste)
+            const customAnalysisName  = document.getElementById('custom-analysis-name').value.trim();
+            const customAnalysisPrice = parseFloat(document.getElementById('custom-analysis-price').value);
+            if (customAnalysisName && !isNaN(customAnalysisPrice) && customAnalysisPrice >= 0) {
+                await API.addTransaction({ patientId:p.id, patientName:p.full_name,
+                    service:`Analyse: ${customAnalysisName}`, amount:customAnalysisPrice, type:'lab' });
             }
 
             const medRows = document.querySelectorAll('#prescription-medications-list tr');
@@ -1271,18 +1282,25 @@ document.addEventListener('DOMContentLoaded', () => {
             state.currentModifiedAnalysis = null;
             e.target.reset();
             document.getElementById('prescription-medications-list').innerHTML = '';
+            document.getElementById('custom-analysis-name').value = '';
+            document.getElementById('custom-analysis-price').value = '';
+
+            const totalAnalyses = checkedAnalyses.length + (customAnalysisName ? 1 : 0);
 
             // Notifications cross-département
             await notifyDepartment('cashier', '🩺 Nouvelle consultation',
                 `${p.full_name} — nouvelle consultation avec analyses/médicaments. Paiement à encaisser.`, '#1a6bca');
-            if (checkedAnalyses.length > 0) {
+            if (totalAnalyses > 0) {
                 await notifyDepartment('lab', '🧪 Analyses prescrites',
-                    `${p.full_name} — ${checkedAnalyses.length} analyse(s) prescrite(s). En attente de paiement.`, '#ffc107');
+                    `${p.full_name} — ${totalAnalyses} analyse(s) prescrite(s). En attente de paiement.`, '#ffc107');
             }
             if (medRows.length > 0) {
                 await notifyDepartment('pharmacy', '💊 Médicaments prescrits',
                     `${p.full_name} — ${medRows.length} médicament(s) prescrit(s). En attente de paiement.`, '#28a745');
             }
+            // Notification administration
+            await notifyAdmin('🩺 Nouvelle consultation enregistrée',
+                `Dr. ${state.currentUser.name} — Patient: ${p.full_name}. ${totalAnalyses} analyse(s), ${medRows.length} médicament(s).`);
         } catch(e) {}
     });
 });
@@ -1501,9 +1519,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('search-pharmacy-patient').click();
         await updateMedicationStockDisplay();
         state.medications = await API.getMedications().catch(()=>[]);
-        // Notification → médecin / infirmier
         await notifyDepartment('nurse', '💊 Médicaments délivrés',
             `Médicaments de ${patientName} délivrés par la pharmacie.`, '#28a745');
+        await notifyAdmin('💊 Médicaments délivrés',
+            `${state.currentUser.name} a délivré les médicaments de ${patientName}.`);
     });
 
     document.getElementById('add-new-medication')?.addEventListener('click', () => {
