@@ -355,6 +355,45 @@ tr:hover td { background:#f4f9ff; }
 .toast.warning .toast-progress { background:var(--warning); }
 @keyframes progress { from { width:100%; } to { width:0%; } }
 
+/* Toast popup amélioré */
+#toast-container {
+    position:fixed;
+    top:20px; right:20px;
+    z-index:10000;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    max-width:380px;
+    pointer-events:none;
+}
+#toast-container .toast { pointer-events:all; }
+.toast {
+    background:#fff;
+    border-radius:14px;
+    padding:14px 16px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+    border-left:4px solid var(--secondary);
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    animation:toastPop .35s cubic-bezier(.34,1.56,.64,1) forwards;
+    position:relative;
+    overflow:hidden;
+    min-width:280px;
+    max-width:380px;
+}
+@keyframes toastPop {
+    0%   { opacity:0; transform:translateX(80px) scale(0.85); }
+    60%  { transform:translateX(-6px) scale(1.02); }
+    100% { opacity:1; transform:translateX(0) scale(1); }
+}
+.toast.removing {
+    animation:toastOut .3s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes toastOut {
+    to { opacity:0; transform:translateX(80px) scale(0.9); }
+}
+
 /* Notification bell popup */
 .notif-panel {
     position:fixed; top:80px; right:20px;

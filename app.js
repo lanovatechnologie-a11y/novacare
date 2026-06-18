@@ -199,7 +199,17 @@ function setupLogin() {
     document.getElementById('logout-btn').addEventListener('click', () => {
         if (confirm('Voulez-vous vous déconnecter?')) {
             localStorage.removeItem('hopital_token');
-            location.reload();
+            state.currentUser = null;
+            state.currentRole = null;
+            state.localNotifications = [];
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('password').focus();
+            // Reset role buttons
+            document.querySelectorAll('.login-role-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.login-role-btn[data-role="admin"]').classList.add('active');
         }
     });
 }
@@ -893,6 +903,65 @@ async function printPatientCard(patientId) {
     } catch(e) {}
 }
 
+// ─── RAPPORTS CAISSE ─────────────────────────────────────────
+async function loadCashierReports(period) {
+    const today = new Date();
+    let fromDate, toDate = today.toISOString().split('T')[0];
+    if (period === 'today') {
+        fromDate = toDate;
+    } else if (period === 'week') {
+        const mon = new Date(today); mon.setDate(today.getDate() - today.getDay() + 1);
+        fromDate = mon.toISOString().split('T')[0];
+    } else {
+        fromDate = document.getElementById('report-from-date')?.value || toDate;
+        toDate   = document.getElementById('report-to-date')?.value   || toDate;
+    }
+    try {
+        const txs = await apiCall(() => API.getTransactions({ fromDate, toDate, status: 'paid' }));
+        const totalHTG = txs.reduce((s,t) => s + parseFloat(t.amount), 0);
+        const byMethod = {};
+        txs.forEach(t => {
+            const m = t.payment_method || 'espèces';
+            byMethod[m] = (byMethod[m] || 0) + parseFloat(t.amount);
+        });
+        const container = document.getElementById('cashier-report-result');
+        container.innerHTML = `
+            <div class="exchange-banner mb-3">
+                <i class="fas fa-calendar"></i>
+                <span>Période : <strong>${fromDate} → ${toDate}</strong> — ${txs.length} transaction(s)</span>
+            </div>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:#28a745;"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="stat-info">
+                        <h3>${totalHTG.toLocaleString('fr-FR', {minimumFractionDigits:2})} HTG</h3>
+                        <p>Total encaissé <span class="currency-tag usd">$${htgToUsd(totalHTG)}</span></p>
+                    </div>
+                </div>
+                ${Object.entries(byMethod).map(([m,v]) => `
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:#1a6bca;"><i class="fas fa-wallet"></i></div>
+                    <div class="stat-info"><h3>${v.toLocaleString('fr-FR', {minimumFractionDigits:2})} HTG</h3><p>${m}</p></div>
+                </div>`).join('')}
+            </div>
+            <div class="table-container mt-3">
+                <table>
+                    <thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant HTG</th><th>USD</th><th>Méthode</th></tr></thead>
+                    <tbody>${txs.map(t => `
+                        <tr>
+                            <td>${t.date} ${t.payment_time||''}</td>
+                            <td>${t.patient_name}</td>
+                            <td>${t.service}</td>
+                            <td>${parseFloat(t.amount).toLocaleString('fr-FR', {minimumFractionDigits:2})}</td>
+                            <td class="text-muted">$${htgToUsd(t.amount)}</td>
+                            <td>${t.payment_method||'-'}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+    } catch(e) {}
+}
+
 // ─── CAISSE ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('search-cashier-patient')?.addEventListener('click', async () => {
@@ -1144,6 +1213,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 `<p><strong>Type:</strong> ${consult.service} — <span class="${consult.status==='paid'?'status-paid':'status-unpaid'}">${consult.status==='paid'?'Payé':'Non payé'}</span></p>` :
                 '<p class="text-muted">Aucune consultation enregistrée</p>';
             document.getElementById('consultation-modification-section')?.classList.remove('hidden');
+
+            // Résultats d'analyses du patient
+            const labTxs = await API.getTransactions({ patientId: p.id, type: 'lab' }).catch(()=>[]);
+            const labResults = labTxs.filter(t => t.result);
+            const labResultsContainer = document.getElementById('doctor-lab-results');
+            if (labResultsContainer) {
+                if (labResults.length > 0) {
+                    labResultsContainer.innerHTML = labResults.map(t => `
+                        <div class="card mb-2" style="border-left-color:#17a2b8;">
+                            <div class="d-flex justify-between align-center">
+                                <div>
+                                    <h5 style="color:#17a2b8;">${t.service}</h5>
+                                    <small class="text-muted">${t.date} — ${t.lab_status === 'completed' ? '<span class="status-paid">Complété</span>' : 'En cours'}</small>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                ${t.result && t.result.startsWith('data:') 
+                                    ? `<img src="${t.result}" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #e2ecf8;">` 
+                                    : `<div class="alert alert-info" style="white-space:pre-wrap;font-size:.88rem;">${t.result}</div>`}
+                            </div>
+                        </div>`).join('');
+                    labResultsContainer.closest('.card').classList.remove('hidden');
+                } else {
+                    labResultsContainer.innerHTML = '<p class="text-muted">Aucun résultat disponible.</p>';
+                    labResultsContainer.closest('.card').classList.remove('hidden');
+                }
+            }
+
             // Signes vitaux récents
             const vitals = await API.getVitals(p.id).catch(()=>[]);
             const vDisplay = document.getElementById('current-vitals-display');
@@ -1707,6 +1804,68 @@ async function updateAdminStats() {
     } catch(e) {}
 }
 
+// ─── ADMIN: Modifier / Supprimer transaction ─────────────────
+async function adminEditTransaction(txId) {
+    const txs = await API.getTransactions({}).catch(()=>[]);
+    const t = txs.find(x => x.id === txId);
+    if (!t) return;
+    const modal = document.createElement('div');
+    modal.className = 'transaction-details-modal';
+    modal.id = 'admin-edit-tx-modal';
+    modal.innerHTML = `
+        <div class="transaction-details-content" style="max-width:520px;">
+            <h4><i class="fas fa-edit" style="color:var(--warning);"></i> Modifier la transaction <span class="badge badge-primary">${t.id}</span></h4>
+            <div class="add-form-grid mt-3" style="margin-top:14px;">
+                <div><label class="form-label">Service</label>
+                    <input type="text" id="edit-tx-service" class="form-control" value="${t.service}"></div>
+                <div><label class="form-label">Montant (HTG)</label>
+                    <input type="number" id="edit-tx-amount" class="form-control" value="${t.amount}" min="0"></div>
+                <div><label class="form-label">Statut</label>
+                    <select id="edit-tx-status" class="form-control">
+                        <option value="unpaid" ${t.status==='unpaid'?'selected':''}>Non payé</option>
+                        <option value="paid" ${t.status==='paid'?'selected':''}>Payé</option>
+                    </select></div>
+                <div><label class="form-label">Méthode paiement</label>
+                    <select id="edit-tx-method" class="form-control">
+                        <option value="">—</option>
+                        <option value="cash" ${t.payment_method==='cash'?'selected':''}>Espèces</option>
+                        <option value="moncash" ${t.payment_method==='moncash'?'selected':''}>MonCash</option>
+                        <option value="natcash" ${t.payment_method==='natcash'?'selected':''}>NatCash</option>
+                        <option value="card" ${t.payment_method==='card'?'selected':''}>Carte</option>
+                    </select></div>
+            </div>
+            <div class="d-flex gap-10 mt-3">
+                <button class="btn btn-success" onclick="saveAdminTxEdit('${t.id}')"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-danger" onclick="deleteAdminTx('${t.id}')"><i class="fas fa-trash"></i> Supprimer</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('admin-edit-tx-modal').remove()">Annuler</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+}
+
+async function saveAdminTxEdit(txId) {
+    const service = document.getElementById('edit-tx-service').value;
+    const amount  = parseFloat(document.getElementById('edit-tx-amount').value);
+    const status  = document.getElementById('edit-tx-status').value;
+    const method  = document.getElementById('edit-tx-method').value;
+    try {
+        await apiCall(() => API.updateTransaction(txId, { service, amount, status, paymentMethod: method }));
+        toast('Transaction modifiée!');
+        document.getElementById('admin-edit-tx-modal').remove();
+        updateAdminStats();
+    } catch(e) {}
+}
+
+async function deleteAdminTx(txId) {
+    if (!confirm(`Supprimer définitivement la transaction ${txId} ?`)) return;
+    try {
+        await apiCall(() => API.deleteTransaction(txId));
+        toast('Transaction supprimée', 'warning');
+        document.getElementById('admin-edit-tx-modal').remove();
+        updateAdminStats();
+    } catch(e) {}
+}
+
 function updateRecentTransactionsTable(txs) {
     document.getElementById('recent-transactions-list').innerHTML = txs.map(t => {
         const amtHTG = parseFloat(t.amount);
@@ -1719,6 +1878,7 @@ function updateRecentTransactionsTable(txs) {
             <td>${t.payment_method||'-'}</td>
             <td>${t.created_by||'-'}</td>
             <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td>
+        <td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction('${t.id}')"><i class="fas fa-edit"></i></button></td>
         </tr>`;
     }).join('');
 }

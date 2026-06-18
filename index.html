@@ -407,6 +407,22 @@
                 </div>
             </div>
 
+            <!-- Rapports caisse -->
+            <div class="card mt-3">
+                <h3><i class="fas fa-chart-bar"></i> Mes Rapports</h3>
+                <div class="d-flex gap-10 flex-wrap mb-3">
+                    <button class="btn btn-sm btn-primary" onclick="loadCashierReports('today')"><i class="fas fa-calendar-day"></i> Aujourd'hui</button>
+                    <button class="btn btn-sm btn-secondary" onclick="loadCashierReports('week')"><i class="fas fa-calendar-week"></i> Cette semaine</button>
+                    <div class="d-flex gap-10 align-center">
+                        <input type="date" id="report-from-date" class="form-control" style="width:150px;">
+                        <span>→</span>
+                        <input type="date" id="report-to-date" class="form-control" style="width:150px;">
+                        <button class="btn btn-sm btn-info" onclick="loadCashierReports('custom')"><i class="fas fa-search"></i> Voir</button>
+                    </div>
+                </div>
+                <div id="cashier-report-result"></div>
+            </div>
+
             <div id="external-medications-container" class="hidden card mt-3">
                 <h3><i class="fas fa-exclamation-triangle"></i> Médicaments à acheter ailleurs</h3>
                 <div id="external-medications-list"></div>
@@ -469,6 +485,12 @@
                             </div>
                             <small class="text-muted">Si le nouveau type est plus cher, le patient devra retourner à la caisse</small>
                         </div>
+                    </div>
+
+                    <!-- Résultats analyses labo -->
+                    <div class="card mt-3" id="doctor-lab-results-card" style="border-left-color:#17a2b8;">
+                        <h3><i class="fas fa-flask" style="color:#17a2b8;"></i> Résultats d'Analyses</h3>
+                        <div id="doctor-lab-results"></div>
                     </div>
 
                     <div id="doctor-patient-vitals" class="vitals-form mt-3">
@@ -731,7 +753,7 @@
                 <h3><i class="fas fa-history"></i> Transactions Récentes</h3>
                 <div class="table-container">
                     <table>
-                        <thead><tr><th>Date/Heure</th><th>Patient</th><th>Service</th><th>Montant (HTG)</th><th>Montant (USD)</th><th>Méthode</th><th>Agent</th><th>Statut</th></tr></thead>
+                        <thead><tr><th>Date/Heure</th><th>Patient</th><th>Service</th><th>Montant (HTG)</th><th>Montant (USD)</th><th>Méthode</th><th>Agent</th><th>Statut</th><th>Action</th></tr></thead>
                         <tbody id="recent-transactions-list"></tbody>
                     </table>
                 </div>
