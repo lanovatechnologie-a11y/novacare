@@ -137,9 +137,9 @@ app.get('/patients', auth, async (req, res) => {
     const params = [];
     if (search) {
         params.push('%' + search.toLowerCase() + '%');
-        q += ` AND (LOWER(full_name) LIKE $\${params.length} OR id LIKE $\${params.length})`;
+        q += ` AND (LOWER(full_name) LIKE $${params.length} OR id LIKE $${params.length})`;
     }
-    if (date) { params.push(date); q += ` AND registration_date=$\${params.length}`; }
+    if (date) { params.push(date); q += ` AND registration_date=$${params.length}`; }
     q += ' ORDER BY created_at DESC';
     const r = await pool.query(q, params);
     res.json(r.rows);
@@ -226,12 +226,12 @@ app.get('/transactions', auth, async (req, res) => {
     const { patientId, status, type, date, fromDate, toDate } = req.query;
     let q = 'SELECT * FROM transactions WHERE 1=1';
     const params = [];
-    if (patientId) { params.push(patientId); q += ` AND patient_id=$\${params.length}`; }
-    if (status && status !== 'all') { params.push(status); q += ` AND status=$\${params.length}`; }
-    if (type)      { params.push(type);      q += ` AND type=$\${params.length}`; }
-    if (date)      { params.push(date);      q += ` AND date=$\${params.length}`; }
-    if (fromDate)  { params.push(fromDate);  q += ` AND date>=$\${params.length}`; }
-    if (toDate)    { params.push(toDate);    q += ` AND date<=$\${params.length}`; }
+    if (patientId) { params.push(patientId); q += ` AND patient_id=$${params.length}`; }
+    if (status && status !== 'all') { params.push(status); q += ` AND status=$${params.length}`; }
+    if (type)      { params.push(type);      q += ` AND type=$${params.length}`; }
+    if (date)      { params.push(date);      q += ` AND date=$${params.length}`; }
+    if (fromDate)  { params.push(fromDate);  q += ` AND date>=$${params.length}`; }
+    if (toDate)    { params.push(toDate);    q += ` AND date<=$${params.length}`; }
     q += ' ORDER BY created_at DESC';
     const r = await pool.query(q, params);
     res.json(r.rows);
@@ -415,9 +415,9 @@ app.delete('/external-service-types/:id', auth, adminOrSubAdmin, async (req, res
 app.get('/appointments', auth, async (req, res) => {
     const { patientId, doctor, fromDate } = req.query;
     let q = 'SELECT * FROM appointments WHERE 1=1', params = [];
-    if (patientId) { params.push(patientId); q+=` AND patient_id=$\${params.length}`; }
-    if (doctor)    { params.push(doctor);    q+=` AND doctor=$\${params.length}`; }
-    if (fromDate)  { params.push(fromDate);  q+=` AND date>=$\${params.length}`; }
+    if (patientId) { params.push(patientId); q+=` AND patient_id=$${params.length}`; }
+    if (doctor)    { params.push(doctor);    q+=` AND doctor=$${params.length}`; }
+    if (fromDate)  { params.push(fromDate);  q+=` AND date>=$${params.length}`; }
     q += ' ORDER BY date,time';
     res.json((await pool.query(q,params)).rows);
 });
@@ -512,12 +512,18 @@ app.get('/stats', auth, adminOrSubAdmin, async (req, res) => {
     });
 });
 
-// Fallback SPA
+// Fallback SPA — uniquement pour les routes non-API
 app.get('*', (req, res) => {
-    const apiPaths = ['/auth','/patients','/transactions','/settings','/users','/medications','/vitals','/consultations','/messages','/stats','/appointments','/consultation-types','/vital-types','/lab-analysis-types','/external-service-types'];
-    if (!apiPaths.some(p => req.path.startsWith(p))) {
-        res.sendFile(__dirname + '/index.html');
+    // Si c'est une requête API (commence par /auth, /patients, etc.), retourner 404 JSON
+    const apiPaths = ['/auth','/patients','/transactions','/settings','/users',
+        '/medications','/vitals','/consultations','/messages','/stats',
+        '/appointments','/consultation-types','/vital-types',
+        '/lab-analysis-types','/external-service-types'];
+    if (apiPaths.some(p => req.path.startsWith(p))) {
+        return res.status(404).json({ error: 'Route non trouvée: ' + req.path });
     }
+    // Sinon servir index.html (SPA)
+    res.sendFile(__dirname + '/index.html');
 });
 
-app.listen(PORT, () => console.log(`✅ Serveur NovaCare démarré sur le port \${PORT}`));
+app.listen(PORT, () => console.log('✅ Serveur NovaCare démarré sur le port ' + PORT));
