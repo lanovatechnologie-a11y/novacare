@@ -28,7 +28,6 @@ const pool = new Pool({ connectionString: buildConnectionString(), ssl: { reject
 pool.connect().then(c => { console.log('✅ PostgreSQL connecté'); c.release(); }).catch(e => console.error('❌ PostgreSQL:', e.message));
 
 app.use(cors({ origin: '*' }));
-app.use(express.static(__dirname));
 app.use(express.json({ limit: '10mb' }));
 
 // ─── Auth middleware ──────────────────────────────────────────
@@ -512,17 +511,11 @@ app.get('/stats', auth, adminOrSubAdmin, async (req, res) => {
     });
 });
 
-// Fallback SPA — uniquement pour les routes non-API
+// Fichiers statiques (css, js, images) — APRÈS toutes les routes API
+app.use(express.static(__dirname));
+
+// Fallback SPA — toujours renvoyer index.html pour les routes inconnues non-API
 app.get('*', (req, res) => {
-    // Si c'est une requête API (commence par /auth, /patients, etc.), retourner 404 JSON
-    const apiPaths = ['/auth','/patients','/transactions','/settings','/users',
-        '/medications','/vitals','/consultations','/messages','/stats',
-        '/appointments','/consultation-types','/vital-types',
-        '/lab-analysis-types','/external-service-types'];
-    if (apiPaths.some(p => req.path.startsWith(p))) {
-        return res.status(404).json({ error: 'Route non trouvée: ' + req.path });
-    }
-    // Sinon servir index.html (SPA)
     res.sendFile(__dirname + '/index.html');
 });
 
