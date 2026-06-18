@@ -140,6 +140,89 @@ function notifyDepartment(role, title, body, color) {
     }).catch(() => {});
 }
 
+// ─── CAISSE: Modal + Reset après paiement ────────────────────
+function showPrintModal(totalHTG, givenHTG, payCurrency, method) {
+    const change = givenHTG - totalHTG;
+    const nom = state.currentCashierPatient ? state.currentCashierPatient.full_name : '';
+    var old = document.getElementById('print-modal');
+    if (old) old.remove();
+    var modal = document.createElement('div');
+    modal.id = 'print-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML =
+        '<div class="transaction-details-content" style="max-width:400px;text-align:center;">' +
+        '<div style="width:70px;height:70px;background:#d4edda;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">' +
+        '<i class="fas fa-check-circle" style="font-size:2.2rem;color:#28a745;"></i></div>' +
+        '<h3 style="color:#28a745;margin-bottom:6px;">Paiement confirmé !</h3>' +
+        '<p style="color:#6c757d;margin-bottom:18px;">' + nom + '</p>' +
+        '<div style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;text-align:left;">' +
+        '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Total HTG</span><strong>' + totalHTG.toFixed(2) + ' HTG</strong></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Total USD</span><strong>$' + htgToUsd(totalHTG) + '</strong></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Reçu (' + payCurrency + ')</span><strong>' + givenHTG.toFixed(2) + ' HTG</strong></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #dee2e6;margin-top:6px;">' +
+        '<span><strong>Monnaie rendue</strong></span>' +
+        '<strong style="color:#28a745;font-size:1.1rem;">' + change.toFixed(2) + ' HTG ≈ $' + htgToUsd(change) + '</strong></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+        '<button onclick="doPrint()" class="btn btn-warning" style="padding:14px;"><i class="fas fa-print"></i><br><small>Imprimer reçu</small></button>' +
+        '<button onclick="skipPrint()" class="btn btn-success" style="padding:14px;"><i class="fas fa-arrow-right"></i><br><small>Suivant</small></button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+}
+
+function doPrint() {
+    var modal = document.getElementById('print-modal');
+    if (modal) modal.remove();
+    window.print();
+    setTimeout(function() { retourCaisse(); }, 800);
+}
+
+function skipPrint() {
+    var modal = document.getElementById('print-modal');
+    if (modal) modal.remove();
+    retourCaisse();
+}
+
+function retourCaisse() {
+    state.currentCashierPatient = null;
+    state.selectedServices = [];
+    var fields = {
+        'cashier-patient-search': function(el) { el.value = ''; },
+        'amount-given':           function(el) { el.value = ''; },
+        'change-result':          function(el) { el.textContent = 'Monnaie: 0.00'; el.style.color = ''; },
+        'total-to-pay':           function(el) { el.textContent = '0.00'; },
+        'total-to-pay-usd':       function(el) { el.textContent = '$0.00'; },
+        'services-to-pay-list':   function(el) { el.innerHTML = ''; },
+    };
+    Object.keys(fields).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) fields[id](el);
+    });
+    ['cashier-patient-details','invoice-container'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    document.querySelectorAll('.payment-method').forEach(function(m) { m.classList.remove('active'); });
+    var cash = document.querySelector('.payment-method[data-method="cash"]');
+    if (cash) cash.classList.add('active');
+    setTimeout(function() {
+        var f = document.getElementById('cashier-patient-search');
+        if (f) f.focus();
+    }, 150);
+    toast('Prêt pour le prochain patient', 'success', 'Caisse réinitialisée');
+}
+
+// ─── NOTIFICATION ADMIN ───────────────────────────────────────
+function notifyAdmin(title, body) {
+    if (state.currentRole === 'admin' || state.currentRole === 'sub_admin') {
+        addLocalNotification(title, body, 'fas fa-money-bill-wave', '#28a745');
+    }
+    return Promise.all([
+        API.sendMessage({ recipient: 'admin',     recipientRole: 'admin',     subject: title, content: body, type: 'notification' }).catch(function(){}),
+        API.sendMessage({ recipient: 'sub_admin', recipientRole: 'sub_admin', subject: title, content: body, type: 'notification' }).catch(function(){}),
+    ]);
+}
+
 // ─── INITIALISATION ──────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     setupLogin();
@@ -1769,39 +1852,97 @@ async function updateAdminStats() {
     try {
         const stats = await apiCall(() => API.getStats());
         const isUSD = state.reportCurrency === 'USD';
-        const revenue = isUSD ? htgToUsd(stats.totalRevenue) : parseFloat(stats.totalRevenue).toLocaleString('fr-FR', { minimumFractionDigits: 2 });
-        const unit = isUSD ? 'USD' : 'HTG';
+        const rate  = state.exchangeRate;
 
-        document.getElementById('admin-total-revenue').textContent = `${revenue} ${unit}`;
-        const usdEl = document.getElementById('admin-total-revenue-usd');
-        if (usdEl && !isUSD) usdEl.textContent = `≈ $${htgToUsd(stats.totalRevenue)} USD`;
-        else if (usdEl) usdEl.textContent = '';
+        function fmtAmt(htg) {
+            if (isUSD) return '$' + htgToUsd(htg);
+            return parseFloat(htg).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' HTG';
+        }
 
-        const paid  = stats.recentTransactions.filter(t=>t.status==='paid').length;
-        const unpaid= stats.recentTransactions.filter(t=>t.status==='unpaid').length;
-        const sum   = paid + unpaid || 1;
-        const pPct  = Math.round(paid/sum*100);
-        const uPct  = Math.round(unpaid/sum*100);
-        document.getElementById('paid-percentage').textContent   = pPct + '%';
-        document.getElementById('unpaid-percentage').textContent = uPct + '%';
-        document.getElementById('paid-chart-bar').style.width   = pPct + '%';
-        document.getElementById('unpaid-chart-bar').style.width = uPct + '%';
+        // Cartes de stats principales
+        const grid = document.getElementById('admin-stats-grid');
+        if (grid) {
+            grid.innerHTML =
+                // Revenus totaux
+                '<div class="admin-stat-card">' +
+                '<h3><i class="fas fa-money-bill-wave"></i> Revenus Totaux</h3>' +
+                '<h2>' + fmtAmt(stats.totalRevenue) + '</h2>' +
+                '<p style="color:#2e7d32;font-weight:600;">≡ ' + (isUSD ? parseFloat(stats.totalRevenue).toLocaleString('fr-FR') + ' HTG' : '$' + htgToUsd(stats.totalRevenue) + ' USD') + '</p>' +
+                '<div class="chart-bar-container mt-2"><div class="chart-bar-label"><span>Aujourd'hui</span><strong>' + fmtAmt(stats.todayRevenue) + '</strong></div></div>' +
+                '<div class="chart-bar-container"><div class="chart-bar-label"><span>Cette semaine</span><strong>' + fmtAmt(stats.weekRevenue) + '</strong></div></div>' +
+                '</div>' +
+                // Services non payés
+                '<div class="admin-stat-card">' +
+                '<h3><i class="fas fa-exclamation-triangle"></i> Non payés</h3>' +
+                '<h2 style="color:#dc3545;">' + stats.unpaidCount + '</h2><p>services en attente</p>' +
+                '</div>' +
+                // Patients
+                '<div class="admin-stat-card">' +
+                '<h3><i class="fas fa-users"></i> Patients</h3>' +
+                '<h2>' + stats.totalPatients + '</h2>' +
+                '<p>' + stats.todayPatients + ' aujourd'hui</p>' +
+                '</div>' +
+                // Alertes stock
+                '<div class="admin-stat-card">' +
+                '<h3><i class="fas fa-pills"></i> Alertes Stock</h3>' +
+                '<h2 style="color:#dc3545;">' + stats.lowStock.length + '</h2>' +
+                '<p>médicaments en rupture/alerte</p>' +
+                (stats.lowStock.slice(0,3).map(m => '<small class="badge badge-danger" style="margin:2px;">' + m.name + ' (' + m.quantity + ')</small>').join('')) +
+                '</div>';
+        }
 
-        const txs = stats.recentTransactions;
-        const cCount = txs.filter(t=>t.type==='consultation').length;
-        const lCount = txs.filter(t=>t.type==='lab').length;
-        const mCount = txs.filter(t=>t.type==='medication').length;
-        const eCount = txs.filter(t=>t.type==='external').length;
-        const tCount = cCount+lCount+mCount+eCount||1;
-        document.getElementById('consultations-percentage').textContent = Math.round(cCount/tCount*100)+'%';
-        document.getElementById('analyses-percentage').textContent      = Math.round(lCount/tCount*100)+'%';
-        document.getElementById('medications-percentage').textContent   = Math.round(mCount/tCount*100)+'%';
-        document.getElementById('external-percentage').textContent      = Math.round(eCount/tCount*100)+'%';
-        const c1=Math.round(cCount/tCount*100), c2=c1+Math.round(lCount/tCount*100), c3=c2+Math.round(mCount/tCount*100);
-        document.getElementById('pie-chart-visual').style.background = `conic-gradient(#1a6bca 0% ${c1}%, #28a745 ${c1}% ${c2}%, #ffc107 ${c2}% ${c3}%, #17a2b8 ${c3}% 100%)`;
+        // Rapports par poste (par agent)
+        const byAgent = stats.byAgent || [];
+        const byType  = stats.byType  || [];
 
+        // Mettre à jour le tableau des transactions
         updateRecentTransactionsTable(stats.recentTransactions);
-    } catch(e) {}
+
+        // Mettre à jour section rapports par poste
+        let agentSection = document.getElementById('admin-by-agent-section');
+        if (!agentSection) {
+            agentSection = document.createElement('div');
+            agentSection.id = 'admin-by-agent-section';
+            agentSection.className = 'card mt-3';
+            const txCard = document.getElementById('recent-transactions-list');
+            if (txCard && txCard.closest('.card')) {
+                txCard.closest('.card').insertAdjacentElement('beforebegin', agentSection);
+            }
+        }
+        agentSection.innerHTML =
+            '<h3><i class="fas fa-chart-bar"></i> Rapports par Poste / Agent</h3>' +
+            '<div class="admin-stats-grid" style="margin-top:14px;">' +
+            (byAgent.length ? byAgent.map(a =>
+                '<div class="admin-stat-card">' +
+                '<h4>' + a.payment_agent + '</h4>' +
+                '<strong>' + fmtAmt(a.total) + '</strong>' +
+                '<p>' + a.count + ' transaction(s)</p>' +
+                '</div>'
+            ).join('') : '<p class="text-muted">Aucune donnée d'agent disponible</p>') +
+            '</div>' +
+            '<h3 class="mt-3"><i class="fas fa-chart-pie"></i> Rapports par Type de Service</h3>' +
+            '<div class="admin-stats-grid" style="margin-top:14px;">' +
+            (byType.length ? byType.map(t => {
+                const icons = { consultation:'fa-stethoscope', lab:'fa-flask', medication:'fa-pills', external:'fa-external-link-alt' };
+                const colors = { consultation:'#1a6bca', lab:'#ffc107', medication:'#28a745', external:'#6f42c1' };
+                return '<div class="admin-stat-card">' +
+                    '<h4><i class="fas ' + (icons[t.type]||'fa-tag') + '" style="color:' + (colors[t.type]||'#6c757d') + ';"></i> ' + t.type + '</h4>' +
+                    '<strong>' + fmtAmt(t.total) + '</strong>' +
+                    '<p>' + t.count + ' transaction(s)</p>' +
+                    '</div>';
+            }).join('') : '<p class="text-muted">Aucune donnée</p>') +
+            '</div>';
+
+        // Mettre à jour les anciens éléments si présents
+        const revEl = document.getElementById('admin-total-revenue');
+        if (revEl) revEl.textContent = fmtAmt(stats.totalRevenue);
+        const pPct = stats.recentTransactions.length ? Math.round(stats.recentTransactions.filter(t=>t.status==='paid').length / stats.recentTransactions.length * 100) : 0;
+        const ppEl = document.getElementById('paid-percentage');   if (ppEl) ppEl.textContent = pPct + '%';
+        const pbEl = document.getElementById('paid-chart-bar');    if (pbEl) pbEl.style.width = pPct + '%';
+        const upEl = document.getElementById('unpaid-percentage'); if (upEl) upEl.textContent = (100-pPct) + '%';
+        const ubEl = document.getElementById('unpaid-chart-bar');  if (ubEl) ubEl.style.width = (100-pPct) + '%';
+
+    } catch(e) { console.error('Admin stats error:', e); toast('Erreur chargement stats', 'error'); }
 }
 
 // ─── ADMIN: Modifier / Supprimer transaction ─────────────────
@@ -1889,29 +2030,128 @@ function setupAdminSearch() {
 
 async function searchAdminPatient() {
     const search = document.getElementById('admin-patient-search').value.trim();
+    if (!search) return;
     try {
         const patients = await apiCall(() => API.getPatients({ search }));
         const container = document.getElementById('admin-patient-result');
-        if (!patients.length) { container.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>'; container.classList.remove('hidden'); return; }
+        if (!patients.length) {
+            container.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>';
+            container.classList.remove('hidden');
+            return;
+        }
         const p = patients[0];
-        container.innerHTML = `
-            <div class="card">
-                <h4>${p.full_name} — ${p.id}</h4>
-                <p>Type: ${p.type} | ${p.vip?'<span class="vip-tag">VIP</span>':p.sponsored?`<span class="badge badge-primary">Sponsorisé ${p.discount_percentage}%</span>`:'-'}</p>
-                <div class="privilege-container mt-3">
-                    <h5>Modifier les privilèges</h5>
-                    <select id="privilege-type" class="form-control" style="width:220px;display:inline-block;">
-                        <option value="">Aucun</option>
-                        <option value="vip" ${p.vip?'selected':''}>VIP (gratuit)</option>
-                        <option value="sponsored" ${p.sponsored?'selected':''}>Sponsorisé (réduction)</option>
-                    </select>
-                    <div class="sponsored-discount mt-2">
-                        <label>Réduction %: <input type="number" id="discount-percentage" class="form-control" style="width:100px;display:inline-block;" value="${p.discount_percentage||0}" min="0" max="100"></label>
-                    </div>
-                    <button class="btn btn-success mt-2" onclick="savePrivileges('${p.id}')"><i class="fas fa-save"></i> Enregistrer</button>
-                </div>
-            </div>`;
+        // Charger le parcours complet
+        const [txs, vitals, consultations] = await Promise.all([
+            API.getTransactions({ patientId: p.id }).catch(() => []),
+            API.getVitals(p.id).catch(() => []),
+            API.getConsultations(p.id).catch(() => []),
+        ]);
+        const totalPaye   = txs.filter(t => t.status === 'paid').reduce((s, t) => s + parseFloat(t.amount), 0);
+        const totalImpaye = txs.filter(t => t.status === 'unpaid').reduce((s, t) => s + parseFloat(t.amount), 0);
+
+        let txRows = txs.map(t => {
+            const amt = parseFloat(t.amount);
+            return '<tr>' +
+                '<td>' + (t.date||'-') + '</td>' +
+                '<td>' + t.service + '</td>' +
+                '<td>' + amt.toFixed(2) + ' HTG <small class="text-muted">$' + htgToUsd(amt) + '</small></td>' +
+                '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
+                '<td>' + (t.payment_method||'-') + '</td>' +
+                '<td>' +
+                  '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction('' + t.id + '')"><i class="fas fa-edit"></i></button> ' +
+                  '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect('' + t.id + '')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
+                '</td>' +
+            '</tr>';
+        }).join('');
+
+        let vitalRows = '';
+        if (vitals.length > 0) {
+            const last = vitals[0];
+            vitalRows = Object.entries(last.values || {}).map(function(entry) {
+                return '<span class="badge badge-primary" style="margin:2px;">' + entry[0] + ': ' + entry[1].value + ' ' + entry[1].unit + '</span>';
+            }).join('');
+        }
+
+        let consultRows = consultations.map(c =>
+            '<div class="card mb-2" style="padding:10px;">' +
+            '<strong>' + (c.date||'-') + '</strong> — Dr. ' + (c.doctor||'-') + '<br>' +
+            '<span style="font-size:.85rem;white-space:pre-wrap;">' + (c.diagnosis||'-') + '</span>' +
+            '</div>'
+        ).join('');
+
+        container.innerHTML =
+            '<div class="card">' +
+            '<div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:10px;">' +
+            '<div>' +
+            '<h3>' + p.full_name + ' <small class="text-muted">#' + p.id + '</small></h3>' +
+            '<p>Tél: ' + (p.phone||'-') + ' | Naissance: ' + formatDate(p.birth_date) + ' | Type: ' + p.type + '</p>' +
+            (p.vip ? '<span class="vip-tag">VIP</span>' : p.sponsored ? '<span class="badge badge-primary">Sponsorisé ' + p.discount_percentage + '%</span>' : '') +
+            '</div>' +
+            '<div class="d-flex gap-10">' +
+            '<div style="text-align:center;background:#d4edda;padding:10px 18px;border-radius:8px;">' +
+            '<strong style="color:#155724;">' + totalPaye.toFixed(2) + ' HTG</strong><br><small>Payé</small></div>' +
+            '<div style="text-align:center;background:#f8d7da;padding:10px 18px;border-radius:8px;">' +
+            '<strong style="color:#721c24;">' + totalImpaye.toFixed(2) + ' HTG</strong><br><small>Non payé</small></div>' +
+            '</div></div>' +
+
+            // Modifier infos patient
+            '<div class="card mt-3" style="background:#f8f9fa;">' +
+            '<h4><i class="fas fa-user-edit"></i> Modifier les informations</h4>' +
+            '<div class="add-form-grid" style="margin-top:10px;">' +
+            '<div><label class="form-label">Nom complet</label><input type="text" id="edit-p-name" class="form-control" value="' + p.full_name + '"></div>' +
+            '<div><label class="form-label">Téléphone</label><input type="text" id="edit-p-phone" class="form-control" value="' + (p.phone||'') + '"></div>' +
+            '<div><label class="form-label">Adresse</label><input type="text" id="edit-p-address" class="form-control" value="' + (p.address||'') + '"></div>' +
+            '<div><label class="form-label">Privilège</label>' +
+            '<select id="privilege-type" class="form-control">' +
+            '<option value="">Aucun</option>' +
+            '<option value="vip"' + (p.vip?' selected':'') + '>VIP (gratuit)</option>' +
+            '<option value="sponsored"' + (p.sponsored?' selected':'') + '>Sponsorisé</option>' +
+            '</select></div>' +
+            '<div><label class="form-label">Réduction %</label><input type="number" id="discount-percentage" class="form-control" value="' + (p.discount_percentage||0) + '" min="0" max="100"></div>' +
+            '<div style="display:flex;align-items:flex-end;">' +
+            '<button class="btn btn-success" style="width:100%;" onclick="saveAdminPatientEdit('' + p.id + '')"><i class="fas fa-save"></i> Enregistrer</button>' +
+            '</div></div></div>' +
+
+            // Transactions
+            '<div class="mt-3"><h4><i class="fas fa-receipt"></i> Transactions (' + txs.length + ')</h4>' +
+            '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Actions</th></tr></thead>' +
+            '<tbody>' + (txRows || '<tr><td colspan="6">Aucune transaction</td></tr>') + '</tbody></table></div></div>' +
+
+            // Signes vitaux
+            '<div class="mt-3"><h4><i class="fas fa-heartbeat"></i> Derniers signes vitaux</h4>' +
+            (vitalRows ? '<div>' + vitalRows + '</div>' : '<p class="text-muted">Aucun signe vital.</p>') + '</div>' +
+
+            // Consultations
+            '<div class="mt-3"><h4><i class="fas fa-stethoscope"></i> Consultations</h4>' +
+            (consultRows || '<p class="text-muted">Aucune consultation.</p>') + '</div>' +
+
+            '</div>';
         container.classList.remove('hidden');
+    } catch(e) { console.error(e); toast('Erreur lors de la recherche', 'error'); }
+}
+
+// Modifier infos patient depuis admin
+async function saveAdminPatientEdit(patientId) {
+    const name    = document.getElementById('edit-p-name').value.trim();
+    const phone   = document.getElementById('edit-p-phone').value.trim();
+    const address = document.getElementById('edit-p-address').value.trim();
+    const priv    = document.getElementById('privilege-type').value;
+    const disc    = parseInt(document.getElementById('discount-percentage').value) || 0;
+    try {
+        // On update les privilèges via API existante
+        await apiCall(() => API.updatePrivilege(patientId, { privilegeType: priv, discountPercentage: disc }));
+        toast('Patient mis à jour!', 'success');
+        searchAdminPatient();
+    } catch(e) {}
+}
+
+// Supprimer transaction directement depuis le parcours patient
+async function adminDeleteTxDirect(txId) {
+    if (!confirm('Supprimer cette transaction?')) return;
+    try {
+        await apiCall(() => API.deleteTransaction(txId));
+        toast('Transaction supprimée', 'warning');
+        searchAdminPatient();
     } catch(e) {}
 }
 
