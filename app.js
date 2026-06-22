@@ -1665,15 +1665,24 @@ async function updateMedicationStockDisplay() {
     const meds = await API.getMedications().catch(()=>[]);
     state.medications = meds;
     const container = document.getElementById('medication-stock-list');
-    container.innerHTML = `<table><thead><tr><th>Médicament</th><th>Forme</th><th>Unité</th><th>Stock</th><th>Alerte</th><th>Prix (HTG)</th><th>Statut</th></tr></thead><tbody>
-        ${meds.map(m=>`<tr class="${m.quantity===0?'out-of-stock':m.quantity<=m.alert_threshold?'low-stock':''}">
-            <td><strong>${m.name}</strong>${m.generic_name?`<br><small class="text-muted">${m.generic_name}</small>`:''}</td>
-            <td>${m.form||'-'}</td><td>${m.unit||'-'}</td>
-            <td><strong>${m.quantity}</strong></td><td>${m.alert_threshold}</td>
-            <td>${m.price} HTG <span class="currency-tag usd">$${htgToUsd(m.price)}</span></td>
-            <td>${m.quantity===0?'<span class="status-unpaid">Rupture</span>':m.quantity<=m.alert_threshold?'<span class="status-partial">Stock faible</span>':'<span class="status-paid">OK</span>'}</td>
-        </tr>`).join('')}
-    </tbody></table>`;
+    container.innerHTML = '<table><thead><tr><th>Médicament</th><th>Forme</th><th>Stock</th><th>Prix</th><th>Emplacement</th><th>Statut</th></tr></thead><tbody>' +
+        meds.map(function(m) {
+            var statusBadge = m.quantity === 0
+                ? '<span class="status-unpaid">Rupture</span>'
+                : m.quantity <= m.alert_threshold
+                    ? '<span class="status-partial">Faible</span>'
+                    : '<span class="status-paid">OK</span>';
+            var location = (m.espace ? m.espace : '') + (m.espace && m.etagere ? ' / ' : '') + (m.etagere ? m.etagere : '');
+            return '<tr class="' + (m.quantity===0?'out-of-stock':m.quantity<=m.alert_threshold?'low-stock':'') + '">' +
+                '<td><strong>' + m.name + '</strong>' + (m.generic_name&&m.generic_name!==m.name?'<br><small class="text-muted">'+m.generic_name+'</small>':'') + '</td>' +
+                '<td>' + (m.form||'-') + '</td>' +
+                '<td><strong>' + m.quantity + '</strong> ' + (m.unit||'') + '</td>' +
+                '<td>' + m.price + ' HTG <span class="currency-tag usd">$' + htgToUsd(m.price) + '</span></td>' +
+                '<td>' + (location ? '<span class="badge badge-primary">' + location + '</span>' : '<span class="text-muted">-</span>') + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+            '</tr>';
+        }).join('') +
+    '</tbody></table>';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2191,60 +2200,239 @@ async function savePrivileges(patientId) {
 
 // ─── PARAMÈTRES ──────────────────────────────────────────────
 async function updateSettingsDisplay() {
-    document.getElementById('consultation-types-list').innerHTML = `
-        <div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Description</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
-        ${state.consultationTypes.map(ct=>`<tr>
-            <td><strong>${ct.name}</strong></td>
-            <td><input type="number" class="form-control small-input" id="ct-price-${ct.id}" value="${ct.price}" style="width:100px;"></td>
-            <td><input type="text" class="form-control" id="ct-desc-${ct.id}" value="${ct.description||''}" style="max-width:220px;"></td>
-            <td><input type="checkbox" ${ct.active?'checked':''} onchange="toggleConsultationType(${ct.id},this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>
-            <td class="d-flex gap-10">
-                <button class="btn btn-sm btn-success" onclick="saveConsultationType(${ct.id})"><i class="fas fa-save"></i></button>
-                <button class="btn btn-sm btn-danger" onclick="deleteConsultationType(${ct.id})"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`).join('')}
-        </tbody></table></div>`;
+    // Types de consultation
+    document.getElementById('consultation-types-list').innerHTML =
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Description</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
+        state.consultationTypes.map(function(ct) {
+            return '<tr>' +
+                '<td><strong>' + ct.name + '</strong></td>' +
+                '<td>' + ct.price + ' HTG</td>' +
+                '<td>' + (ct.description||'-') + '</td>' +
+                '<td><input type="checkbox" ' + (ct.active?'checked':'') + ' onchange="toggleConsultationType(' + ct.id + ',this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>' +
+                '<td><div class="d-flex gap-10">' +
+                    '<button class="btn btn-sm btn-warning" onclick=\"openEditModal(\'consultation_type\',' + ct.id + ')" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteConsultationType(' + ct.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
 
-    document.getElementById('vitals-types-list').innerHTML = `
-        <div class="table-container"><table><thead><tr><th>Nom</th><th>Unité</th><th>Min</th><th>Max</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
-        ${state.vitalTypes.map(v=>`<tr>
-            <td>${v.name}</td><td>${v.unit}</td><td>${v.min}</td><td>${v.max}</td>
-            <td><input type="checkbox" ${v.active?'checked':''} onchange="toggleVitalType(${v.id},this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>
-            <td><button class="btn btn-sm btn-danger" onclick="deleteVitalType(${v.id})"><i class="fas fa-trash"></i></button></td>
-        </tr>`).join('')}
-        </tbody></table></div>`;
+    // Types signes vitaux
+    document.getElementById('vitals-types-list').innerHTML =
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Unité</th><th>Min</th><th>Max</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
+        state.vitalTypes.map(function(v) {
+            return '<tr>' +
+                '<td>' + v.name + '</td><td>' + v.unit + '</td><td>' + v.min + '</td><td>' + v.max + '</td>' +
+                '<td><input type="checkbox" ' + (v.active?'checked':'') + ' onchange="toggleVitalType(' + v.id + ',this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>' +
+                '<td><div class="d-flex gap-10">' +
+                    '<button class="btn btn-sm btn-warning" onclick=\"openEditModal(\'vital_type\',' + v.id + ')" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteVitalType(' + v.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
 
-    document.getElementById('lab-analyses-types-list').innerHTML = `
-        <div class="table-container"><table><thead><tr><th>Nom</th><th>Prix</th><th>Type</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
-        ${state.labAnalysisTypes.map(a=>`<tr>
-            <td>${a.name}</td>
-            <td><input type="number" class="form-control" id="la-price-${a.id}" value="${a.price}" style="width:100px;"></td>
-            <td><span class="result-type-badge ${a.result_type==='image'?'result-type-image':'result-type-text'}">${a.result_type==='image'?'Image':'Texte'}</span></td>
-            <td><input type="checkbox" ${a.active?'checked':''} onchange="toggleLabAnalysisType(${a.id},this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>
-            <td class="d-flex gap-10">
-                <button class="btn btn-sm btn-success" onclick="saveLabAnalysisType(${a.id})"><i class="fas fa-save"></i></button>
-                <button class="btn btn-sm btn-danger" onclick="deleteLabAnalysisType(${a.id})"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`).join('')}
-        </tbody></table></div>`;
+    // Types analyses labo
+    document.getElementById('lab-analyses-types-list').innerHTML =
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix</th><th>Type</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
+        state.labAnalysisTypes.map(function(a) {
+            return '<tr>' +
+                '<td>' + a.name + '</td>' +
+                '<td>' + a.price + ' HTG</td>' +
+                '<td><span class="result-type-badge ' + (a.result_type==='image'?'result-type-image':'result-type-text') + '">' + (a.result_type==='image'?'Image':'Texte') + '</span></td>' +
+                '<td><input type="checkbox" ' + (a.active?'checked':'') + ' onchange="toggleLabAnalysisType(' + a.id + ',this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>' +
+                '<td><div class="d-flex gap-10">' +
+                    '<button class="btn btn-sm btn-warning" onclick=\"openEditModal(\'lab_analysis_type\',' + a.id + ')" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteLabAnalysisType(' + a.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
 
-    document.getElementById('external-services-types-list').innerHTML = `
-        <div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Actif</th><th>Actions</th></tr></thead><tbody>
-        ${state.externalServiceTypes.map(s=>`<tr>
-            <td>${s.name}</td><td>${s.price} Gdes</td>
-            <td><input type="checkbox" ${s.active?'checked':''} onchange="toggleExternalServiceType(${s.id},this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>
-            <td><button class="btn btn-sm btn-danger" onclick="deleteExternalServiceType(${s.id})"><i class="fas fa-trash"></i></button></td>
-        </tr>`).join('')}
-        </tbody></table></div>`;
+    // Services externes
+    document.getElementById('external-services-types-list').innerHTML =
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
+        state.externalServiceTypes.map(function(s) {
+            return '<tr>' +
+                '<td>' + s.name + '</td>' +
+                '<td>' + s.price + ' Gdes</td>' +
+                '<td><input type="checkbox" ' + (s.active?'checked':'') + ' onchange="toggleExternalServiceType(' + s.id + ',this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>' +
+                '<td><div class="d-flex gap-10">' +
+                    '<button class="btn btn-sm btn-warning" onclick=\"openEditModal(\'external_service_type\',' + s.id + ')" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteExternalServiceType(' + s.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+}
+
+// ─── MODAL MODIFICATION UNIVERSELLE ──────────────────────────
+function openEditModal(type, id) {
+    var item, fields, title, saveFn;
+    if (type === 'consultation_type') {
+        item  = state.consultationTypes.find(function(c) { return c.id === id; });
+        title = 'Modifier le type de consultation';
+        fields = [
+            { id:'em-ct-name',  label:'Nom',          value: item.name,             type:'text'   },
+            { id:'em-ct-price', label:'Prix (Gdes)',   value: item.price,            type:'number' },
+            { id:'em-ct-desc',  label:'Description',   value: item.description||'',  type:'text'   },
+        ];
+        saveFn = 'saveEditConsultationType(' + id + ')';
+    } else if (type === 'vital_type') {
+        item  = state.vitalTypes.find(function(v) { return v.id === id; });
+        title = 'Modifier le signe vital';
+        fields = [
+            { id:'em-vt-name', label:'Nom',   value: item.name, type:'text'   },
+            { id:'em-vt-unit', label:'Unité', value: item.unit, type:'text'   },
+            { id:'em-vt-min',  label:'Min',   value: item.min,  type:'number' },
+            { id:'em-vt-max',  label:'Max',   value: item.max,  type:'number' },
+        ];
+        saveFn = 'saveEditVitalType(' + id + ')';
+    } else if (type === 'lab_analysis_type') {
+        item  = state.labAnalysisTypes.find(function(a) { return a.id === id; });
+        title = "Modifier l\'analyse";
+        fields = [
+            { id:'em-la-name',  label:'Nom',          value: item.name,        type:'text'   },
+            { id:'em-la-price', label:'Prix (Gdes)',   value: item.price,       type:'number' },
+        ];
+        saveFn = 'saveEditLabAnalysisType(' + id + ')';
+    } else if (type === 'external_service_type') {
+        item  = state.externalServiceTypes.find(function(s) { return s.id === id; });
+        title = 'Modifier le service externe';
+        fields = [
+            { id:'em-es-name',  label:'Nom',         value: item.name,  type:'text'   },
+            { id:'em-es-price', label:'Prix (Gdes)',  value: item.price, type:'number' },
+        ];
+        saveFn = 'saveEditExternalServiceType(' + id + ')';
+    } else if (type === 'medication') {
+        item  = state.medications.find(function(m) { return m.id === id; });
+        title = 'Modifier le médicament';
+        fields = [
+            { id:'em-med-name',    label:'Nom',          value: item.name,            type:'text'   },
+            { id:'em-med-price',   label:'Prix (Gdes)',   value: item.price,           type:'number' },
+            { id:'em-med-qty',     label:'Quantité',      value: item.quantity,        type:'number' },
+            { id:'em-med-alert',   label:'Seuil alerte',  value: item.alert_threshold, type:'number' },
+            { id:'em-med-espace',  label:'Espace',        value: item.espace||'',      type:'text'   },
+            { id:'em-med-etagere', label:'Étagère',       value: item.etagere||'',     type:'text'   },
+        ];
+        saveFn = "saveEditMedication(\'" + id + "\')";
+    }
+    if (!item) return;
+
+    var existing = document.getElementById('universal-edit-modal');
+    if (existing) existing.remove();
+
+    var fieldsHTML = fields.map(function(f) {
+        return '<div><label class="form-label">' + f.label + '</label>' +
+               '<input type="' + f.type + '" id="' + f.id + '" class="form-control" value="' + f.value + '"></div>';
+    }).join('');
+
+    var modal = document.createElement('div');
+    modal.id = 'universal-edit-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML =
+        '<div class="transaction-details-content" style="max-width:500px;">' +
+        '<h4><i class="fas fa-edit" style="color:var(--warning);"></i> ' + title + '</h4>' +
+        '<div class="add-form-grid" style="margin-top:16px;">' + fieldsHTML + '</div>' +
+        '<div class="d-flex gap-10 mt-3">' +
+        '<button class="btn btn-success" onclick="' + saveFn + '"><i class="fas fa-save"></i> Enregistrer</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'universal-edit-modal\').remove()">Annuler</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+}
+
+async function saveEditConsultationType(id) {
+    var name  = document.getElementById('em-ct-name').value.trim();
+    var price = parseFloat(document.getElementById('em-ct-price').value);
+    var desc  = document.getElementById('em-ct-desc').value;
+    if (!name || isNaN(price)) { toast('Remplir tous les champs', 'error'); return; }
+    var ct = state.consultationTypes.find(function(c) { return c.id === id; });
+    try {
+        await apiCall(function() { return API.updateConsultationType(id, { name:name, price:price, description:desc, active:ct.active }); });
+        Object.assign(ct, { name:name, price:price, description:desc });
+        document.getElementById('universal-edit-modal').remove();
+        updateSettingsDisplay(); updateConsultationTypesSelect();
+        toast('Type de consultation modifié!');
+    } catch(e) {}
+}
+
+async function saveEditVitalType(id) {
+    var name = document.getElementById('em-vt-name').value.trim();
+    var unit = document.getElementById('em-vt-unit').value.trim();
+    var min  = parseFloat(document.getElementById('em-vt-min').value);
+    var max  = parseFloat(document.getElementById('em-vt-max').value);
+    if (!name || !unit) { toast('Remplir tous les champs', 'error'); return; }
+    var vt = state.vitalTypes.find(function(v) { return v.id === id; });
+    try {
+        await apiCall(function() { return API.updateVitalType(id, { name:name, unit:unit, min:min, max:max, active:vt.active }); });
+        Object.assign(vt, { name:name, unit:unit, min:min, max:max });
+        document.getElementById('universal-edit-modal').remove();
+        updateSettingsDisplay(); updateVitalsInputs();
+        toast('Signe vital modifié!');
+    } catch(e) {}
+}
+
+async function saveEditLabAnalysisType(id) {
+    var name  = document.getElementById('em-la-name').value.trim();
+    var price = parseFloat(document.getElementById('em-la-price').value);
+    var at    = state.labAnalysisTypes.find(function(a) { return a.id === id; });
+    try {
+        await apiCall(function() { return API.updateLabAnalysisType(id, { name:name, price:price, active:at.active }); });
+        Object.assign(at, { name:name, price:price });
+        document.getElementById('universal-edit-modal').remove();
+        updateSettingsDisplay(); updateLabAnalysesSelect();
+        toast('Analyse modifiée!');
+    } catch(e) {}
+}
+
+async function saveEditExternalServiceType(id) {
+    var name  = document.getElementById('em-es-name').value.trim();
+    var price = parseFloat(document.getElementById('em-es-price').value);
+    var st    = state.externalServiceTypes.find(function(s) { return s.id === id; });
+    try {
+        await apiCall(function() { return API.updateExternalServiceType(id, { name:name, price:price, active:st.active }); });
+        Object.assign(st, { name:name, price:price });
+        document.getElementById('universal-edit-modal').remove();
+        updateSettingsDisplay(); updateExternalServicesOptions(); updateExternalServicesSelect();
+        toast('Service modifié!');
+    } catch(e) {}
+}
+
+async function saveEditMedication(id) {
+    var name    = document.getElementById('em-med-name').value.trim();
+    var price   = parseFloat(document.getElementById('em-med-price').value);
+    var qty     = parseInt(document.getElementById('em-med-qty').value);
+    var alert   = parseInt(document.getElementById('em-med-alert').value);
+    var espace  = document.getElementById('em-med-espace').value;
+    var etagere = document.getElementById('em-med-etagere').value;
+    try {
+        await apiCall(function() { return API.updateMedication(id, { name:name, price:price, quantity:qty, alertThreshold:alert, espace:espace, etagere:etagere }); });
+        var med = state.medications.find(function(m) { return m.id === id; });
+        if (med) Object.assign(med, { name:name, price:price, quantity:qty, alert_threshold:alert, espace:espace, etagere:etagere });
+        document.getElementById('universal-edit-modal').remove();
+        updateMedicationsSettingsList(); updateMedicationStockDisplay();
+        toast('Médicament modifié!');
+    } catch(e) {}
 }
 
 async function updateMedicationsSettingsList() {
-    const meds = await API.getMedications().catch(()=>[]);
-    document.getElementById('medications-settings-list').innerHTML = meds.map(m=>`
-        <tr>
-            <td><strong>${m.name}</strong></td><td>${m.price} HTG</td><td>${m.quantity}</td><td>${m.alert_threshold}</td>
-            <td><button class="btn btn-sm btn-danger" onclick="deleteMedicationSettings('${m.id}')"><i class="fas fa-trash"></i></button></td>
-        </tr>`).join('');
+    var meds = await API.getMedications().catch(function() { return []; });
+    state.medications = meds;
+    document.getElementById('medications-settings-list').innerHTML = meds.map(function(m) {
+        return '<tr class="' + (m.quantity === 0 ? 'out-of-stock' : m.quantity <= m.alert_threshold ? 'low-stock' : '') + '">' +
+            '<td><strong>' + m.name + '</strong>' + (m.generic_name && m.generic_name !== m.name ? '<br><small class="text-muted">' + m.generic_name + '</small>' : '') + '</td>' +
+            '<td>' + (m.form||'-') + '</td>' +
+            '<td>' + m.price + ' HTG</td>' +
+            '<td>' + m.quantity + '</td>' +
+            '<td>' + m.alert_threshold + '</td>' +
+            '<td>' + (m.espace ? '<span class="badge badge-primary">' + m.espace + '</span>' : '-') + '</td>' +
+            '<td>' + (m.etagere ? '<span class="badge" style="background:#e8e0ff;color:#6f42c1;">' + m.etagere + '</span>' : '-') + '</td>' +
+            '<td><div class="d-flex gap-10">' +
+                '<button class="btn btn-sm btn-warning" onclick="openEditModal(\'medication\',\'' + m.id + '\')" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                '<button class="btn btn-sm btn-danger" onclick="deleteMedicationSettings(\'' + m.id + '\') " title="Supprimer"><i class="fas fa-trash"></i></button>' +
+            '</div></td>' +
+        '</tr>';
+    }).join('');
 
     if (state.currentRole === 'admin' || (state.currentRole === 'sub_admin' && state.subAdminPermissions.users)) {
         const users = await API.getUsers().catch(()=>[]);
@@ -2429,19 +2617,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('add-medication-settings')?.addEventListener('click', async () => {
-        const name  = document.getElementById('new-medication-name').value.trim();
-        const price = parseFloat(document.getElementById('new-medication-price').value);
-        const qty   = parseInt(document.getElementById('new-medication-quantity').value);
-        const alert = parseInt(document.getElementById('new-medication-alert').value);
-        if (!name || isNaN(price) || isNaN(qty) || isNaN(alert)) { toast('Remplir tous les champs', 'error'); return; }
-        const med = await apiCall(() => API.addMedication({ name, genericName: name, form:'Comprimé', unit:'comprimés', quantity:qty, alertThreshold:alert, price }));
-        state.medications.push(med);
-        updateMedicationsSettingsList();
-        document.getElementById('new-medication-name').value = '';
-        document.getElementById('new-medication-price').value = '';
-        document.getElementById('new-medication-quantity').value = '';
-        document.getElementById('new-medication-alert').value = '';
-        toast('Médicament ajouté!');
+        var name    = document.getElementById('new-medication-name').value.trim();
+        var generic = (document.getElementById('new-medication-generic')||{}).value || name;
+        var form    = (document.getElementById('new-medication-form')||{}).value || 'Comprimé';
+        var unit    = (document.getElementById('new-medication-unit')||{}).value || 'comprimés';
+        var price   = parseFloat(document.getElementById('new-medication-price').value);
+        var qty     = parseInt(document.getElementById('new-medication-quantity').value);
+        var alert   = parseInt(document.getElementById('new-medication-alert').value);
+        var espace  = (document.getElementById('new-medication-espace')||{}).value || '';
+        var etagere = (document.getElementById('new-medication-etagere')||{}).value || '';
+        if (!name || isNaN(price) || isNaN(qty) || isNaN(alert)) { toast('Remplir tous les champs obligatoires', 'error'); return; }
+        try {
+            var med = await apiCall(function() {
+                return API.addMedication({ name:name, genericName:generic, form:form, unit:unit, quantity:qty, alertThreshold:alert, price:price, espace:espace, etagere:etagere });
+            });
+            state.medications.push(med);
+            updateMedicationsSettingsList();
+            ['new-medication-name','new-medication-generic','new-medication-price','new-medication-quantity','new-medication-alert'].forEach(function(id) {
+                var el = document.getElementById(id); if (el) el.value = '';
+            });
+            ['new-medication-form','new-medication-espace','new-medication-etagere'].forEach(function(id) {
+                var el = document.getElementById(id); if (el) el.value = '';
+            });
+            toast('Médicament ajouté avec succès!', 'success');
+        } catch(e) {}
     });
 
     document.getElementById('add-user')?.addEventListener('click', async () => {

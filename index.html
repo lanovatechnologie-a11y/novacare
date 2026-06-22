@@ -624,34 +624,7 @@
             </div>
             <div class="card mt-3">
                 <h3><i class="fas fa-warehouse"></i> Stock Médicaments</h3>
-                <button id="add-new-medication" class="btn btn-success mb-3"><i class="fas fa-plus"></i> Ajouter médicament</button>
-                <div id="new-medication-form" style="display:none;" class="card mb-3">
-                    <h4><i class="fas fa-plus-circle" style="color:var(--success);"></i> Nouveau médicament</h4>
-                    <div class="add-form-grid" style="margin-top:10px;">
-                        <div><label class="form-label">Nom commercial *</label><input type="text" id="new-med-name" class="form-control" placeholder="Ex: Amoxicilline 500mg"></div>
-                        <div><label class="form-label">Nom générique</label><input type="text" id="new-med-generic" class="form-control" placeholder="Nom générique"></div>
-                        <div><label class="form-label">Forme *</label>
-                            <select id="new-med-form" class="form-control">
-                                <option value="">Choisir...</option>
-                                <option value="Comprimé">Comprimé</option>
-                                <option value="Capsule">Capsule</option>
-                                <option value="Sirop">Sirop</option>
-                                <option value="Injection">Injection</option>
-                                <option value="Crème">Crème</option>
-                                <option value="Pommade">Pommade</option>
-                                <option value="Suppositoire">Suppositoire</option>
-                            </select>
-                        </div>
-                        <div><label class="form-label">Unité *</label><input type="text" id="new-med-unit" class="form-control" placeholder="comprimés, ml…"></div>
-                        <div><label class="form-label">Quantité *</label><input type="number" id="new-med-quantity" class="form-control" placeholder="0" min="0"></div>
-                        <div><label class="form-label">Seuil alerte *</label><input type="number" id="new-med-alert" class="form-control" placeholder="10" min="0"></div>
-                        <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-med-price" class="form-control" placeholder="0.00" min="0"></div>
-                    </div>
-                    <div class="mt-3 d-flex gap-10">
-                        <button id="save-new-medication" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer</button>
-                        <button id="cancel-new-medication" class="btn btn-secondary">Annuler</button>
-                    </div>
-                </div>
+                <p class="text-muted" style="font-size:.85rem;margin-bottom:10px;"><i class="fas fa-info-circle"></i> L'ajout de médicaments est réservé à l'administrateur (section Paramètres).</p>
                 <div class="table-container"><div id="medication-stock-list"></div></div>
             </div>
         </section>
@@ -814,20 +787,54 @@
                 </div>
             </div>
 
-            <!-- Médicaments -->
-            <div class="card">
-                <h3><i class="fas fa-pills"></i> Gestion des Médicaments</h3>
+            <!-- Médicaments (admin seulement) -->
+            <div class="card" id="admin-medications-card">
+                <h3><i class="fas fa-pills"></i> Gestion des Médicaments <span class="badge badge-warning" style="font-size:.75rem;">Admin seulement</span></h3>
                 <div class="table-container mt-2">
                     <table>
-                        <thead><tr><th>Médicament</th><th>Prix (Gdes)</th><th>Quantité</th><th>Seuil alerte</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Médicament</th><th>Forme</th><th>Prix</th><th>Qté</th><th>Alerte</th><th>Emplacement</th><th>Étagère</th><th>Actions</th></tr></thead>
                         <tbody id="medications-settings-list"></tbody>
                     </table>
                 </div>
-                <div class="add-form-grid">
-                    <div><label class="form-label">Nom *</label><input type="text" id="new-medication-name" class="form-control" placeholder="Nom du médicament"></div>
+                <div class="add-form-grid" style="margin-top:16px;">
+                    <div><label class="form-label">Nom commercial *</label><input type="text" id="new-medication-name" class="form-control" placeholder="Ex: Amoxicilline 500mg"></div>
+                    <div><label class="form-label">Nom générique</label><input type="text" id="new-medication-generic" class="form-control" placeholder="Nom générique"></div>
+                    <div><label class="form-label">Forme *</label>
+                        <select id="new-medication-form" class="form-control">
+                            <option value="">Choisir...</option>
+                            <option value="Comprimé">Comprimé</option>
+                            <option value="Capsule">Capsule</option>
+                            <option value="Sirop">Sirop</option>
+                            <option value="Injection">Injection</option>
+                            <option value="Crème">Crème</option>
+                            <option value="Pommade">Pommade</option>
+                            <option value="Suppositoire">Suppositoire</option>
+                        </select>
+                    </div>
+                    <div><label class="form-label">Unité *</label><input type="text" id="new-medication-unit" class="form-control" placeholder="comprimés, ml…"></div>
                     <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-medication-price" class="form-control" placeholder="0.00" min="0"></div>
                     <div><label class="form-label">Quantité *</label><input type="number" id="new-medication-quantity" class="form-control" placeholder="0" min="0"></div>
                     <div><label class="form-label">Seuil alerte *</label><input type="number" id="new-medication-alert" class="form-control" placeholder="10" min="0"></div>
+                    <div><label class="form-label"><i class="fas fa-map-marker-alt" style="color:#1a6bca;"></i> Espace</label>
+                        <select id="new-medication-espace" class="form-control">
+                            <option value="">Sélectionner...</option>
+                            <option value="Espace 1">Espace 1</option>
+                            <option value="Espace 2">Espace 2</option>
+                            <option value="Espace 3">Espace 3</option>
+                            <option value="Espace 4">Espace 4</option>
+                            <option value="Espace 5">Espace 5</option>
+                        </select>
+                    </div>
+                    <div><label class="form-label"><i class="fas fa-layer-group" style="color:#6f42c1;"></i> Étagère</label>
+                        <select id="new-medication-etagere" class="form-control">
+                            <option value="">Sélectionner...</option>
+                            <option value="Étagère 1">Étagère 1</option>
+                            <option value="Étagère 2">Étagère 2</option>
+                            <option value="Étagère 3">Étagère 3</option>
+                            <option value="Étagère 4">Étagère 4</option>
+                            <option value="Étagère 5">Étagère 5</option>
+                        </select>
+                    </div>
                     <div style="display:flex;align-items:flex-end;">
                         <button type="button" id="add-medication-settings" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
                     </div>

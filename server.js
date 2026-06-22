@@ -411,23 +411,25 @@ app.get('/medications', auth, async (req, res) => {
 });
 app.post('/medications', auth, async (req, res) => {
     try {
-        const { name, genericName, form, unit, quantity, alertThreshold, price } = req.body;
+        const { name, genericName, form, unit, quantity, alertThreshold, price, espace, etagere } = req.body;
         const id = 'MED' + Date.now();
         const r = await pool.query(
-            'INSERT INTO medications(id,name,generic_name,form,unit,quantity,alert_threshold,price) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-            [id, name, genericName, form, unit, quantity, alertThreshold, price]
+            'INSERT INTO medications(id,name,generic_name,form,unit,quantity,alert_threshold,price,espace,etagere) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
+            [id, name, genericName||name, form||'Comprimé', unit||'comprimés', quantity, alertThreshold||10, price, espace||null, etagere||null]
         );
         res.status(201).json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.put('/medications/:id', auth, async (req, res) => {
     try {
-        const { name, quantity, alertThreshold, price } = req.body;
+        const { name, quantity, alertThreshold, price, espace, etagere } = req.body;
         const p = [], sets = [];
         if (name)           { p.push(name);           sets.push('name=$'            + p.length); }
         if (quantity!=null) { p.push(quantity);        sets.push('quantity=$'        + p.length); }
         if (alertThreshold) { p.push(alertThreshold);  sets.push('alert_threshold=$' + p.length); }
         if (price!=null)    { p.push(price);           sets.push('price=$'           + p.length); }
+        if (espace!==undefined)  { p.push(espace||null);  sets.push('espace=$'  + p.length); }
+        if (etagere!==undefined) { p.push(etagere||null); sets.push('etagere=$' + p.length); }
         if (!sets.length) return res.json({ success: true });
         p.push(req.params.id);
         await pool.query('UPDATE medications SET ' + sets.join(',') + ' WHERE id=$' + p.length, p);
