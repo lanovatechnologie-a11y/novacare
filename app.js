@@ -140,6 +140,30 @@ function notifyDepartment(role, title, body, color) {
     }).catch(() => {});
 }
 
+// ─── UTILITAIRES UI SUPPLÉMENTAIRES ─────────────────────────
+function togglePasswordView() {
+    var input = document.getElementById('password');
+    var icon  = document.getElementById('eye-icon');
+    if (!input || !icon) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+
+// Ripple effect sur tous les boutons
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.btn');
+    if (!btn) return;
+    btn.classList.remove('ripple');
+    void btn.offsetWidth; // reflow
+    btn.classList.add('ripple');
+    setTimeout(function() { btn.classList.remove('ripple'); }, 500);
+});
+
 // ─── CAISSE: Modal + Reset après paiement ────────────────────
 function showPrintModal(totalHTG, givenHTG, payCurrency, method) {
     const change = givenHTG - totalHTG;
