@@ -420,7 +420,7 @@ function setupRoleBasedNavigation() {
     if (role === 'admin') {
         allowed = allSections;
     } else if (role === 'sub_admin') {
-        // Basé sur les permissions définies par l'admin
+        // Basé sur les permissions définies par l\'admin
         allowed = ['dashboard'];
         const perms = state.subAdminPermissions;
         if (perms.secretary)      allowed.push('secretary');
@@ -614,7 +614,7 @@ async function updateRoleDashboard() {
                 <div class="stats-container">
                     <div class="stat-card">
                         <div class="stat-icon" style="background:#1a6bca"><i class="fas fa-user-plus"></i></div>
-                        <div class="stat-info"><h3>${patients.length}</h3><p>Patients aujourd'hui</p></div>
+                        <div class="stat-info"><h3>${patients.length}</h3><p>Patients aujourd\'hui</p></div>
                     </div>
                     <div class="stat-card clickable-stat" onclick="showSection('messaging')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
@@ -636,7 +636,7 @@ async function updateRoleDashboard() {
                         <div class="stat-icon" style="background:#28a745"><i class="fas fa-money-bill-wave"></i></div>
                         <div class="stat-info">
                             <h3>${revenueHTG.toLocaleString('fr-FR')} HTG</h3>
-                            <p>Encaissements aujourd'hui <span class="currency-tag usd">$${htgToUsd(revenueHTG)}</span></p>
+                            <p>Encaissements aujourd\'hui <span class="currency-tag usd">$${htgToUsd(revenueHTG)}</span></p>
                         </div>
                     </div>
                     <div class="stat-card clickable-stat" onclick="showSection('messaging')">
@@ -1297,7 +1297,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<p class="text-muted">Aucune consultation enregistrée</p>';
             document.getElementById('consultation-modification-section')?.classList.remove('hidden');
 
-            // Résultats d'analyses du patient
+            // Résultats d\'analyses du patient
             const labTxs = await API.getTransactions({ patientId: p.id, type: 'lab' }).catch(()=>[]);
             const labResults = labTxs.filter(t => t.result);
             const labResultsContainer = document.getElementById('doctor-lab-results');
@@ -1605,7 +1605,7 @@ async function saveLabResultFn(txId) {
                 updatePendingAnalysesList();
                 // Notification → médecin
                 await notifyDepartment('doctor', '🧪 Résultat d\'analyse disponible',
-                    `Résultat d'analyse (image) disponible. Référence: ${txId}`, '#17a2b8');
+                    `Résultat d\'analyse (image) disponible. Référence: ${txId}`, '#17a2b8');
             };
             reader.readAsDataURL(fileInput.files[0]);
         } else {
@@ -1615,7 +1615,7 @@ async function saveLabResultFn(txId) {
             document.getElementById('lab-result-modal').remove();
             updatePendingAnalysesList();
             await notifyDepartment('doctor', '🧪 Résultat d\'analyse disponible',
-                `Nouveau résultat d'analyse disponible. Référence: ${txId}`, '#17a2b8');
+                `Nouveau résultat d\'analyse disponible. Référence: ${txId}`, '#17a2b8');
         }
     } catch(e) {}
 }
@@ -1868,7 +1868,7 @@ async function updateAdminStats() {
                 '<h3><i class="fas fa-money-bill-wave"></i> Revenus Totaux</h3>' +
                 '<h2>' + fmtAmt(stats.totalRevenue) + '</h2>' +
                 '<p style="color:#2e7d32;font-weight:600;">≡ ' + (isUSD ? parseFloat(stats.totalRevenue).toLocaleString('fr-FR') + ' HTG' : '$' + htgToUsd(stats.totalRevenue) + ' USD') + '</p>' +
-                '<div class="chart-bar-container mt-2"><div class="chart-bar-label"><span>Aujourd'hui</span><strong>' + fmtAmt(stats.todayRevenue) + '</strong></div></div>' +
+                '<div class="chart-bar-container mt-2"><div class="chart-bar-label"><span>Aujourd\'hui</span><strong>' + fmtAmt(stats.todayRevenue) + '</strong></div></div>' +
                 '<div class="chart-bar-container"><div class="chart-bar-label"><span>Cette semaine</span><strong>' + fmtAmt(stats.weekRevenue) + '</strong></div></div>' +
                 '</div>' +
                 // Services non payés
@@ -1880,7 +1880,7 @@ async function updateAdminStats() {
                 '<div class="admin-stat-card">' +
                 '<h3><i class="fas fa-users"></i> Patients</h3>' +
                 '<h2>' + stats.totalPatients + '</h2>' +
-                '<p>' + stats.todayPatients + ' aujourd'hui</p>' +
+                '<p>' + stats.todayPatients + ' aujourd\'hui</p>' +
                 '</div>' +
                 // Alertes stock
                 '<div class="admin-stat-card">' +
@@ -1918,7 +1918,7 @@ async function updateAdminStats() {
                 '<strong>' + fmtAmt(a.total) + '</strong>' +
                 '<p>' + a.count + ' transaction(s)</p>' +
                 '</div>'
-            ).join('') : '<p class="text-muted">Aucune donnée d'agent disponible</p>') +
+            ).join('') : '<p class="text-muted">Aucune donnée d\'agent disponible</p>') +
             '</div>' +
             '<h3 class="mt-3"><i class="fas fa-chart-pie"></i> Rapports par Type de Service</h3>' +
             '<div class="admin-stats-grid" style="margin-top:14px;">' +
@@ -2058,8 +2058,8 @@ async function searchAdminPatient() {
                 '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
                 '<td>' + (t.payment_method||'-') + '</td>' +
                 '<td>' +
-                  '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction('' + t.id + '')"><i class="fas fa-edit"></i></button> ' +
-                  '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect('' + t.id + '')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
+                  '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button> ' +
+                  '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect(\'' + t.id + '\')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
                 '</td>' +
             '</tr>';
         }).join('');
@@ -2109,7 +2109,7 @@ async function searchAdminPatient() {
             '</select></div>' +
             '<div><label class="form-label">Réduction %</label><input type="number" id="discount-percentage" class="form-control" value="' + (p.discount_percentage||0) + '" min="0" max="100"></div>' +
             '<div style="display:flex;align-items:flex-end;">' +
-            '<button class="btn btn-success" style="width:100%;" onclick="saveAdminPatientEdit('' + p.id + '')"><i class="fas fa-save"></i> Enregistrer</button>' +
+            '<button class="btn btn-success" style="width:100%;" onclick="saveAdminPatientEdit(\'' + p.id + '\')"><i class="fas fa-save"></i> Enregistrer</button>' +
             '</div></div></div>' +
 
             // Transactions
