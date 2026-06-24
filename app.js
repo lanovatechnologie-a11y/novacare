@@ -591,6 +591,305 @@ function updateChangeCalc(totalHTG) {
     }
 }
 
+// ─── TABLEAU DE BORD ADMIN ───────────────────────────────────
+function renderAdminDashboard(stats, container) {
+    const rev  = parseFloat(stats.totalRevenue  || 0);
+    const tday = parseFloat(stats.todayRevenue  || 0);
+    const week = parseFloat(stats.weekRevenue   || 0);
+
+    // Calcul diagramme camembert par type
+    const byType = stats.byType || [];
+    const totalTx = byType.reduce(function(s,t){ return s + parseFloat(t.total); }, 0) || 1;
+    const colors = { consultation:'#1a6bca', lab:'#ffc107', medication:'#28a745', external:'#6f42c1' };
+    const labels = { consultation:'Consultations', lab:'Analyses', medication:'Médicaments', external:'Services ext.' };
+
+    // Générer segments camembert SVG
+    function pieSegments(data, total) {
+        var segs = '', cumul = 0;
+        var cx = 80, cy = 80, r = 70;
+        data.forEach(function(item) {
+            var pct   = parseFloat(item.total) / total;
+            var start = cumul * 2 * Math.PI - Math.PI/2;
+            var end   = (cumul + pct) * 2 * Math.PI - Math.PI/2;
+            var x1 = cx + r * Math.cos(start);
+            var y1 = cy + r * Math.sin(start);
+            var x2 = cx + r * Math.cos(end);
+            var y2 = cy + r * Math.sin(end);
+            var large = pct > 0.5 ? 1 : 0;
+            var color = colors[item.type] || '#aaa';
+            if (pct > 0.001) {
+                segs += '<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+r+','+r+' 0 '+large+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+color+'" stroke="#fff" stroke-width="2" opacity="0.9"/>';
+            }
+            cumul += pct;
+        });
+        return segs;
+    }
+
+    // Barres horizontales pour revenus semaine vs mois
+    var maxBar = Math.max(tday, week, rev/4, 1);
+    function bar(val, color) {
+        var pct = Math.min(100, (val / maxBar) * 100).toFixed(1);
+        return '<div style="background:#e9ecef;border-radius:6px;height:12px;margin:4px 0;overflow:hidden;">' +
+               '<div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:6px;transition:width .8s ease;"></div></div>';
+    }
+
+    // Diagramme barres par agent
+    var byAgent = stats.byAgent || [];
+    var maxAgent = byAgent.length ? Math.max.apply(null, byAgent.map(function(a){ return parseFloat(a.total); })) : 1;
+    var agentBars = byAgent.slice(0,6).map(function(a) {
+        var pct = Math.min(100, (parseFloat(a.total)/maxAgent*100)).toFixed(1);
+        return '<div style="margin-bottom:10px;">'+
+               '<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:3px;">'+
+               '<span><i class="fas fa-user" style="color:#1a6bca;"></i> '+a.payment_agent+'</span>'+
+               '<strong>'+parseFloat(a.total).toLocaleString('fr-FR')+' HTG</strong></div>'+
+               '<div style="background:#e9ecef;border-radius:6px;height:14px;overflow:hidden;">'+
+               '<div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#1a6bca,#2196F3);border-radius:6px;transition:width .8s ease;"></div></div></div>';
+    }).join('') || '<p class="text-muted">Aucune donnée agent</p>';
+
+    // Patients récents (dernières 10 lignes)
+    var recentTx = stats.recentTransactions || [];
+    // Grouper par patient pour avoir les 8 derniers patients uniques
+    var seenPat = {}, recentPats = [];
+    recentTx.forEach(function(t) {
+        if (!seenPat[t.patient_id] && t.patient_id) {
+            seenPat[t.patient_id] = true;
+            recentPats.push(t);
+        }
+    });
+
+    container.innerHTML =
+        // ── Cartes stats cliquables ──
+        '<div class="stats-container">' +
+        // Patients total - cliquable
+        '<div class="stat-card clickable-stat" onclick="showAdminDetailModal(\'patients\')" style="cursor:pointer;" title="Voir les patients">' +
+        '<div class="stat-icon" style="background:#1a6bca"><i class="fas fa-users"></i></div>' +
+        '<div class="stat-info"><h3>'+stats.totalPatients+'</h3><p>Patients <small style="color:#1a6bca;font-weight:600;">↗ Voir tout</small></p></div></div>' +
+        // Revenus
+        '<div class="stat-card clickable-stat" onclick="showAdminDetailModal(\'revenus\')" style="cursor:pointer;" title="Voir les revenus">' +
+        '<div class="stat-icon" style="background:#28a745"><i class="fas fa-money-bill-wave"></i></div>' +
+        '<div class="stat-info"><h3>'+rev.toLocaleString('fr-FR')+' HTG</h3>' +
+        '<p>Revenus <span class="currency-tag usd">$'+htgToUsd(rev)+'</span> <small style="color:#28a745;font-weight:600;">↗ Voir tout</small></p></div></div>' +
+        // Impayés
+        '<div class="stat-card clickable-stat" onclick="showAdminDetailModal(\'impayes\')" style="cursor:pointer;" title="Voir les impayés">' +
+        '<div class="stat-icon" style="background:#ffc107"><i class="fas fa-exclamation-triangle"></i></div>' +
+        '<div class="stat-info"><h3>'+stats.unpaidCount+'</h3><p>Impayés <small style="color:#ffc107;font-weight:600;">↗ Voir tout</small></p></div></div>' +
+        // Stock
+        '<div class="stat-card clickable-stat" onclick="showAdminDetailModal(\'stock\')" style="cursor:pointer;" title="Voir le stock">' +
+        '<div class="stat-icon" style="background:#dc3545"><i class="fas fa-pills"></i></div>' +
+        '<div class="stat-info"><h3>'+stats.lowStock.length+'</h3><p>Alertes stock <small style="color:#dc3545;font-weight:600;">↗ Voir tout</small></p></div></div>' +
+        // Aujourd\'hui
+        '<div class="stat-card">' +
+        '<div class="stat-icon" style="background:#17a2b8"><i class="fas fa-calendar-day"></i></div>' +
+        '<div class="stat-info"><h3>'+tday.toLocaleString('fr-FR')+' HTG</h3><p>Encaissé aujourd\'hui <span class="currency-tag usd">$'+htgToUsd(tday)+'</span></p></div></div>' +
+        // Cette semaine
+        '<div class="stat-card">' +
+        '<div class="stat-icon" style="background:#6f42c1"><i class="fas fa-calendar-week"></i></div>' +
+        '<div class="stat-info"><h3>'+week.toLocaleString('fr-FR')+' HTG</h3><p>Cette semaine <span class="currency-tag usd">$'+htgToUsd(week)+'</span></p></div></div>' +
+        '</div>' +
+
+        // ── Diagrammes ──
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin:20px 0;">' +
+
+        // Camembert revenus par type
+        '<div class="card">' +
+        '<h3 style="margin-bottom:14px;"><i class="fas fa-chart-pie" style="color:#1a6bca;"></i> Répartition des services</h3>' +
+        (byType.length > 0 ?
+        '<div style="display:flex;align-items:center;gap:20px;">' +
+        '<svg width="160" height="160" viewBox="0 0 160 160">' +
+        pieSegments(byType, totalTx) +
+        '<circle cx="80" cy="80" r="30" fill="white"/>' +
+        '<text x="80" y="84" text-anchor="middle" font-size="11" font-weight="bold" fill="#2c3e50">Total</text>' +
+        '</svg>' +
+        '<div>'+byType.map(function(t){
+            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.85rem;">'+
+                   '<div style="width:12px;height:12px;border-radius:3px;background:'+(colors[t.type]||'#aaa')+'"></div>'+
+                   '<span>'+(labels[t.type]||t.type)+'</span>' +
+                   '<strong style="margin-left:auto;">'+parseFloat(t.total).toLocaleString('fr-FR')+' HTG</strong>' +
+                   '</div>';
+        }).join('')+'</div></div>'
+        : '<p class="text-muted">Aucune donnée</p>') +
+        '</div>' +
+
+        // Barres revenus
+        '<div class="card">' +
+        '<h3 style="margin-bottom:14px;"><i class="fas fa-chart-bar" style="color:#28a745;"></i> Revenus comparatifs</h3>' +
+        '<div style="font-size:.85rem;">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Aujourd\'hui</span><strong>'+tday.toLocaleString('fr-FR')+' HTG</strong></div>'+bar(tday,'#17a2b8')+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:3px;margin-top:8px;"><span>Cette semaine</span><strong>'+week.toLocaleString('fr-FR')+' HTG</strong></div>'+bar(week,'#1a6bca')+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:3px;margin-top:8px;"><span>Total</span><strong>'+rev.toLocaleString('fr-FR')+' HTG</strong></div>'+bar(rev,'#28a745')+
+        '<p style="margin-top:12px;color:#6c757d;font-size:.78rem;">Taux: 1 USD = '+state.exchangeRate+' HTG</p>' +
+        '</div></div>' +
+
+        // Barres par agent
+        '<div class="card" style="grid-column:1/-1;">' +
+        '<h3 style="margin-bottom:14px;"><i class="fas fa-users" style="color:#6f42c1;"></i> Performance par agent</h3>' +
+        agentBars +
+        '</div>' +
+
+        '</div>' +
+
+        // ── Derniers patients (cliquables) ──
+        '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<h3><i class="fas fa-user-clock" style="color:#1a6bca;"></i> Derniers patients enregistrés</h3>' +
+        '<button class="btn btn-sm btn-outline" onclick="showAdminDetailModal(\'patients\')"><i class="fas fa-list"></i> Voir tous</button>' +
+        '</div>' +
+        '<div class="table-container"><table><thead><tr><th>ID</th><th>Nom</th><th>Type</th><th>Date</th><th>Montant dû</th><th>Détails</th></tr></thead><tbody>' +
+        recentPats.slice(0,8).map(function(t){
+            return '<tr style="cursor:pointer;" onclick="quickViewPatient(\'' + t.patient_id + '\',\'' + t.patient_name + '\')">' +
+                '<td><strong>'+t.patient_id+'</strong></td>' +
+                '<td>'+t.patient_name+'</td>' +
+                '<td>'+t.type+'</td>' +
+                '<td>'+t.date+'</td>' +
+                '<td>'+parseFloat(t.amount).toLocaleString('fr-FR')+' HTG</td>' +
+                '<td><button class="btn btn-xs btn-primary" onclick="event.stopPropagation();quickViewPatient(\'' + t.patient_id + '\',\'' + t.patient_name + '\')">'+
+                '<i class="fas fa-eye"></i></button></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div></div>' +
+
+        // ── Transactions récentes ──
+        '<div class="card mt-3">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<h3><i class="fas fa-receipt" style="color:#28a745;"></i> Transactions récentes</h3>' +
+        '<button class="btn btn-sm btn-outline" onclick="showSection(\'administration\')"><i class="fas fa-chart-bar"></i> Administration</button>' +
+        '</div>' +
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>HTG</th><th>USD</th><th>Statut</th><th>Action</th></tr></thead><tbody>' +
+        recentTx.slice(0,8).map(function(t){
+            var amt = parseFloat(t.amount);
+            return '<tr>' +
+                '<td>'+t.date+'</td>' +
+                '<td style="cursor:pointer;color:#1a6bca;" onclick="quickViewPatient(\'' + t.patient_id + '\',\'' + t.patient_name + '\')">'+t.patient_name+'</td>' +
+                '<td>'+t.service+'</td>' +
+                '<td>'+amt.toLocaleString('fr-FR')+'</td>' +
+                '<td class="text-muted">$'+htgToUsd(amt)+'</td>' +
+                '<td><span class="'+(t.status==='paid'?'status-paid':'status-unpaid')+'">'+(t.status==='paid'?'Payé':'Non payé')+'</span></td>' +
+                '<td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div></div>';
+
+    // Stocker les stats pour les modals
+    state._lastStats = stats;
+}
+
+// ── Modal détails rapides patient ───────────────────────────
+function goToPatientProfile(pid) {
+    var m = document.getElementById('quick-view-modal'); if(m) m.remove();
+    var s = document.getElementById('admin-patient-search'); if(s) s.value = pid;
+    showSection('administration');
+    setTimeout(searchAdminPatient, 300);
+}
+
+async function quickViewPatient(patientId, patientName) {
+    var modal = document.getElementById('quick-view-modal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'quick-view-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML = '<div class="transaction-details-content" style="max-width:650px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+        '<h4><i class="fas fa-user" style="color:#1a6bca;"></i> '+patientName+' <small class="text-muted">#'+patientId+'</small></h4>' +
+        '<button class="btn btn-sm btn-secondary" onclick="document.getElementById(\'quick-view-modal\').remove()"><i class="fas fa-times"></i></button>' +
+        '</div><div id="quick-view-body"><div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:#1a6bca;"></i></div></div>' +
+        '<div class="mt-3 d-flex gap-10">' +
+        '<button class="btn btn-primary" data-pid="' + patientId + '" onclick="goToPatientProfile(this.dataset.pid)"><i class="fas fa-external-link-alt"></i> Voir profil complet</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'quick-view-modal\').remove()">Fermer</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+    try {
+        var txs = await API.getTransactions({ patientId: patientId }).catch(function(){ return []; });
+        var totalPaye   = txs.filter(function(t){ return t.status==='paid'; }).reduce(function(s,t){ return s+parseFloat(t.amount); }, 0);
+        var totalImpaye = txs.filter(function(t){ return t.status==='unpaid'; }).reduce(function(s,t){ return s+parseFloat(t.amount); }, 0);
+        document.getElementById('quick-view-body').innerHTML =
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">' +
+            '<div style="background:#d4edda;padding:12px;border-radius:8px;text-align:center;">' +
+            '<strong style="color:#155724;font-size:1.1rem;">'+totalPaye.toLocaleString('fr-FR')+' HTG</strong><br><small>Payé</small></div>' +
+            '<div style="background:#f8d7da;padding:12px;border-radius:8px;text-align:center;">' +
+            '<strong style="color:#721c24;font-size:1.1rem;">'+totalImpaye.toLocaleString('fr-FR')+' HTG</strong><br><small>Non payé</small></div>' +
+            '</div>' +
+            '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th></tr></thead><tbody>' +
+            txs.slice(0,6).map(function(t){
+                return '<tr><td>'+t.date+'</td><td>'+t.service+'</td>' +
+                    '<td>'+parseFloat(t.amount).toLocaleString('fr-FR')+' HTG</td>' +
+                    '<td><span class="'+(t.status==='paid'?'status-paid':'status-unpaid')+'">'+(t.status==='paid'?'Payé':'Non payé')+'</span></td></tr>';
+            }).join('') +
+            '</tbody></table></div>';
+    } catch(e) {}
+}
+
+// ── Modal détails par catégorie ──────────────────────────────
+async function showAdminDetailModal(type) {
+    var modal = document.getElementById('admin-detail-modal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'admin-detail-modal';
+    modal.className = 'transaction-details-modal';
+
+    var titles = {
+        patients: '<i class="fas fa-users" style="color:#1a6bca;"></i> Tous les patients',
+        revenus:  '<i class="fas fa-money-bill-wave" style="color:#28a745;"></i> Détail des revenus',
+        impayes:  '<i class="fas fa-exclamation-triangle" style="color:#ffc107;"></i> Services non payés',
+        stock:    '<i class="fas fa-pills" style="color:#dc3545;"></i> Alertes de stock',
+    };
+    modal.innerHTML = '<div class="transaction-details-content" style="max-width:750px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+        '<h4>'+titles[type]+'</h4>' +
+        '<button class="btn btn-sm btn-secondary" onclick="document.getElementById(\'admin-detail-modal\').remove()"><i class="fas fa-times"></i></button>' +
+        '</div><div id="admin-detail-body"><div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:#1a6bca;"></i></div></div></div>';
+    document.body.appendChild(modal);
+
+    try {
+        var body = document.getElementById('admin-detail-body');
+        if (type === 'patients') {
+            var patients = await API.getPatients({}).catch(function(){ return []; });
+            body.innerHTML = '<div class="table-container"><table><thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Type</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
+                patients.map(function(p){
+                    return '<tr>' +
+                        '<td><strong>'+p.id+'</strong></td><td>'+p.full_name+'</td>' +
+                        '<td>'+(p.phone||'-')+'</td><td>'+p.type+'</td>' +
+                        '<td>'+(p.registration_date||'-')+'</td>' +
+                        '<td><button class="btn btn-xs btn-primary" data-pid="' + p.id + '" onclick="goToPatientProfile(this.dataset.pid)"><i class="fas fa-eye"></i></button></td></tr>';
+                        '<i class="fas fa-eye"></i></button></td></tr>';
+                }).join('') +
+                '</tbody></table></div>';
+        } else if (type === 'revenus') {
+            var txsPaid = await API.getTransactions({ status: 'paid' }).catch(function(){ return []; });
+            var tot = txsPaid.reduce(function(s,t){ return s+parseFloat(t.amount); }, 0);
+            body.innerHTML = '<div class="exchange-banner mb-3"><i class="fas fa-money-bill-wave"></i>' +
+                '<span>Total encaissé: <strong>'+tot.toLocaleString('fr-FR')+' HTG</strong> ≈ <strong>$'+htgToUsd(tot)+'</strong></span></div>' +
+                '<div class="table-container"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>HTG</th><th>USD</th><th>Méthode</th></tr></thead><tbody>' +
+                txsPaid.slice(0,30).map(function(t){
+                    var a = parseFloat(t.amount);
+                    return '<tr><td>'+t.date+'</td><td>'+t.patient_name+'</td><td>'+t.service+'</td>' +
+                        '<td>'+a.toLocaleString('fr-FR')+'</td><td>$'+htgToUsd(a)+'</td><td>'+(t.payment_method||'-')+'</td></tr>';
+                }).join('')+'</tbody></table></div>';
+        } else if (type === 'impayes') {
+            var txsUnpaid = await API.getTransactions({ status: 'unpaid' }).catch(function(){ return []; });
+            var totU = txsUnpaid.reduce(function(s,t){ return s+parseFloat(t.amount); }, 0);
+            body.innerHTML = '<div class="alert alert-warning mb-3"><strong>'+txsUnpaid.length+' services non payés</strong> — Total: '+totU.toLocaleString('fr-FR')+' HTG ($'+htgToUsd(totU)+')</div>' +
+                '<div class="table-container"><table><thead><tr><th>Patient</th><th>Service</th><th>Montant</th><th>Date</th><th>Action</th></tr></thead><tbody>' +
+                txsUnpaid.slice(0,30).map(function(t){
+                    return '<tr><td>'+t.patient_name+'</td><td>'+t.service+'</td>' +
+                        '<td>'+parseFloat(t.amount).toLocaleString('fr-FR')+' HTG</td><td>'+t.date+'</td>' +
+                        '<td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button></td></tr>';
+                }).join('')+'</tbody></table></div>';
+        } else if (type === 'stock') {
+            var meds = state._lastStats ? state._lastStats.lowStock : [];
+            body.innerHTML = meds.length ?
+                '<div class="table-container"><table><thead><tr><th>Médicament</th><th>Stock actuel</th><th>Seuil alerte</th><th>Emplacement</th></tr></thead><tbody>' +
+                meds.map(function(m){
+                    return '<tr class="'+(m.quantity===0?'out-of-stock':'low-stock')+'">' +
+                        '<td><strong>'+m.name+'</strong></td>' +
+                        '<td><strong style="color:'+(m.quantity===0?'#dc3545':'#856404')+';">'+m.quantity+'</strong></td>' +
+                        '<td>'+m.alert_threshold+'</td>' +
+                        '<td>'+(m.espace&&m.etagere?m.espace+' / '+m.etagere:m.espace||m.etagere||'-')+'</td></tr>';
+                }).join('')+'</tbody></table></div>'
+                : '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Aucun médicament en rupture ou alerte.</div>';
+        }
+    } catch(e) { document.getElementById('admin-detail-body').innerHTML = '<p class="text-muted">Erreur chargement</p>'; }
+}
+
 // ─── TABLEAU DE BORD ─────────────────────────────────────────
 async function updateRoleDashboard() {
     const container = document.getElementById('role-dashboard-content');
@@ -600,37 +899,7 @@ async function updateRoleDashboard() {
     try {
         if (role === 'admin' || role === 'sub_admin') {
             const stats = await apiCall(() => API.getStats());
-            const rate = state.exchangeRate;
-            container.innerHTML = `
-                <div class="stats-container">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background:#1a6bca"><i class="fas fa-users"></i></div>
-                        <div class="stat-info"><h3>${stats.totalPatients}</h3><p>Patients total</p></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background:#28a745"><i class="fas fa-money-bill-wave"></i></div>
-                        <div class="stat-info">
-                            <h3>${parseFloat(stats.totalRevenue).toLocaleString('fr-FR')} HTG</h3>
-                            <p>Revenus totaux <span class="currency-tag usd">$${htgToUsd(stats.totalRevenue)}</span></p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background:#ffc107"><i class="fas fa-exclamation-triangle"></i></div>
-                        <div class="stat-info"><h3>${stats.unpaidCount}</h3><p>Services impayés</p></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background:#dc3545"><i class="fas fa-pills"></i></div>
-                        <div class="stat-info"><h3>${stats.lowStock.length}</h3><p>Médicaments en alerte</p></div>
-                    </div>
-                </div>
-                <div class="card mt-3"><h3>Transactions récentes</h3>
-                    <div class="table-container"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant (HTG)</th><th>USD</th><th>Statut</th></tr></thead>
-                    <tbody>${stats.recentTransactions.slice(0,8).map(t => `
-                        <tr><td>${t.date}</td><td>${t.patient_name}</td><td>${t.service}</td>
-                        <td>${parseFloat(t.amount).toLocaleString('fr-FR')} HTG</td>
-                        <td class="text-muted">$${htgToUsd(t.amount)}</td>
-                        <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td></tr>`).join('')}
-                    </tbody></table></div></div>`;
+            renderAdminDashboard(stats, container);
         } else if (role === 'secretary') {
             const patients = await apiCall(() => API.getPatients({ date: today }));
             const unread = await API.getUnreadCount().catch(() => ({ count: 0 }));
@@ -640,7 +909,7 @@ async function updateRoleDashboard() {
                         <div class="stat-icon" style="background:#1a6bca"><i class="fas fa-user-plus"></i></div>
                         <div class="stat-info"><h3>${patients.length}</h3><p>Patients aujourd\'hui</p></div>
                     </div>
-                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                    <div class="stat-card clickable-stat" onclick="showSection(\'messaging\')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
@@ -663,7 +932,7 @@ async function updateRoleDashboard() {
                             <p>Encaissements aujourd\'hui <span class="currency-tag usd">$${htgToUsd(revenueHTG)}</span></p>
                         </div>
                     </div>
-                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                    <div class="stat-card clickable-stat" onclick="showSection(\'messaging\')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
@@ -672,7 +941,7 @@ async function updateRoleDashboard() {
             const unread = await API.getUnreadCount().catch(() => ({ count: 0 }));
             container.innerHTML = `
                 <div class="stats-container">
-                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                    <div class="stat-card clickable-stat" onclick="showSection(\'messaging\')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
@@ -687,7 +956,7 @@ async function updateRoleDashboard() {
                         <div class="stat-icon" style="background:#1a6bca"><i class="fas fa-calendar-alt"></i></div>
                         <div class="stat-info"><h3>${apps.length}</h3><p>Rendez-vous à venir</p></div>
                     </div>
-                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                    <div class="stat-card clickable-stat" onclick="showSection(\'messaging\')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
@@ -701,7 +970,7 @@ async function updateRoleDashboard() {
                         <div class="stat-icon" style="background:#dc3545"><i class="fas fa-pills"></i></div>
                         <div class="stat-info"><h3>${meds.length}</h3><p>Médicaments en alerte</p></div>
                     </div>
-                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                    <div class="stat-card clickable-stat" onclick="showSection(\'messaging\')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
@@ -716,7 +985,7 @@ async function updateRoleDashboard() {
                         <div class="stat-icon" style="background:#ffc107"><i class="fas fa-flask"></i></div>
                         <div class="stat-info"><h3>${pending.length}</h3><p>Analyses en attente</p></div>
                     </div>
-                    <div class="stat-card clickable-stat" onclick="showSection('messaging')">
+                    <div class="stat-card clickable-stat" onclick="showSection(\'messaging\')">
                         <div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
@@ -1610,7 +1879,7 @@ function enterLabResult(txId) {
         </div>
         <div class="d-flex gap-10 mt-3">
             <button class="btn btn-success" onclick="saveLabResultFn('${txId}')"><i class="fas fa-save"></i> Enregistrer</button>
-            <button class="btn btn-secondary" onclick="document.getElementById('lab-result-modal').remove()">Annuler</button>
+            <button class="btn btn-secondary" onclick="document.getElementById(\'lab-result-modal\').remove()">Annuler</button>
         </div>
     </div>`;
     document.body.appendChild(modal);
@@ -2011,7 +2280,7 @@ async function adminEditTransaction(txId) {
             <div class="d-flex gap-10 mt-3">
                 <button class="btn btn-success" onclick="saveAdminTxEdit('${t.id}')"><i class="fas fa-save"></i> Enregistrer</button>
                 <button class="btn btn-danger" onclick="deleteAdminTx('${t.id}')"><i class="fas fa-trash"></i> Supprimer</button>
-                <button class="btn btn-secondary" onclick="document.getElementById('admin-edit-tx-modal').remove()">Annuler</button>
+                <button class="btn btn-secondary" onclick="document.getElementById(\'admin-edit-tx-modal\').remove()">Annuler</button>
             </div>
         </div>`;
     document.body.appendChild(modal);
