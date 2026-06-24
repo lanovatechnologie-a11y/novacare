@@ -58,7 +58,7 @@ const API = (() => {
         payTransactions:      (ids, method) => request('POST', '/transactions/pay', { transactionIds: ids, paymentMethod: method }),
         addTransaction:       (data)        => request('POST', '/transactions/add', data),
         saveLabResult:        (id, result)  => request('PUT',  `/transactions/${id}/lab-result`, { result }),
-        updateConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),
+        updateTransactionConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),
         deliverMedication:    (id)          => request('PUT',  `/transactions/${id}/deliver`, {}),
 
         // ── Signes vitaux ─────────────────────────────────────

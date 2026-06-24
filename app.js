@@ -1404,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const txs = await API.getTransactions({ patientId: p.id, type: 'consultation' });
         if (!txs.length) { toast('Aucune consultation trouvée', 'error'); return; }
         try {
-            await apiCall(() => API.updateConsultationType(txs[0].id, typeId));
+            await apiCall(() => API.updateTransactionConsultationType(txs[0].id, typeId));
             toast('Type de consultation modifié');
             document.getElementById('search-doctor-patient').click();
         } catch(e) {}
