@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Espace Patient — NovaCare</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+    --primary:#1a6bca; --primary-dark:#0d4d9c; --primary-light:#e8f2ff;
+    --success:#28a745; --danger:#dc3545; --warning:#ffc107; --info:#17a2b8;
+    --white:#fff; --bg:#f0f5fc; --border:#e2ecf8; --text:#2c3e50;
+    --muted:#6c757d; --shadow:0 4px 20px rgba(26,107,202,.10);
+    --radius:12px; --radius-sm:8px; --transition:.25s cubic-bezier(.4,0,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+body{background:var(--bg);color:var(--text);line-height:1.6}
+
+/* ── Login ─────────────────────────────── */
+.login-container{display:flex;justify-content:center;align-items:center;min-height:100vh;
+  background:linear-gradient(135deg,#0a3d82 0%,#1a6bca 50%,#2196F3 100%);
+  background-size:400% 400%;animation:gradShift 8s ease infinite;position:relative;overflow:hidden}
+@keyframes gradShift{0%{background-position:0 50%}50%{background-position:100% 50%}100%{background-position:0 50%}}
+.login-container::before,.login-container::after{content:'';position:absolute;border-radius:50%;background:rgba(255,255,255,.06)}
+.login-container::before{width:500px;height:500px;top:-200px;right:-100px;animation:fb 10s ease-in-out infinite}
+.login-container::after{width:400px;height:400px;bottom:-150px;left:-80px;animation:fa 14s ease-in-out infinite}
+@keyframes fb{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-30px) scale(1.1)}}
+@keyframes fa{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(20px) scale(.9)}}
+.login-box{background:#fff;width:100%;max-width:460px;padding:44px;border-radius:20px;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;z-index:1;
+  animation:slideUp .6s cubic-bezier(.34,1.56,.64,1)}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
+.hospital-title{color:var(--primary);font-size:1.4rem;font-weight:700;margin-bottom:4px}
+.hospital-sub{color:var(--muted);font-size:.88rem}
+.divider{height:2px;background:linear-gradient(90deg,var(--primary),transparent);border-radius:1px;margin:20px 0}
+.form-label{display:block;margin-bottom:7px;font-weight:600;color:#445;font-size:.9rem}
+.form-control{width:100%;padding:11px 14px;border:1.5px solid #d8e6f3;border-radius:var(--radius-sm);
+  font-size:.93rem;transition:var(--transition);background:#fff;color:var(--text)}
+.form-control:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,107,202,.12)}
+.form-group{margin-bottom:16px}
+.btn{padding:10px 22px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);
+  cursor:pointer;font-weight:600;font-size:.9rem;transition:var(--transition);
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;position:relative;overflow:hidden}
+.btn:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 12px rgba(26,107,202,.3)}
+.btn-success{background:var(--success)}.btn-success:hover{background:#218838}
+.btn-secondary{background:var(--muted)}.btn-secondary:hover{background:#5a6268}
+.btn-warning{background:var(--warning);color:#212529}
+.btn-danger{background:var(--danger)}
+.btn-sm{padding:6px 13px;font-size:.82rem}
+.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:var(--muted);font-size:1rem}
+.pass-wrap{position:relative}
+.pass-wrap .form-control{padding-right:44px}
+
+/* ── App ──────────────────────────────── */
+.app-header{background:linear-gradient(135deg,#1a6bca 0%,#0d4d9c 60%,#083580 100%);
+  color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;
+  border-radius:var(--radius);box-shadow:0 6px 24px rgba(13,77,156,.25);margin:16px;
+  animation:headerIn .4s cubic-bezier(.4,0,.2,1)}
+@keyframes headerIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.app-header h2{font-size:1.3rem}
+.container{max-width:1100px;margin:0 auto;padding:0 16px 24px}
+.logout-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
+  padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem;transition:var(--transition)}
+.logout-btn:hover{background:rgba(255,255,255,.28)}
+
+/* ── Nav ──────────────────────────────── */
+.patient-nav{display:flex;background:#fff;border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:20px;flex-wrap:wrap;overflow:hidden;border:1px solid var(--border)}
+.nav-btn{flex:1;text-align:center;padding:13px 8px;cursor:pointer;transition:var(--transition);
+  font-weight:600;font-size:.83rem;color:var(--muted);border:none;background:none;
+  border-bottom:3px solid transparent;display:flex;align-items:center;justify-content:center;
+  gap:6px;min-width:80px}
+.nav-btn:hover{background:var(--primary-light);color:var(--primary)}
+.nav-btn.active{color:var(--primary);border-bottom:3px solid var(--primary);background:var(--primary-light)}
+
+/* ── Content ──────────────────────────── */
+.content-section{display:none}.content-section.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{background:#fff;border-radius:var(--radius-sm);padding:20px;margin-bottom:18px;
+  border:1px solid var(--border);border-left:4px solid var(--primary);
+  box-shadow:0 2px 8px rgba(26,107,202,.06);transition:var(--transition)}
+.card:hover{box-shadow:0 6px 20px rgba(26,107,202,.12)}
+.card h4{color:var(--primary);margin-bottom:12px;font-size:1rem;font-weight:700;
+  display:flex;align-items:center;gap:8px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:var(--radius-sm);padding:18px;
+  box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;
+  border:1px solid var(--border);transition:var(--transition);cursor:pointer}
+.stat-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(26,107,202,.15)}
+.stat-icon{width:50px;height:50px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:1.3rem;color:#fff;flex-shrink:0}
+.stat-info h3{font-size:1.5rem;font-weight:700;margin-bottom:2px}
+.stat-info p{color:var(--muted);font-size:.8rem;font-weight:600}
+
+/* ── Table ─────────────────────────────── */
+.table-container{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 13px;text-align:left;border-bottom:1px solid var(--border);font-size:.87rem}
+th{background:var(--primary-light);color:var(--primary);font-weight:700;font-size:.8rem;letter-spacing:.3px;text-transform:uppercase}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f4f9ff}
+
+/* ── Badges & status ──────────────────── */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700}
+.badge-primary{background:var(--primary-light);color:var(--primary)}
+.badge-success{background:#d4edda;color:#155724}
+.badge-warning{background:#fff3cd;color:#856404}
+.badge-danger{background:#f8d7da;color:#721c24}
+.badge-info{background:#d1ecf1;color:#0c5460}
+.status-paid{background:#d4edda;color:#155724;padding:4px 10px;border-radius:14px;font-size:.8rem;font-weight:700}
+.status-unpaid{background:#f8d7da;color:#721c24;padding:4px 10px;border-radius:14px;font-size:.8rem;font-weight:700}
+.status-pending{background:#fff3cd;color:#856404;padding:4px 10px;border-radius:14px;font-size:.8rem;font-weight:700}
+.vip-tag{background:var(--warning);color:#212529;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:700}
+
+/* ── Alert ─────────────────────────────── */
+.alert{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:14px;display:flex;align-items:flex-start;gap:10px}
+.alert-info{background:#d1ecf1;color:#0c5460;border-left:4px solid var(--info)}
+.alert-success{background:#d4edda;color:#155724;border-left:4px solid var(--success)}
+.alert-warning{background:#fff3cd;color:#856404;border-left:4px solid var(--warning)}
+.alert-danger{background:#f8d7da;color:#721c24;border-left:4px solid var(--danger)}
+
+/* ── Message items ────────────────────── */
+.msg-item{padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  margin-bottom:10px;transition:var(--transition);cursor:pointer}
+.msg-item:hover{background:var(--primary-light)}
+.msg-item.unread{background:#f0f7ff;border-left:3px solid var(--primary)}
+.msg-sender{font-weight:700;font-size:.9rem;margin-bottom:3px}
+.msg-subject{font-size:.88rem;color:var(--text);margin-bottom:4px}
+.msg-preview{font-size:.82rem;color:var(--muted);margin-bottom:5px}
+.msg-time{font-size:.75rem;color:#aaa}
+
+/* ── Transaction items ────────────────── */
+.tx-item{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:8px;transition:var(--transition)}
+.tx-item:hover{background:var(--primary-light)}
+
+/* ── Image preview ────────────────────── */
+.img-result{max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border);margin-top:8px}
+.result-box{background:#f8fbff;border:1px solid var(--border);border-radius:8px;
+  padding:12px;margin-top:8px;white-space:pre-wrap;font-size:.87rem;line-height:1.6}
+
+/* ── Toast ─────────────────────────────── */
+#toast-container{position:fixed;top:20px;right:20px;z-index:10000;
+  display:flex;flex-direction:column;gap:10px;max-width:360px;pointer-events:none}
+.toast{background:#fff;border-radius:12px;padding:13px 16px;
+  box-shadow:0 8px 28px rgba(0,0,0,.15);border-left:4px solid var(--muted);
+  display:flex;align-items:flex-start;gap:10px;pointer-events:all;
+  animation:toastIn .35s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden}
+.toast.success{border-left-color:var(--success)}.toast.error{border-left-color:var(--danger)}
+.toast.info{border-left-color:var(--info)}.toast.warning{border-left-color:var(--warning)}
+.toast.removing{animation:toastOut .3s ease forwards}
+@keyframes toastIn{from{opacity:0;transform:translateX(80px) scale(.85)}60%{transform:translateX(-6px) scale(1.02)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(80px) scale(.9)}}
+.toast-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+.toast.success .toast-icon{color:var(--success)}.toast.error .toast-icon{color:var(--danger)}
+.toast.info .toast-icon{color:var(--info)}.toast.warning .toast-icon{color:var(--warning)}
+.toast-body{flex:1}.toast-title{font-weight:700;font-size:.85rem;margin-bottom:2px}
+.toast-msg{font-size:.8rem;color:var(--muted)}
+.toast-close{background:none;border:none;font-size:.85rem;color:var(--muted);cursor:pointer;padding:0}
+.toast-progress{position:absolute;bottom:0;left:0;height:3px;animation:tprog 4s linear forwards}
+.toast.success .toast-progress{background:var(--success)}.toast.error .toast-progress{background:var(--danger)}
+.toast.info .toast-progress{background:var(--info)}.toast.warning .toast-progress{background:var(--warning)}
+@keyframes tprog{from{width:100%}to{width:0}}
+
+/* ── Spinner ───────────────────────────── */
+.spinner-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);
+  display:flex;justify-content:center;align-items:center;z-index:9999;backdrop-filter:blur(2px)}
+.spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+
+/* ── Price cards ───────────────────────── */
+.price-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.price-card{background:#fff;border-radius:var(--radius-sm);padding:16px;border:1px solid var(--border);
+  text-align:center;transition:var(--transition);box-shadow:0 2px 6px rgba(26,107,202,.06)}
+.price-card:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(26,107,202,.13)}
+.price-amount{font-size:1.4rem;font-weight:700;color:var(--primary);margin:8px 0}
+.price-name{font-size:.9rem;font-weight:600;color:var(--text)}
+.price-sub{font-size:.78rem;color:var(--muted)}
+
+/* ── Profile ───────────────────────────── */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.profile-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.profile-item:last-child{border-bottom:none}
+.profile-label{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.profile-value{font-size:.93rem;font-weight:600;margin-top:2px}
+
+/* ── Responsive ────────────────────────── */
+@media(max-width:600px){
+  .app-header{flex-direction:column;gap:10px;padding:14px}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .nav-btn{font-size:.75rem;padding:10px 5px}
+  .profile-grid{grid-template-columns:1fr}
+}
+
+/* ── Unread count badge ─────────────────── */
+.nav-badge{background:var(--danger);color:#fff;border-radius:50%;width:17px;height:17px;
+  font-size:.65rem;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- ══ ÉCRAN DE CONNEXION ══ -->
+<div id="login-screen" class="login-container">
+  <div class="login-box">
+    <div style="text-align:center;margin-bottom:20px">
+      <i class="fas fa-user-injured fa-3x" style="color:var(--primary)" id="login-icon"></i>
+      <img id="login-logo" src="" alt="" style="max-height:80px;margin:0 auto;display:none">
+      <h2 class="hospital-title" id="hospital-login-name">NovaCare</h2>
+      <p class="hospital-sub">Espace Patient — Connectez-vous avec votre ID patient</p>
+    </div>
+    <div class="divider"></div>
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label"><i class="fas fa-id-card" style="color:var(--primary)"></i> ID Patient</label>
+        <input type="text" id="inp-id" class="form-control" placeholder="Ex: PAT0001" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="fas fa-lock" style="color:var(--primary)"></i> Mot de passe</label>
+        <div class="pass-wrap">
+          <input type="password" id="inp-pwd" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+          <button type="button" class="eye-btn" onclick="togglePwd()"><i class="fas fa-eye" id="eye-icon"></i></button>
+        </div>
+      </div>
+      <button type="submit" class="btn" style="width:100%;padding:13px;font-size:1rem;border-radius:10px;justify-content:center">
+        <i class="fas fa-sign-in-alt"></i> Se connecter
+      </button>
+    </form>
+    <p style="text-align:center;font-size:.8rem;color:var(--muted);margin-top:14px">
+      <i class="fas fa-info-circle"></i> Votre ID patient vous a été remis à l'accueil.
+    </p>
+  </div>
+</div>
+
+<!-- ══ APPLICATION PATIENT ══ -->
+<div id="patient-app" class="hidden">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <img id="header-logo" src="" alt="" style="max-height:48px;border-radius:8px;display:none">
+        <div>
+          <h2><i class="fas fa-user-injured"></i> Mon Espace Patient</h2>
+          <p id="welcome-text" style="opacity:.8;font-size:.85rem;margin-top:2px"></p>
+        </div>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+  </header>
+
+  <div class="container">
+    <!-- Navigation -->
+    <nav class="patient-nav">
+      <button class="nav-btn active" data-tab="dashboard"><i class="fas fa-tachometer-alt"></i> Accueil</button>
+      <button class="nav-btn" data-tab="bills"><i class="fas fa-file-invoice-dollar"></i> Mes factures</button>
+      <button class="nav-btn" data-tab="analyses"><i class="fas fa-flask"></i> Mes analyses</button>
+      <button class="nav-btn" data-tab="appointments"><i class="fas fa-calendar-alt"></i> Rendez-vous</button>
+      <button class="nav-btn" data-tab="messages"><i class="fas fa-comments"></i> Messages <span id="unread-badge" class="nav-badge hidden">0</span></button>
+      <button class="nav-btn" data-tab="prices"><i class="fas fa-tags"></i> Tarifs</button>
+    </nav>
+
+    <!-- Sections -->
+    <section id="tab-dashboard"    class="content-section active"></section>
+    <section id="tab-bills"        class="content-section"></section>
+    <section id="tab-analyses"     class="content-section"></section>
+    <section id="tab-appointments" class="content-section"></section>
+
+    <!-- Messages -->
+    <section id="tab-messages" class="content-section">
+      <div class="card">
+        <h4><i class="fas fa-pen"></i> Envoyer un message</h4>
+        <div class="form-group">
+          <label class="form-label">Destinataire</label>
+          <select id="msg-recipient" class="form-control">
+            <option value="admin">Administration</option>
+            <option value="doctor">Médecin</option>
+            <option value="secretary">Secrétariat</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sujet</label>
+          <input type="text" id="msg-subject" class="form-control" placeholder="Sujet du message">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message</label>
+          <textarea id="msg-content" class="form-control" rows="4" placeholder="Votre message..."></textarea>
+        </div>
+        <button class="btn btn-success" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Envoyer</button>
+      </div>
+      <div class="card">
+        <h4><i class="fas fa-inbox"></i> Messages reçus</h4>
+        <div id="messages-list"><p class="text-muted">Chargement...</p></div>
+      </div>
+    </section>
+
+    <section id="tab-prices" class="content-section"></section>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="spinner-overlay" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  PATIENT APP — Connecté au backend NovaCare
+// ══════════════════════════════════════════════════════
+
+const API_URL = (function() {
+    // Même domaine que cette page
+    const base = window.location.origin;
+    return base;
+})();
+
+let state = {
+    token:    null,
+    patient:  null,
+    patientId: null,
+    unread:   0,
+};
+
+// ── Utilitaires ───────────────────────────────────────
+function showSpinner() { document.getElementById('spinner-overlay').classList.remove('hidden'); }
+function hideSpinner() { document.getElementById('spinner-overlay').classList.add('hidden'); }
+
+function toast(msg, type, title) {
+    type  = type  || 'success';
+    var icons  = {success:'fa-check-circle',error:'fa-times-circle',info:'fa-info-circle',warning:'fa-exclamation-triangle'};
+    var titles = {success:'Succès',error:'Erreur',info:'Information',warning:'Attention'};
+    var el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.innerHTML = '<i class="fas ' + (icons[type]||icons.success) + ' toast-icon"></i>' +
+        '<div class="toast-body"><div class="toast-title">' + (title||titles[type]) + '</div>' +
+        '<div class="toast-msg">' + msg + '</div></div>' +
+        '<button class="toast-close" onclick="closeToast(this.closest(\'.toast\'))"><i class="fas fa-times"></i></button>' +
+        '<div class="toast-progress"></div>';
+    document.getElementById('toast-container').appendChild(el);
+    var t = setTimeout(function() { closeToast(el); }, 4000);
+    el._timer = t;
+}
+function closeToast(el) {
+    if (!el) return;
+    clearTimeout(el._timer);
+    el.classList.add('removing');
+    setTimeout(function() { el.remove(); }, 300);
+}
+
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('fr-FR') : '-'; }
+function fmtDT(d)   { return d ? new Date(d).toLocaleString('fr-FR') : '-'; }
+function htgToUsd(v) { return (parseFloat(v) / parseFloat(localStorage.getItem('nc_rate') || '130')).toFixed(2); }
+function togglePwd() {
+    var i = document.getElementById('inp-pwd');
+    var e = document.getElementById('eye-icon');
+    if (i.type === 'password') { i.type = 'text'; e.className = 'fas fa-eye-slash'; }
+    else { i.type = 'password'; e.className = 'fas fa-eye'; }
+}
+
+// ── API helpers ───────────────────────────────────────
+async function apiGet(path) {
+    var r = await fetch(API_URL + path, {
+        headers: { 'Authorization': 'Bearer ' + state.token, 'Content-Type': 'application/json' }
+    });
+    if (!r.ok) {
+        var err = await r.json().catch(function() { return { error: 'Erreur ' + r.status }; });
+        throw new Error(err.error || 'Erreur serveur');
+    }
+    return r.json();
+}
+async function apiPost(path, body) {
+    var r = await fetch(API_URL + path, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + state.token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+        var err = await r.json().catch(function() { return { error: 'Erreur ' + r.status }; });
+        throw new Error(err.error || 'Erreur serveur');
+    }
+    return r.json();
+}
+
+// ── Connexion ─────────────────────────────────────────
+document.getElementById('login-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var id  = document.getElementById('inp-id').value.trim().toUpperCase();
+    var pwd = document.getElementById('inp-pwd').value;
+    if (!id || !pwd) { toast('Remplir tous les champs', 'error'); return; }
+    showSpinner();
+    try {
+        // Le patient se connecte avec son ID comme username et role 'patient'
+        var data = await fetch(API_URL + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: id, password: pwd, role: 'patient' })
+        });
+        var res = await data.json();
+        if (!data.ok) throw new Error(res.error || 'Identifiants incorrects');
+
+        state.token     = res.token;
+        state.patientId = res.user.username;
+        state.patient   = res.user;
+
+        // Sauvegarder session
+        localStorage.setItem('nc_patient_token',    state.token);
+        localStorage.setItem('nc_patient_id',       state.patientId);
+        localStorage.setItem('nc_patient_name',     res.user.name);
+
+        await initApp();
+        toast('Bienvenue ' + res.user.name + ' !', 'success');
+    } catch(err) {
+        toast(err.message || 'Connexion échouée', 'error');
+    } finally { hideSpinner(); }
+});
+
+// ── Déconnexion ───────────────────────────────────────
+function doLogout() {
+    if (!confirm('Voulez-vous vous déconnecter ?')) return;
+    localStorage.removeItem('nc_patient_token');
+    localStorage.removeItem('nc_patient_id');
+    localStorage.removeItem('nc_patient_name');
+    state = { token: null, patient: null, patientId: null, unread: 0 };
+    document.getElementById('patient-app').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('inp-id').value = '';
+    document.getElementById('inp-pwd').value = '';
+}
+
+// ── Initialisation app ────────────────────────────────
+async function initApp() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('patient-app').classList.remove('hidden');
+    document.getElementById('welcome-text').textContent = 'ID: ' + state.patientId + ' — ' + (localStorage.getItem('nc_patient_name') || '');
+
+    // Charger paramètres hôpital (logo, nom, taux)
+    try {
+        var settings = await apiGet('/settings');
+        if (settings.name) {
+            document.getElementById('hospital-login-name').textContent = settings.name;
+            document.title = 'Espace Patient — ' + settings.name;
+        }
+        if (settings.logo) {
+            document.getElementById('header-logo').src  = settings.logo;
+            document.getElementById('header-logo').style.display = 'block';
+            document.getElementById('login-logo').src   = settings.logo;
+            document.getElementById('login-logo').style.display  = 'block';
+            document.getElementById('login-icon').style.display  = 'none';
+        }
+        if (settings.exchangeRate) localStorage.setItem('nc_rate', settings.exchangeRate);
+    } catch(e) {}
+
+    // Charger dashboard
+    await loadDashboard();
+    checkUnread();
+    // Rafraîchir messages toutes les 30s
+    setInterval(checkUnread, 30000);
+}
+
+// ── Navigation ────────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+        document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        var tab = this.dataset.tab;
+        document.querySelectorAll('.content-section').forEach(function(s) { s.classList.remove('active'); });
+        document.getElementById('tab-' + tab).classList.add('active');
+        if      (tab === 'dashboard')    await loadDashboard();
+        else if (tab === 'bills')        await loadBills();
+        else if (tab === 'analyses')     await loadAnalyses();
+        else if (tab === 'appointments') await loadAppointments();
+        else if (tab === 'messages')     await loadMessages();
+        else if (tab === 'prices')       await loadPrices();
+    });
+});
+
+// ── TABLEAU DE BORD ───────────────────────────────────
+async function loadDashboard() {
+    var el = document.getElementById('tab-dashboard');
+    el.innerHTML = '<p style="text-align:center;padding:30px;color:var(--muted)"><i class="fas fa-spinner fa-spin fa-2x"></i></p>';
+    try {
+        var [patientRes, txs, vitals, appts, msgs] = await Promise.all([
+            apiGet('/patients/' + state.patientId).catch(function() { return null; }),
+            apiGet('/transactions?patientId=' + state.patientId).catch(function() { return []; }),
+            apiGet('/vitals/' + state.patientId).catch(function() { return []; }),
+            apiGet('/appointments?patientId=' + state.patientId).catch(function() { return []; }),
+            apiGet('/messages').catch(function() { return []; }),
+        ]);
+
+        var p        = patientRes || {};
+        var totalDu  = txs.filter(function(t) { return t.status === 'unpaid'; }).reduce(function(s,t) { return s + parseFloat(t.amount); }, 0);
+        var totalPay = txs.filter(function(t) { return t.status === 'paid'; }).reduce(function(s,t) { return s + parseFloat(t.amount); }, 0);
+        var labTxs   = txs.filter(function(t) { return t.type === 'lab'; });
+        var unread   = msgs.filter(function(m) { return !m.read; }).length;
+        var nextAppt = appts.filter(function(a) { return a.status === 'scheduled' || a.status === 'confirmed'; }).sort(function(a,b) { return a.date > b.date ? 1 : -1; })[0];
+
+        el.innerHTML =
+            // Cartes stats
+            '<div class="stats-grid">' +
+            '<div class="stat-card" onclick="document.querySelector(\'[data-tab=bills]\').click()">' +
+            '<div class="stat-icon" style="background:#dc3545"><i class="fas fa-file-invoice-dollar"></i></div>' +
+            '<div class="stat-info"><h3>' + totalDu.toLocaleString('fr-FR') + '</h3><p>HTG à payer</p></div></div>' +
+            '<div class="stat-card" onclick="document.querySelector(\'[data-tab=analyses]\').click()">' +
+            '<div class="stat-icon" style="background:#1a6bca"><i class="fas fa-flask"></i></div>' +
+            '<div class="stat-info"><h3>' + labTxs.length + '</h3><p>Analyses</p></div></div>' +
+            '<div class="stat-card" onclick="document.querySelector(\'[data-tab=appointments]\').click()">' +
+            '<div class="stat-icon" style="background:#ffc107"><i class="fas fa-calendar-alt"></i></div>' +
+            '<div class="stat-info"><h3>' + appts.length + '</h3><p>Rendez-vous</p></div></div>' +
+            '<div class="stat-card" onclick="document.querySelector(\'[data-tab=messages]\').click()">' +
+            '<div class="stat-icon" style="background:#17a2b8"><i class="fas fa-comments"></i></div>' +
+            '<div class="stat-info"><h3>' + unread + '</h3><p>Messages non lus</p></div></div>' +
+            '</div>' +
+
+            // Infos patient
+            '<div class="card">' +
+            '<h4><i class="fas fa-user-circle"></i> Mon profil</h4>' +
+            '<div class="profile-grid">' +
+            '<div class="profile-item"><div class="profile-label">Nom complet</div><div class="profile-value">' + (p.full_name||'-') + '</div></div>' +
+            '<div class="profile-item"><div class="profile-label">ID Patient</div><div class="profile-value">' + state.patientId + '</div></div>' +
+            '<div class="profile-item"><div class="profile-label">Date de naissance</div><div class="profile-value">' + fmtDate(p.birth_date) + '</div></div>' +
+            '<div class="profile-item"><div class="profile-label">Téléphone</div><div class="profile-value">' + (p.phone||'-') + '</div></div>' +
+            '<div class="profile-item"><div class="profile-label">Adresse</div><div class="profile-value">' + (p.address||'-') + '</div></div>' +
+            '<div class="profile-item"><div class="profile-label">Type</div><div class="profile-value">' + (p.type||'-') +
+            (p.vip ? ' <span class="vip-tag">VIP</span>' : '') +
+            (p.sponsored ? ' <span class="badge badge-primary">Sponsorisé ' + p.discount_percentage + '%</span>' : '') +
+            '</div></div>' +
+            '</div></div>' +
+
+            // Prochain rendez-vous
+            (nextAppt ?
+            '<div class="card" style="border-left-color:#28a745">' +
+            '<h4><i class="fas fa-calendar-check" style="color:#28a745"></i> Prochain rendez-vous</h4>' +
+            '<p><strong>' + nextAppt.date + ' à ' + nextAppt.time + '</strong></p>' +
+            '<p>Médecin: ' + (nextAppt.doctor||'-') + '</p>' +
+            '<p><small class="text-muted">Motif: ' + (nextAppt.reason||'-') + '</small></p>' +
+            '</div>' : '') +
+
+            // Derniers signes vitaux
+            (vitals.length ?
+            '<div class="card">' +
+            '<h4><i class="fas fa-heartbeat" style="color:#dc3545"></i> Derniers signes vitaux</h4>' +
+            '<p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Pris le ' + vitals[0].date + ' à ' + vitals[0].time + '</p>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+            Object.entries(vitals[0].values||{}).map(function(e) {
+                return '<span class="badge badge-info" style="padding:5px 12px;font-size:.82rem;">' + e[0] + ': <strong>' + e[1].value + ' ' + e[1].unit + '</strong></span>';
+            }).join('') +
+            '</div></div>' : '') +
+
+            // Résumé financier
+            '<div class="card">' +
+            '<h4><i class="fas fa-wallet" style="color:#28a745"></i> Résumé financier</h4>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+            '<div style="background:#d4edda;padding:14px;border-radius:8px;text-align:center">' +
+            '<div style="font-size:1.2rem;font-weight:700;color:#155724">' + totalPay.toLocaleString('fr-FR') + ' HTG</div>' +
+            '<div style="font-size:.78rem;color:#155724">Total payé</div></div>' +
+            '<div style="background:#f8d7da;padding:14px;border-radius:8px;text-align:center">' +
+            '<div style="font-size:1.2rem;font-weight:700;color:#721c24">' + totalDu.toLocaleString('fr-FR') + ' HTG</div>' +
+            '<div style="font-size:.78rem;color:#721c24">Solde restant</div></div>' +
+            '</div></div>';
+
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
+    }
+}
+
+// ── FACTURES ──────────────────────────────────────────
+async function loadBills() {
+    var el = document.getElementById('tab-bills');
+    el.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted)"><i class="fas fa-spinner fa-spin fa-2x"></i></p>';
+    try {
+        var txs = await apiGet('/transactions?patientId=' + state.patientId);
+        if (!txs.length) {
+            el.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucune transaction enregistrée.</div>';
+            return;
+        }
+        var unpaid = txs.filter(function(t) { return t.status === 'unpaid'; });
+        var paid   = txs.filter(function(t) { return t.status === 'paid'; });
+        var totU   = unpaid.reduce(function(s,t) { return s + parseFloat(t.amount); }, 0);
+        var totP   = paid.reduce(function(s,t) { return s + parseFloat(t.amount); }, 0);
+
+        function txRow(t) {
+            var a = parseFloat(t.amount);
+            return '<div class="tx-item">' +
+                '<div>' +
+                '<strong>' + t.service + '</strong><br>' +
+                '<small class="text-muted">' + (t.date||'-') + ' · ' + (t.type||'-') + '</small>' +
+                '</div>' +
+                '<div style="text-align:right">' +
+                '<div style="font-weight:700">' + a.toLocaleString('fr-FR') + ' HTG <small style="color:var(--muted)">≈$' + htgToUsd(a) + '</small></div>' +
+                '<span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'✅ Payé':'⏳ Non payé') + '</span>' +
+                (t.payment_method ? '<br><small class="text-muted">' + t.payment_method + '</small>' : '') +
+                '</div></div>';
+        }
+
+        el.innerHTML =
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">' +
+            '<div style="background:#d4edda;padding:16px;border-radius:10px;text-align:center">' +
+            '<div style="font-size:1.3rem;font-weight:700;color:#155724">' + totP.toLocaleString('fr-FR') + ' HTG</div>' +
+            '<div style="font-size:.8rem;color:#155724;margin-top:3px">✅ Total payé</div></div>' +
+            '<div style="background:#f8d7da;padding:16px;border-radius:10px;text-align:center">' +
+            '<div style="font-size:1.3rem;font-weight:700;color:#721c24">' + totU.toLocaleString('fr-FR') + ' HTG</div>' +
+            '<div style="font-size:.8rem;color:#721c24;margin-top:3px">⏳ Reste à payer</div></div>' +
+            '</div>' +
+
+            (unpaid.length ? '<div class="card" style="border-left-color:#dc3545"><h4><i class="fas fa-exclamation-triangle" style="color:#dc3545"></i> À régler</h4>' + unpaid.map(txRow).join('') + '</div>' : '') +
+            (paid.length   ? '<div class="card"><h4><i class="fas fa-check-circle" style="color:#28a745"></i> Payés</h4>' + paid.map(txRow).join('') + '</div>' : '');
+
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> ' + e.message + '</div>';
+    }
+}
+
+// ── ANALYSES ──────────────────────────────────────────
+async function loadAnalyses() {
+    var el = document.getElementById('tab-analyses');
+    el.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted)"><i class="fas fa-spinner fa-spin fa-2x"></i></p>';
+    try {
+        var txs = await apiGet('/transactions?patientId=' + state.patientId + '&type=lab');
+        if (!txs.length) {
+            el.innerHTML = '<div class="alert alert-info"><i class="fas fa-flask"></i> Aucune analyse prescrite.</div>';
+            return;
+        }
+        el.innerHTML = txs.map(function(t) {
+            var hasResult = !!t.result;
+            var isImage   = hasResult && t.result.startsWith('data:');
+            return '<div class="card">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">' +
+                '<div>' +
+                '<h4 style="margin-bottom:4px">' + t.service + '</h4>' +
+                '<p style="font-size:.82rem;color:var(--muted)">Prescrit le ' + (t.date||'-') + '</p>' +
+                '</div>' +
+                '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">' +
+                '<span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'✅ Payé':'⏳ Non payé') + '</span>' +
+                '<span class="' + (t.lab_status==='completed'?'status-paid':'status-pending') + '">' + (t.lab_status==='completed'?'🧪 Résultat dispo':'⏳ En attente') + '</span>' +
+                '</div></div>' +
+                (hasResult ?
+                    (isImage ?
+                        '<img src="' + t.result + '" class="img-result">' :
+                        '<div class="result-box">' + t.result + '</div>'
+                    ) : (t.status === 'paid' ? '<div class="alert alert-warning" style="margin-top:10px"><i class="fas fa-clock"></i> Résultat en cours de traitement par le laboratoire.</div>' : '<div class="alert alert-info" style="margin-top:10px"><i class="fas fa-info-circle"></i> Veuillez régler cette analyse à la caisse pour obtenir le résultat.</div>')) +
+                '</div>';
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
+    }
+}
+
+// ── RENDEZ-VOUS ───────────────────────────────────────
+async function loadAppointments() {
+    var el = document.getElementById('tab-appointments');
+    el.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted)"><i class="fas fa-spinner fa-spin fa-2x"></i></p>';
+    try {
+        var appts = await apiGet('/appointments?patientId=' + state.patientId);
+        if (!appts.length) {
+            el.innerHTML = '<div class="alert alert-info"><i class="fas fa-calendar-times"></i> Aucun rendez-vous programmé.</div>';
+            return;
+        }
+        var statusMap = { scheduled:'⏳ Programmé', confirmed:'✅ Confirmé', completed:'✔️ Terminé', cancelled:'❌ Annulé' };
+        var statusClass = { scheduled:'status-pending', confirmed:'status-paid', completed:'status-paid', cancelled:'status-unpaid' };
+        el.innerHTML = appts.map(function(a) {
+            return '<div class="card">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">' +
+                '<div>' +
+                '<h4 style="margin-bottom:4px"><i class="fas fa-calendar-day" style="color:#ffc107"></i> ' + a.date + ' à ' + a.time + '</h4>' +
+                '<p><i class="fas fa-user-md" style="color:var(--primary);margin-right:6px"></i>' + (a.doctor||'Médecin non précisé') + '</p>' +
+                '<p style="font-size:.85rem;color:var(--muted);margin-top:4px"><i class="fas fa-notes-medical" style="margin-right:4px"></i>' + (a.reason||'-') + '</p>' +
+                '</div>' +
+                '<span class="' + (statusClass[a.status]||'status-pending') + '">' + (statusMap[a.status]||a.status) + '</span>' +
+                '</div></div>';
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
+    }
+}
+
+// ── MESSAGES ──────────────────────────────────────────
+async function loadMessages() {
+    var el = document.getElementById('messages-list');
+    el.innerHTML = '<p style="color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> Chargement...</p>';
+    try {
+        var msgs = await apiGet('/messages');
+        // Marquer tous comme lus
+        msgs.filter(function(m) { return !m.read; }).forEach(function(m) {
+            fetch(API_URL + '/messages/' + m.id + '/read', {
+                method:'PUT', headers:{'Authorization':'Bearer '+state.token,'Content-Type':'application/json'},body:'{}'
+            }).catch(function(){});
+        });
+        updateUnreadBadge(0);
+        if (!msgs.length) {
+            el.innerHTML = '<div class="alert alert-info"><i class="fas fa-inbox"></i> Aucun message.</div>';
+            return;
+        }
+        el.innerHTML = msgs.map(function(m) {
+            return '<div class="msg-item ' + (!m.read?'unread':'') + '">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+                '<div class="msg-sender">' + (m.sender||'Équipe médicale') +
+                ' <span class="badge badge-info" style="font-size:.7rem;">' + (m.sender_role||'') + '</span>' +
+                (!m.read ? ' <span class="badge badge-danger" style="font-size:.7rem;">Nouveau</span>' : '') +
+                '</div>' +
+                '<div class="msg-time">' + fmtDT(m.created_at) + '</div>' +
+                '</div>' +
+                (m.subject ? '<div class="msg-subject"><i class="fas fa-tag" style="color:var(--primary);font-size:.8rem;margin-right:4px"></i>' + m.subject + '</div>' : '') +
+                '<div class="msg-preview">' + m.content + '</div>' +
+                '</div>';
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
+    }
+}
+
+async function sendMessage() {
+    var recipient = document.getElementById('msg-recipient').value;
+    var subject   = document.getElementById('msg-subject').value.trim();
+    var content   = document.getElementById('msg-content').value.trim();
+    if (!content) { toast('Écrivez un message', 'error'); return; }
+    showSpinner();
+    try {
+        await apiPost('/messages', {
+            recipient: recipient,
+            recipientRole: recipient,
+            subject: subject || 'Message patient',
+            content: content,
+            type: 'message'
+        });
+        document.getElementById('msg-subject').value = '';
+        document.getElementById('msg-content').value = '';
+        toast('Message envoyé !', 'success');
+        await loadMessages();
+    } catch(e) {
+        toast(e.message, 'error');
+    } finally { hideSpinner(); }
+}
+
+// ── TARIFS ────────────────────────────────────────────
+async function loadPrices() {
+    var el = document.getElementById('tab-prices');
+    el.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted)"><i class="fas fa-spinner fa-spin fa-2x"></i></p>';
+    try {
+        var [ct, meds, ext, lat] = await Promise.all([
+            apiGet('/consultation-types').catch(function() { return []; }),
+            apiGet('/medications').catch(function() { return []; }),
+            apiGet('/external-service-types').catch(function() { return []; }),
+            apiGet('/lab-analysis-types').catch(function() { return []; }),
+        ]);
+
+        var rate = parseFloat(localStorage.getItem('nc_rate') || '130');
+
+        function priceCard(name, price, sub) {
+            return '<div class="price-card">' +
+                '<div class="price-name">' + name + '</div>' +
+                (sub ? '<div class="price-sub">' + sub + '</div>' : '') +
+                '<div class="price-amount">' + parseFloat(price).toLocaleString('fr-FR') + ' HTG</div>' +
+                '<div class="price-sub">≈ $' + (parseFloat(price)/rate).toFixed(2) + ' USD</div>' +
+                '</div>';
+        }
+
+        el.innerHTML =
+            '<div class="alert alert-info" style="margin-bottom:18px"><i class="fas fa-info-circle"></i> Taux de change: 1 USD = ' + rate + ' HTG. Tarifs à titre indicatif.</div>' +
+
+            '<div class="card"><h4><i class="fas fa-stethoscope"></i> Types de Consultation</h4>' +
+            '<div class="price-grid">' + ct.filter(function(c){return c.active;}).map(function(c){return priceCard(c.name, c.price, c.description);}).join('') + '</div></div>' +
+
+            '<div class="card mt-3"><h4><i class="fas fa-flask"></i> Analyses de Laboratoire</h4>' +
+            '<div class="price-grid">' + lat.filter(function(a){return a.active;}).map(function(a){return priceCard(a.name, a.price, a.result_type==='image'?'Résultat image':'Résultat texte');}).join('') + '</div></div>' +
+
+            '<div class="card mt-3"><h4><i class="fas fa-pills"></i> Médicaments</h4>' +
+            '<div class="table-container"><table><thead><tr><th>Nom</th><th>Forme</th><th>Unité</th><th>Prix HTG</th><th>Prix USD</th><th>Stock</th></tr></thead><tbody>' +
+            meds.map(function(m){
+                return '<tr><td><strong>' + m.name + '</strong>' + (m.generic_name&&m.generic_name!==m.name?'<br><small style="color:var(--muted)">'+m.generic_name+'</small>':'') + '</td>' +
+                    '<td>' + (m.form||'-') + '</td><td>' + (m.unit||'-') + '</td>' +
+                    '<td><strong>' + m.price + '</strong> HTG</td>' +
+                    '<td>$' + (m.price/rate).toFixed(2) + '</td>' +
+                    '<td><span class="' + (m.quantity===0?'status-unpaid':m.quantity<=m.alert_threshold?'status-pending':'status-paid') + '">' + (m.quantity===0?'Rupture':m.quantity<=m.alert_threshold?'Limité':'Disponible') + '</span></td></tr>';
+            }).join('') + '</tbody></table></div></div>' +
+
+            '<div class="card mt-3"><h4><i class="fas fa-external-link-alt"></i> Services Externes</h4>' +
+            '<div class="price-grid">' + ext.filter(function(s){return s.active;}).map(function(s){return priceCard(s.name, s.price);}).join('') + '</div></div>';
+
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
+    }
+}
+
+// ── Messages non lus ──────────────────────────────────
+async function checkUnread() {
+    try {
+        var r = await apiGet('/messages/unread-count');
+        updateUnreadBadge(r.count || 0);
+    } catch(e) {}
+}
+function updateUnreadBadge(count) {
+    var b = document.getElementById('unread-badge');
+    if (count > 0) { b.textContent = count; b.classList.remove('hidden'); }
+    else b.classList.add('hidden');
+}
+
+// ── Vérifier session au chargement ───────────────────
+window.addEventListener('DOMContentLoaded', async function() {
+    var token = localStorage.getItem('nc_patient_token');
+    var id    = localStorage.getItem('nc_patient_id');
+    if (token && id) {
+        state.token     = token;
+        state.patientId = id;
+        state.patient   = { username: id, name: localStorage.getItem('nc_patient_name') || id };
+        try {
+            // Vérifier que le token est encore valide
+            await apiGet('/patients/' + id);
+            await initApp();
+        } catch(e) {
+            // Token expiré ou invalide
+            localStorage.removeItem('nc_patient_token');
+            localStorage.removeItem('nc_patient_id');
+        }
+    }
+});
+</script>
+</body>
+</html>

@@ -62,6 +62,25 @@ app.post('/auth/login', async (req, res) => {
         const { username, password, role } = req.body;
         if (!username || !password || !role)
             return res.status(400).json({ error: 'Champs manquants' });
+
+        // Connexion patient: chercher dans la table patients
+        if (role === 'patient') {
+            const r = await pool.query('SELECT * FROM patients WHERE id=$1', [username.toUpperCase()]);
+            if (!r.rows.length) return res.status(401).json({ error: 'ID patient introuvable' });
+            const p = r.rows[0];
+            // Vérifier mot de passe dans la table patient_accounts
+            const acc = await pool.query('SELECT * FROM patient_accounts WHERE patient_id=$1 AND active=TRUE', [p.id]);
+            if (!acc.rows.length) return res.status(401).json({ error: 'Compte patient non activé. Contactez l\'accueil.' });
+            const ok = await bcrypt.compare(password, acc.rows[0].password_hash);
+            if (!ok) return res.status(401).json({ error: 'Mot de passe incorrect' });
+            const token = jwt.sign(
+                { id: p.id, username: p.id, role: 'patient', name: p.full_name },
+                JWT_SECRET, { expiresIn: '12h' }
+            );
+            return res.json({ token, user: { id: p.id, name: p.full_name, username: p.id, role: 'patient' } });
+        }
+
+        // Connexion staff normal
         const r = await pool.query(
             'SELECT * FROM users WHERE username=$1 AND role=$2 AND active=TRUE',
             [username, role]
@@ -117,6 +136,24 @@ app.put('/settings', auth, adminOnly, async (req, res) => {
 // ════════════════════════════════════════════════════════════
 //  UTILISATEURS
 // ════════════════════════════════════════════════════════════
+// ─── COMPTES PATIENTS ─────────────────────────────────────
+app.post('/patient-accounts', auth, adminOnly, async (req, res) => {
+    try {
+        const { patientId, password } = req.body;
+        const hash = await bcrypt.hash(password, 10);
+        await pool.query(
+            'INSERT INTO patient_accounts(patient_id,password_hash,active) VALUES($1,$2,TRUE) ON CONFLICT(patient_id) DO UPDATE SET password_hash=$2,active=TRUE',
+            [patientId, hash]
+        );
+        res.json({ success: true, message: 'Compte patient créé/mis à jour' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/patient-accounts/:patientId', auth, adminOnly, async (req, res) => {
+    await pool.query('UPDATE patient_accounts SET active=FALSE WHERE patient_id=$1', [req.params.patientId]);
+    res.json({ success: true });
+});
+
 app.get('/users', auth, async (req, res) => {
     const r = await pool.query('SELECT id,name,role,username,active FROM users ORDER BY name');
     res.json(r.rows);
@@ -547,6 +584,12 @@ app.get('/messages', auth, async (req, res) => {
         if (req.user.role === 'admin' || req.user.role === 'sub_admin') {
             r = await pool.query(
                 "SELECT * FROM messages WHERE recipient=$1 OR recipient='admin' OR recipient='sub_admin' ORDER BY created_at DESC LIMIT 100",
+                [req.user.username]
+            );
+        } else if (req.user.role === 'patient') {
+            // Patient voit ses messages reçus
+            r = await pool.query(
+                'SELECT * FROM messages WHERE recipient=$1 OR recipient=$1 ORDER BY created_at DESC LIMIT 50',
                 [req.user.username]
             );
         } else {

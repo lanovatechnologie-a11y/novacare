@@ -2432,6 +2432,58 @@ async function searchAdminPatient() {
     } catch(e) { console.error(e); toast('Erreur lors de la recherche', 'error'); }
 }
 
+// Créer / modifier compte patient (accès espace patient)
+function openPatientAccountModal(patientId, patientName) {
+    var old = document.getElementById('patient-acc-modal');
+    if (old) old.remove();
+    var modal = document.createElement('div');
+    modal.id = 'patient-acc-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML =
+        '<div class="transaction-details-content" style="max-width:420px;">' +
+        '<h4><i class="fas fa-key" style="color:#28a745;"></i> Compte Espace Patient</h4>' +
+        '<p class="text-muted" style="margin-bottom:16px;">Patient: <strong>' + patientName + '</strong> — ID: <strong>' + patientId + '</strong></p>' +
+        '<div class="alert alert-info" style="margin-bottom:14px;">' +
+        '<i class="fas fa-info-circle"></i> Le patient utilisera son ID (<strong>' + patientId + '</strong>) comme identifiant de connexion sur la page patient.' +
+        '</div>' +
+        '<div class="form-group"><label class="form-label">Nouveau mot de passe</label>' +
+        '<input type="password" id="pat-acc-pwd" class="form-control" placeholder="Minimum 6 caractères"></div>' +
+        '<div class="form-group"><label class="form-label">Confirmer le mot de passe</label>' +
+        '<input type="password" id="pat-acc-pwd2" class="form-control" placeholder="Répéter le mot de passe"></div>' +
+        '<div class="d-flex gap-10 mt-3">' +
+        '<button class="btn btn-success" onclick="savePatientAccount(\'' + patientId + '\') ">' +
+        '<i class="fas fa-save"></i> Créer / Mettre à jour</button>' +
+        '<button class="btn btn-danger" onclick="revokePatientAccount(\'' + patientId + '\',\'' + patientName + '\')"><i class="fas fa-ban"></i> Révoquer accès</button>' +
+        '<i class="fas fa-ban"></i> Révoquer accès</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'patient-acc-modal\').remove()">Annuler</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+    document.getElementById('pat-acc-pwd').focus();
+}
+
+async function savePatientAccount(patientId) {
+    var pwd  = document.getElementById('pat-acc-pwd').value;
+    var pwd2 = document.getElementById('pat-acc-pwd2').value;
+    if (!pwd || pwd.length < 6)  { toast('Mot de passe trop court (min 6 caractères)', 'error'); return; }
+    if (pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+    try {
+        await apiCall(function() { return API.createPatientAccount(patientId, pwd); });
+        toast('Compte patient créé/mis à jour !', 'success');
+        document.getElementById('patient-acc-modal').remove();
+        addLocalNotification('👤 Compte patient créé',
+            'Accès espace patient activé pour ' + patientId, 'fas fa-user-circle', '#28a745');
+    } catch(e) {}
+}
+
+async function revokePatientAccount(patientId, patientName) {
+    if (!confirm('Révoquer l\'accès espace patient de ' + patientName + ' ?')) return;
+    try {
+        await apiCall(function() { return API.deletePatientAccount(patientId); });
+        toast('Accès patient révoqué', 'warning');
+        document.getElementById('patient-acc-modal').remove();
+    } catch(e) {}
+}
+
 // Modifier infos patient depuis admin
 async function saveAdminPatientEdit(patientId) {
     const name    = document.getElementById('edit-p-name').value.trim();
