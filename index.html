@@ -925,10 +925,25 @@
                                 <option value="doctor">Médecin</option>
                                 <option value="lab">Laboratoire</option>
                                 <option value="pharmacy">Pharmacie</option>
+                            <option value="multi">Multi-Rôle</option>
                             </select>
                         </div>
                         <div><label class="form-label">Identifiant *</label><input type="text" id="new-user-username" class="form-control" placeholder="login"></div>
                         <div><label class="form-label">Mot de passe *</label><input type="password" id="new-user-password" class="form-control" placeholder="••••••••"></div>
+                        <div id="multi-roles-container" style="display:none;grid-column:1/-1;">
+                            <label class="form-label"><i class="fas fa-layer-group" style="color:#6f42c1;"></i> Rôles combinés (sélectionner au moins 2)</label>
+                            <div class="permissions-grid" style="margin-top:8px;">
+                                <div class="permission-item"><input type="checkbox" id="mr-secretary" value="secretary"><label for="mr-secretary"><i class="fas fa-user-tie" style="color:var(--primary);"></i> Secrétariat</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-cashier" value="cashier"><label for="mr-cashier"><i class="fas fa-cash-register" style="color:var(--success);"></i> Caisse</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-nurse" value="nurse"><label for="mr-nurse"><i class="fas fa-user-nurse" style="color:#17a2b8;"></i> Infirmier</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-doctor" value="doctor"><label for="mr-doctor"><i class="fas fa-user-md" style="color:#6f42c1;"></i> Médecin</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-lab" value="lab"><label for="mr-lab"><i class="fas fa-flask" style="color:var(--warning);"></i> Laboratoire</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-pharmacy" value="pharmacy"><label for="mr-pharmacy"><i class="fas fa-pills" style="color:var(--danger);"></i> Pharmacie</label></div>
+                            </div>
+                            <div class="alert alert-info mt-2" style="font-size:.82rem;">
+                                <i class="fas fa-info-circle"></i> L'utilisateur pourra sélectionner l'un de ces rôles à la connexion pour accéder aux sections correspondantes.
+                            </div>
+                        </div>
                         <div style="display:flex;align-items:flex-end;">
                             <button type="button" id="add-user" class="btn btn-success" style="width:100%;"><i class="fas fa-user-plus"></i> Créer</button>
                         </div>

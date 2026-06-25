@@ -80,21 +80,43 @@ app.post('/auth/login', async (req, res) => {
             return res.json({ token, user: { id: p.id, name: p.full_name, username: p.id, role: 'patient' } });
         }
 
-        // Connexion staff normal
-        const r = await pool.query(
+        // Connexion staff — chercher par username + role (ou role=multi)
+        let r = await pool.query(
             'SELECT * FROM users WHERE username=$1 AND role=$2 AND active=TRUE',
             [username, role]
         );
+        // Si pas trouvé avec le rôle exact, chercher si c'est un compte multi-rôle
+        if (!r.rows.length) {
+            r = await pool.query(
+                "SELECT * FROM users WHERE username=$1 AND role='multi' AND active=TRUE",
+                [username]
+            );
+            if (r.rows.length) {
+                // Vérifier que le rôle demandé fait partie de ses rôles
+                const extraRoles = (r.rows[0].extra_roles || '').split(',').map(s => s.trim()).filter(Boolean);
+                if (!extraRoles.includes(role)) {
+                    return res.status(401).json({ error: 'Vous n\'avez pas accès à ce rôle' });
+                }
+            }
+        }
         if (!r.rows.length)
             return res.status(401).json({ error: 'Identifiants incorrects ou compte désactivé' });
         const ok = await bcrypt.compare(password, r.rows[0].password_hash);
         if (!ok) return res.status(401).json({ error: 'Identifiants incorrects' });
         const u = r.rows[0];
+        // Pour un compte multi, le token contient tous ses rôles
+        const extraRoles = u.role === 'multi'
+            ? (u.extra_roles || '').split(',').map(s => s.trim()).filter(Boolean)
+            : [u.role];
+        const activeRole = u.role === 'multi' ? role : u.role;
         const token = jwt.sign(
-            { id: u.id, username: u.username, role: u.role, name: u.name },
+            { id: u.id, username: u.username, role: activeRole, roles: extraRoles, name: u.name },
             JWT_SECRET, { expiresIn: '12h' }
         );
-        res.json({ token, user: { id: u.id, name: u.name, username: u.username, role: u.role } });
+        res.json({
+            token,
+            user: { id: u.id, name: u.name, username: u.username, role: activeRole, roles: extraRoles }
+        });
     } catch(e) { console.error(e); res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
@@ -160,11 +182,12 @@ app.get('/users', auth, async (req, res) => {
 });
 app.post('/users', auth, adminOnly, async (req, res) => {
     try {
-        const { name, role, username, password } = req.body;
+        const { name, role, username, password, extraRoles } = req.body;
         const hash = await bcrypt.hash(password, 10);
+        const extraRolesStr = extraRoles ? extraRoles.join(',') : null;
         const r = await pool.query(
-            'INSERT INTO users(name,role,username,password_hash) VALUES($1,$2,$3,$4) RETURNING id,name,role,username,active',
-            [name, role, username, hash]
+            'INSERT INTO users(name,role,username,password_hash,extra_roles) VALUES($1,$2,$3,$4,$5) RETURNING id,name,role,username,active,extra_roles',
+            [name, role, username, hash, extraRolesStr]
         );
         res.status(201).json(r.rows[0]);
     } catch(e) { res.status(400).json({ error: 'Identifiant déjà utilisé' }); }

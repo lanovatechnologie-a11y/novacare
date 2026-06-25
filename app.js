@@ -281,12 +281,13 @@ function setupLogin() {
             showSpinner();
             const data = await API.login(username, password, role);
             localStorage.setItem('hopital_token', data.token);
-            state.currentUser = data.user;
-            state.currentRole = role;
+            state.currentUser  = data.user;
+            state.currentRole  = role;
+            state.currentRoles = data.user.roles || [role]; // tous les rôles si compte multi
 
-            // Afficher infos utilisateur (pas sur l'écran d'accueil, seulement dans le header)
-            document.getElementById('current-username').textContent = data.user.name;
-            document.getElementById('current-user-role').textContent = getRoleLabel(role);
+            document.getElementById('current-username').textContent  = data.user.name;
+            document.getElementById('current-user-role').textContent = getRoleLabel(role) +
+                (state.currentRoles.length > 1 ? ' <span class="badge badge-warning" style="font-size:.7rem;">Multi-rôle</span>' : '');
             document.getElementById('dashboard-role').textContent = getRoleLabel(role);
 
             document.getElementById('login-screen').classList.add('hidden');
@@ -323,14 +324,15 @@ function setupLogin() {
 
 function getRoleLabel(role) {
     const labels = {
-        admin: 'Administrateur Principal',
+        admin:     'Administrateur Principal',
         sub_admin: 'Sous-Administrateur',
+        multi:     'Multi-Rôle',
         secretary: 'Secrétariat',
-        cashier: 'Caissier',
-        nurse: 'Infirmier',
-        doctor: 'Médecin',
-        lab: 'Laboratoire',
-        pharmacy: 'Pharmacie',
+        cashier:   'Caissier',
+        nurse:     'Infirmier',
+        doctor:    'Médecin',
+        lab:       'Laboratoire',
+        pharmacy:  'Pharmacie',
     };
     return labels[role] || role;
 }
@@ -2964,19 +2966,41 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     });
 
+    // Afficher/masquer sélection rôles combinés
+    document.getElementById('new-user-role')?.addEventListener('change', function() {
+        var container = document.getElementById('multi-roles-container');
+        if (!container) return;
+        container.style.display = this.value === 'multi' ? 'block' : 'none';
+    });
+
     document.getElementById('add-user')?.addEventListener('click', async () => {
         const name     = document.getElementById('new-user-name').value.trim();
         const role     = document.getElementById('new-user-role').value;
         const username = document.getElementById('new-user-username').value.trim();
         const password = document.getElementById('new-user-password').value;
         if (!name || !role || !username || !password) { toast('Remplir tous les champs', 'error'); return; }
+
+        // Collecter les rôles combinés si multi
+        let extraRoles = [];
+        if (role === 'multi') {
+            document.querySelectorAll('#multi-roles-container input[type=checkbox]:checked').forEach(function(cb) {
+                extraRoles.push(cb.value);
+            });
+            if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles pour un compte multi-rôle', 'error'); return; }
+        }
+
         try {
-            await apiCall(() => API.addUser({ name, role, username, password }));
-            toast(`Utilisateur ${username} créé!`, 'success');
+            await apiCall(() => API.addUser({ name, role, username, password, extraRoles }));
+            const label = role === 'multi' ? 'Multi-Rôle (' + extraRoles.join('+') + ')' : role;
+            toast('Utilisateur ' + username + ' créé — ' + label + ' !', 'success');
             updateMedicationsSettingsList();
-            document.getElementById('new-user-name').value = '';
+            document.getElementById('new-user-name').value     = '';
             document.getElementById('new-user-username').value = '';
             document.getElementById('new-user-password').value = '';
+            document.getElementById('new-user-role').value     = '';
+            // Décocher les rôles
+            document.querySelectorAll('#multi-roles-container input[type=checkbox]').forEach(function(cb) { cb.checked = false; });
+            document.getElementById('multi-roles-container').style.display = 'none';
         } catch(e) {}
     });
 
