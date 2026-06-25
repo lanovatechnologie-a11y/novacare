@@ -61,6 +61,10 @@ const API = (() => {
         updateTransactionConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),
         deliverMedication:    (id)          => request('PUT',  `/transactions/${id}/deliver`, {}),
 
+        // ── Transactions (Admin) ──────────────────────────────
+        updateTransaction: (id, data) => request('PUT', `/transactions/${id}`, data),
+        deleteTransaction: (id)       => request('DELETE', `/transactions/${id}`),
+
         // ── Signes vitaux ─────────────────────────────────────
         getVitals:    (patientId) => request('GET',  `/vitals/${patientId}`),
         addVitals:    (data)      => request('POST', '/vitals', data),
@@ -114,6 +118,12 @@ const API = (() => {
         sendMessage:      (data)     => request('POST', '/messages', data),
         markRead:         (id)       => request('PUT',  `/messages/${id}/read`, {}),
         markAllRead:      ()         => request('PUT',  '/messages/read-all', {}),
+
+        // ── Comptes patients ──────────────────────────────────
+        createPatientAccount: (patientId, password) =>
+            request('POST', '/patient-accounts', { patientId, password }),
+        deletePatientAccount: (patientId) =>
+            request('DELETE', `/patient-accounts/${patientId}`),
 
         // ── Stats admin ───────────────────────────────────────
         getStats: () => request('GET', '/stats'),
