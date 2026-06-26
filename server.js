@@ -193,10 +193,35 @@ app.post('/users', auth, adminOnly, async (req, res) => {
     } catch(e) { res.status(400).json({ error: 'Identifiant déjà utilisé' }); }
 });
 app.put('/users/:id', auth, adminOnly, async (req, res) => {
-    const { name, active } = req.body;
-    await pool.query('UPDATE users SET name=$1, active=$2 WHERE id=$3', [name, active, req.params.id]);
-    res.json({ success: true });
+    try {
+        const { name, active, username, role, extraRoles } = req.body;
+        const p = [], sets = [];
+        if (name     !== undefined) { p.push(name);                    sets.push('name=$'        + p.length); }
+        if (active   !== undefined) { p.push(active);                  sets.push('active=$'      + p.length); }
+        if (username !== undefined) { p.push(username);                sets.push('username=$'    + p.length); }
+        if (role     !== undefined) { p.push(role);                    sets.push('role=$'        + p.length); }
+        if (extraRoles !== undefined) {
+            p.push(extraRoles && extraRoles.length ? extraRoles.join(',') : null);
+            sets.push('extra_roles=$' + p.length);
+        }
+        if (!sets.length) return res.json({ success: true });
+        p.push(req.params.id);
+        await pool.query('UPDATE users SET ' + sets.join(',') + ' WHERE id=$' + p.length, p);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+// Changer mot de passe utilisateur
+app.put('/users/:id/password', auth, adminOnly, async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (!password || password.length < 6) return res.status(400).json({ error: 'Mot de passe trop court' });
+        const hash = await bcrypt.hash(password, 10);
+        await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, req.params.id]);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.delete('/users/:id', auth, adminOnly, async (req, res) => {
     await pool.query('DELETE FROM users WHERE id=$1', [req.params.id]);
     res.json({ success: true });
@@ -699,6 +724,45 @@ app.get('/stats', auth, adminOrSub, async (req, res) => {
             byAgent:            byAgent.rows,
         });
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+});
+
+// ════════════════════════════════════════════════════════════
+//  GESTION DE CAISSE — COMMISSIONS / RETRAITS
+// ════════════════════════════════════════════════════════════
+
+// Enregistrer un retrait/commission
+app.post('/cash-withdrawals', auth, adminOnly, async (req, res) => {
+    try {
+        const { agentUsername, agentName, amount, note, date } = req.body;
+        const id = 'WD' + Date.now();
+        await pool.query(
+            `INSERT INTO cash_withdrawals(id,agent_username,agent_name,amount,note,date,created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7)`,
+            [id, agentUsername, agentName, amount, note||null, date||new Date().toISOString().split('T')[0], req.user.username]
+        );
+        res.status(201).json({ id, success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Lister les retraits
+app.get('/cash-withdrawals', auth, adminOnly, async (req, res) => {
+    try {
+        const { agentUsername, date, fromDate, toDate } = req.query;
+        let q = 'SELECT * FROM cash_withdrawals WHERE 1=1';
+        const p = [];
+        if (agentUsername) { p.push(agentUsername); q += ' AND agent_username=$'+p.length; }
+        if (date)          { p.push(date);           q += ' AND date=$'+p.length; }
+        if (fromDate)      { p.push(fromDate);        q += ' AND date>=$'+p.length; }
+        if (toDate)        { p.push(toDate);          q += ' AND date<=$'+p.length; }
+        q += ' ORDER BY created_at DESC';
+        res.json((await pool.query(q, p)).rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Supprimer un retrait
+app.delete('/cash-withdrawals/:id', auth, adminOnly, async (req, res) => {
+    await pool.query('DELETE FROM cash_withdrawals WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
 });
 
 // ════════════════════════════════════════════════════════════

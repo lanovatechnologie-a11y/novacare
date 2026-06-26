@@ -2152,6 +2152,186 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ─── ADMINISTRATION ──────────────────────────────────────────
+// ─── GESTION DE CAISSE ───────────────────────────────────────
+async function renderCashManagement(stats) {
+    var section = document.getElementById('cash-management-section');
+    if (!section) {
+        section = document.createElement('div');
+        section.id = 'cash-management-section';
+        section.className = 'card mt-3';
+        var adminSection = document.getElementById('administration');
+        if (adminSection) adminSection.appendChild(section);
+    }
+
+    // Charger les retraits du jour
+    var today = new Date().toISOString().split('T')[0];
+    var withdrawals = await API.getCashWithdrawals({ fromDate: today }).catch(function() { return []; });
+    var totalWithdrawals = withdrawals.reduce(function(s, w) { return s + parseFloat(w.amount); }, 0);
+
+    // Calculer encaissements du jour
+    var todayRevenue = parseFloat(stats.todayRevenue || 0);
+    var netCaisse    = todayRevenue - totalWithdrawals;
+
+    // Récupérer les agents (caissiers)
+    var users = await API.getUsers().catch(function() { return []; });
+    var cashiers = users.filter(function(u) {
+        return u.active && (u.role === 'cashier' || (u.extra_roles && u.extra_roles.includes('cashier')));
+    });
+
+    // Encaissements par agent aujourd\'hui
+    var byAgent = stats.byAgent || [];
+
+    section.innerHTML =
+        '<h3><i class="fas fa-cash-register" style="color:#28a745;"></i> Gestion de Caisse — ' + today + '</h3>' +
+
+        // Résumé
+        '<div class="stats-container" style="margin:16px 0;">' +
+        '<div class="stat-card">' +
+        '<div class="stat-icon" style="background:#28a745"><i class="fas fa-arrow-down"></i></div>' +
+        '<div class="stat-info"><h3>' + todayRevenue.toLocaleString('fr-FR') + ' HTG</h3><p>Encaissé aujourd\'hui</p></div></div>' +
+        '<div class="stat-card">' +
+        '<div class="stat-icon" style="background:#dc3545"><i class="fas fa-arrow-up"></i></div>' +
+        '<div class="stat-info"><h3>' + totalWithdrawals.toLocaleString('fr-FR') + ' HTG</h3><p>Retraits/Commissions</p></div></div>' +
+        '<div class="stat-card">' +
+        '<div class="stat-icon" style="background:#1a6bca"><i class="fas fa-wallet"></i></div>' +
+        '<div class="stat-info"><h3 style="color:' + (netCaisse >= 0 ? '#28a745' : '#dc3545') + ';">' +
+        netCaisse.toLocaleString('fr-FR') + ' HTG</h3><p>Caisse nette</p></div></div>' +
+        '<div class="stat-card">' +
+        '<div class="stat-icon" style="background:#17a2b8"><i class="fas fa-dollar-sign"></i></div>' +
+        '<div class="stat-info"><h3>$' + (netCaisse / parseFloat(localStorage.getItem ? localStorage.getItem('nc_rate') || 130 : 130)).toFixed(2) + '</h3><p>Caisse nette (USD)</p></div></div>' +
+        '</div>' +
+
+        // Enregistrer un retrait/commission
+        '<div class="card" style="background:#f8f9fa;margin-bottom:16px;">' +
+        '<h4><i class="fas fa-minus-circle" style="color:#dc3545;"></i> Enregistrer un retrait / commission</h4>' +
+        '<div class="add-form-grid" style="margin-top:12px;">' +
+        '<div><label class="form-label">Agent *</label>' +
+        '<select id="wd-agent" class="form-control">' +
+        '<option value="">Sélectionner...</option>' +
+        (byAgent.length ? byAgent.map(function(a) {
+            var totalAgent = parseFloat(a.total);
+            var wdAgent    = withdrawals.filter(function(w) { return w.agent_username === a.payment_agent; })
+                                        .reduce(function(s,w) { return s+parseFloat(w.amount); }, 0);
+            return '<option value="' + a.payment_agent + '" data-total="' + totalAgent + '" data-wd="' + wdAgent + '">' +
+                   a.payment_agent + ' — Encaissé: ' + totalAgent.toLocaleString('fr-FR') + ' HTG' +
+                   ' | Déjà retiré: ' + wdAgent.toLocaleString('fr-FR') + ' HTG' +
+                   ' | Disponible: ' + (totalAgent - wdAgent).toLocaleString('fr-FR') + ' HTG' +
+                   '</option>';
+        }).join('') : '<option disabled>Aucun agent actif aujourd\'hui</option>') +
+        '</select></div>' +
+        '<div><label class="form-label">Montant (HTG) *</label>' +
+        '<input type="number" id="wd-amount" class="form-control" placeholder="0.00" min="0" step="0.01"></div>' +
+        '<div><label class="form-label">Note</label>' +
+        '<input type="text" id="wd-note" class="form-control" placeholder="Ex: Commission journalière, avance..."></div>' +
+        '<div style="display:flex;align-items:flex-end;">' +
+        '<button class="btn btn-danger" style="width:100%;" onclick="enregistrerRetrait()">' +
+        '<i class="fas fa-minus-circle"></i> Enregistrer</button></div>' +
+        '</div>' +
+        '<div id="wd-agent-info" style="margin-top:10px;"></div>' +
+        '</div>' +
+
+        // Liste des retraits du jour
+        '<h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Retraits du jour</h4>' +
+        (withdrawals.length ?
+        '<div class="table-container"><table><thead><tr><th>Agent</th><th>Montant</th><th>USD</th><th>Note</th><th>Heure</th><th>Par</th><th>Action</th></tr></thead><tbody>' +
+        withdrawals.map(function(w) {
+            var amt = parseFloat(w.amount);
+            var rate = 130;
+            return '<tr>' +
+                '<td><strong>' + w.agent_name + '</strong><br><small>' + w.agent_username + '</small></td>' +
+                '<td><strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
+                '<td>$' + (amt/rate).toFixed(2) + '</td>' +
+                '<td>' + (w.note || '-') + '</td>' +
+                '<td>' + (w.created_at ? new Date(w.created_at).toLocaleTimeString('fr-FR') : '-') + '</td>' +
+                '<td>' + (w.created_by || '-') + '</td>' +
+                '<td><button class="btn btn-xs btn-danger" onclick="supprimerRetrait(\'' + w.id + '\') ">' +
+                '<i class="fas fa-trash"></i></button></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table></div>'
+        : '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun retrait enregistré aujourd\'hui.</div>') +
+
+        // Rapport par agent
+        (byAgent.length ?
+        '<h4 style="margin:16px 0 10px;"><i class="fas fa-users"></i> Bilan par agent</h4>' +
+        '<div class="table-container"><table><thead><tr><th>Agent</th><th>Encaissé</th><th>Retraits</th><th>Net en caisse</th></tr></thead><tbody>' +
+        byAgent.map(function(a) {
+            var enc  = parseFloat(a.total);
+            var wd   = withdrawals.filter(function(w) { return w.agent_username === a.payment_agent; })
+                                   .reduce(function(s,w) { return s+parseFloat(w.amount); }, 0);
+            var net  = enc - wd;
+            return '<tr>' +
+                '<td><strong>' + a.payment_agent + '</strong></td>' +
+                '<td>' + enc.toLocaleString('fr-FR') + ' HTG</td>' +
+                '<td style="color:#dc3545;">' + wd.toLocaleString('fr-FR') + ' HTG</td>' +
+                '<td><strong style="color:' + (net>=0?'#28a745':'#dc3545') + ';">' + net.toLocaleString('fr-FR') + ' HTG</strong></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table></div>' : '');
+
+    // Afficher infos agent au changement
+    document.getElementById('wd-agent')?.addEventListener('change', function() {
+        var opt = this.options[this.selectedIndex];
+        var info = document.getElementById('wd-agent-info');
+        if (!opt || !opt.dataset.total) { info.innerHTML = ''; return; }
+        var total = parseFloat(opt.dataset.total);
+        var wd    = parseFloat(opt.dataset.wd);
+        var dispo = total - wd;
+        info.innerHTML = '<div class="alert alert-info" style="font-size:.85rem;">' +
+            '<i class="fas fa-info-circle"></i> ' +
+            'Encaissé: <strong>' + total.toLocaleString('fr-FR') + ' HTG</strong> | ' +
+            'Déjà retiré: <strong>' + wd.toLocaleString('fr-FR') + ' HTG</strong> | ' +
+            'Disponible: <strong style="color:#155724;">' + dispo.toLocaleString('fr-FR') + ' HTG</strong>' +
+            '</div>';
+        document.getElementById('wd-amount').max = dispo;
+    });
+}
+
+async function enregistrerRetrait() {
+    var agentSel = document.getElementById('wd-agent');
+    var agent    = agentSel.value;
+    var agentName = agentSel.options[agentSel.selectedIndex]?.text?.split(' —')[0] || agent;
+    var amount   = parseFloat(document.getElementById('wd-amount').value);
+    var note     = document.getElementById('wd-note').value.trim();
+
+    if (!agent) { toast('Sélectionner un agent', 'error'); return; }
+    if (isNaN(amount) || amount <= 0) { toast('Montant invalide', 'error'); return; }
+
+    // Vérifier disponible
+    var opt   = agentSel.options[agentSel.selectedIndex];
+    var total = parseFloat(opt.dataset.total || 0);
+    var wd    = parseFloat(opt.dataset.wd    || 0);
+    var dispo = total - wd;
+    if (amount > dispo) {
+        toast('Montant supérieur au disponible (' + dispo.toLocaleString('fr-FR') + ' HTG)', 'error');
+        return;
+    }
+
+    try {
+        await apiCall(function() {
+            return API.addCashWithdrawal({
+                agentUsername: agent,
+                agentName:     agentName,
+                amount:        amount,
+                note:          note,
+                date:          new Date().toISOString().split('T')[0]
+            });
+        });
+        toast(agentName + ' — ' + amount.toLocaleString('fr-FR') + ' HTG retiré avec succès !', 'success');
+        document.getElementById('wd-amount').value = '';
+        document.getElementById('wd-note').value   = '';
+        // Rafraîchir
+        updateAdminStats();
+    } catch(e) {}
+}
+
+async function supprimerRetrait(id) {
+    if (!confirm('Supprimer ce retrait ?')) return;
+    try {
+        await apiCall(function() { return API.deleteCashWithdrawal(id); });
+        toast('Retrait supprimé', 'warning');
+        updateAdminStats();
+    } catch(e) {}
+}
+
 async function updateAdminStats() {
     try {
         const stats = await apiCall(() => API.getStats());
@@ -2236,6 +2416,9 @@ async function updateAdminStats() {
                     '</div>';
             }).join('') : '<p class="text-muted">Aucune donnée</p>') +
             '</div>';
+
+        // Section gestion de caisse (retraits/commissions)
+        await renderCashManagement(stats);
 
         // Mettre à jour les anciens éléments si présents
         const revEl = document.getElementById('admin-total-revenue');
@@ -2758,22 +2941,27 @@ async function updateMedicationsSettingsList() {
     }).join('');
 
     if (state.currentRole === 'admin' || (state.currentRole === 'sub_admin' && state.subAdminPermissions.users)) {
-        const users = await API.getUsers().catch(()=>[]);
-        document.getElementById('users-list').innerHTML = users.map(u=>`
-            <tr>
-                <td><strong>${u.name}</strong></td>
-                <td><span class="badge badge-primary">${getRoleLabel(u.role)}</span></td>
-                <td>${u.username}</td>
-                <td>${u.active?'<span class="badge badge-success">Actif</span>':'<span class="badge badge-danger">Inactif</span>'}</td>
-                <td>
-                    ${u.role==='sub_admin'?'<span class="badge badge-warning">Permissions config.</span>':'-'}
-                </td>
-                <td>
-                    <button class="btn btn-sm ${u.active?'btn-warning':'btn-success'}" onclick="toggleUser('${u.id}',${!u.active},'${u.name}')">
-                        ${u.active?'Désactiver':'Activer'}
-                    </button>
-                </td>
-            </tr>`).join('');
+        var users = await API.getUsers().catch(function() { return []; });
+        document.getElementById('users-list').innerHTML = users.map(function(u) {
+            var extraRolesLabel = u.extra_roles
+                ? u.extra_roles.split(',').map(function(r) {
+                    return '<span class="badge badge-info" style="margin:1px;font-size:.7rem;">' + getRoleLabel(r.trim()) + '</span>';
+                  }).join('')
+                : '';
+            return '<tr>' +
+                '<td><strong>' + u.name + '</strong></td>' +
+                '<td><span class="badge badge-primary">' + getRoleLabel(u.role) + '</span>' + extraRolesLabel + '</td>' +
+                '<td><code>' + u.username + '</code></td>' +
+                '<td>' + (u.active
+                    ? '<span class="badge badge-success"><i class="fas fa-check"></i> Actif</span>'
+                    : '<span class="badge badge-danger"><i class="fas fa-times"></i> Inactif</span>') + '</td>' +
+                '<td><div class="d-flex gap-10">' +
+                    '<button class="btn btn-sm btn-warning" onclick="openEditUserModal(\'' + u.id + '\' )" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-sm ' + (u.active ? 'btn-secondary' : 'btn-success') + '" onclick="toggleUser(\'' + u.id + '\' ,' + !u.active + ',\'' + u.name + '\' )" title="' + (u.active ? 'Désactiver' : 'Activer') + '"><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\' ,\'' + u.name + '\' )" title="Supprimer"><i class="fas fa-trash"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('');
     }
 }
 
@@ -2853,10 +3041,219 @@ async function deleteMedicationSettings(id) {
     updateMedicationsSettingsList();
     toast('Médicament supprimé');
 }
+// ─── MODIFIER UTILISATEUR ────────────────────────────────────
+function openEditUserModal(userId) {
+    // Chercher l'utilisateur dans le DOM (on recharge depuis l'API)
+    API.getUsers().then(function(users) {
+        var u = users.find(function(x) { return String(x.id) === String(userId); });
+        if (!u) { toast('Utilisateur introuvable', 'error'); return; }
+
+        var existing = document.getElementById('edit-user-modal');
+        if (existing) existing.remove();
+
+        var extraChecks = ['secretary','cashier','nurse','doctor','lab','pharmacy'].map(function(r) {
+            var checked = u.extra_roles && u.extra_roles.split(',').map(function(s){return s.trim();}).includes(r) ? 'checked' : '';
+            return '<div class="permission-item"><input type="checkbox" id="eu-mr-'+r+'" value="'+r+'" '+checked+'>' +
+                   '<label for="eu-mr-'+r+'">'+getRoleLabel(r)+'</label></div>';
+        }).join('');
+
+        var modal = document.createElement('div');
+        modal.id = 'edit-user-modal';
+        modal.className = 'transaction-details-modal';
+        modal.innerHTML =
+            '<div class="transaction-details-content" style="max-width:520px;">' +
+            '<h4><i class="fas fa-user-edit" style="color:var(--warning);"></i> Modifier l\'utilisateur</h4>' +
+            '<div class="add-form-grid" style="margin-top:16px;">' +
+                '<div><label class="form-label">Nom complet *</label>' +
+                '<input type="text" id="eu-name" class="form-control" value="' + u.name + '"></div>' +
+                '<div><label class="form-label">Identifiant *</label>' +
+                '<input type="text" id="eu-username" class="form-control" value="' + u.username + '"></div>' +
+                '<div><label class="form-label">Rôle *</label>' +
+                '<select id="eu-role" class="form-control" onchange="document.getElementById(\'eu-multi-section\').style.display=this.value===\'multi\'?\'block\':\'none\'">' +
+                    '<option value="sub_admin"' + (u.role==='sub_admin'?' selected':'') + '>Sous-Administrateur</option>' +
+                    '<option value="secretary"' + (u.role==='secretary'?' selected':'') + '>Secrétariat</option>' +
+                    '<option value="cashier"'   + (u.role==='cashier'  ?' selected':'') + '>Caisse</option>' +
+                    '<option value="nurse"'     + (u.role==='nurse'    ?' selected':'') + '>Infirmier</option>' +
+                    '<option value="doctor"'    + (u.role==='doctor'   ?' selected':'') + '>Médecin</option>' +
+                    '<option value="lab"'       + (u.role==='lab'      ?' selected':'') + '>Laboratoire</option>' +
+                    '<option value="pharmacy"'  + (u.role==='pharmacy' ?' selected':'') + '>Pharmacie</option>' +
+                    '<option value="multi"'     + (u.role==='multi'    ?' selected':'') + '>Multi-Rôle</option>' +
+                '</select></div>' +
+                '<div><label class="form-label">Statut</label>' +
+                '<select id="eu-active" class="form-control">' +
+                    '<option value="true"'  + (u.active ?' selected':'') + '>Actif</option>' +
+                    '<option value="false"' + (!u.active?' selected':'') + '>Inactif</option>' +
+                '</select></div>' +
+            '</div>' +
+            '<div id="eu-multi-section" style="display:' + (u.role==='multi'?'block':'none') + ';margin-top:12px;">' +
+                '<label class="form-label"><i class="fas fa-layer-group" style="color:#6f42c1;"></i> Rôles combinés</label>' +
+                '<div class="permissions-grid" style="margin-top:8px;">' + extraChecks + '</div>' +
+            '</div>' +
+            '<hr style="margin:16px 0;border-color:var(--border);">' +
+            '<h5 style="margin-bottom:10px;color:var(--text);"><i class="fas fa-key" style="color:#ffc107;"></i> Changer le mot de passe <small style="color:var(--muted);font-weight:400;">(laisser vide = pas de changement)</small></h5>' +
+            '<div class="add-form-grid">' +
+                '<div><label class="form-label">Nouveau mot de passe</label>' +
+                '<input type="password" id="eu-pwd" class="form-control" placeholder="Laisser vide si inchang&#233;"></div>' +
+                '<div><label class="form-label">Confirmer</label>' +
+                '<input type="password" id="eu-pwd2" class="form-control" placeholder="Répéter le mot de passe"></div>' +
+            '</div>' +
+            '<div class="d-flex gap-10 mt-3">' +
+                '<button class="btn btn-success" onclick="saveEditUser(\'' + userId + '\') "><i class="fas fa-save"></i> Enregistrer</button>' +
+                '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-user-modal\').remove()">Annuler</button>' +
+            '</div></div>';
+        document.body.appendChild(modal);
+    }).catch(function() { toast('Erreur chargement utilisateur', 'error'); });
+}
+
+async function saveEditUser(userId) {
+    var name     = document.getElementById('eu-name').value.trim();
+    var username = document.getElementById('eu-username').value.trim();
+    var role     = document.getElementById('eu-role').value;
+    var active   = document.getElementById('eu-active').value === 'true';
+    var pwd      = document.getElementById('eu-pwd').value;
+    var pwd2     = document.getElementById('eu-pwd2').value;
+
+    if (!name || !username || !role) { toast('Remplir les champs obligatoires', 'error'); return; }
+    if (pwd && pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+    if (pwd && pwd.length < 4) { toast('Mot de passe trop court', 'error'); return; }
+
+    var extraRoles = [];
+    if (role === 'multi') {
+        document.querySelectorAll('#eu-multi-section input[type=checkbox]:checked').forEach(function(cb) {
+            extraRoles.push(cb.value);
+        });
+        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles', 'error'); return; }
+    }
+
+    var data = { name: name, username: username, role: role, active: active, extraRoles: extraRoles };
+    if (pwd) data.password = pwd;
+
+    try {
+        await apiCall(function() { return API.updateUser(userId, data); });
+        toast('Utilisateur modifié avec succès !', 'success');
+        document.getElementById('edit-user-modal').remove();
+        updateMedicationsSettingsList();
+    } catch(e) {}
+}
+
 async function toggleUser(id, active, name) {
-    await apiCall(() => API.updateUser(id, { name, active }));
-    toast(`Utilisateur ${active?'activé':'désactivé'}`);
+    await apiCall(function() { return API.updateUser(id, { name: name, active: active }); });
+    toast('Utilisateur ' + (active ? 'activé' : 'désactivé'));
     updateMedicationsSettingsList();
+}
+
+async function deleteUser(id, name) {
+    if (!confirm('Supprimer définitivement l\'utilisateur "' + name + '" ?\nCette action est irréversible.')) return;
+    try {
+        await apiCall(function() { return API.deleteUser(id); });
+        toast('Utilisateur "' + name + '" supprimé', 'warning');
+        updateMedicationsSettingsList();
+    } catch(e) {}
+}
+
+function openEditUserModal(id) {
+    // Récupérer les infos actuelles depuis le DOM
+    API.getUsers().then(function(users) {
+        var u = users.find(function(x) { return String(x.id) === String(id); });
+        if (!u) { toast('Utilisateur introuvable', 'error'); return; }
+
+        var existing = document.getElementById('edit-user-modal');
+        if (existing) existing.remove();
+
+        var rolesOptions = ['secretary','cashier','nurse','doctor','lab','pharmacy','sub_admin','multi'].map(function(r) {
+            return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + getRoleLabel(r) + '</option>';
+        }).join('');
+
+        var multiRolesHtml = ['secretary','cashier','nurse','doctor','lab','pharmacy'].map(function(r) {
+            var checked = u.extra_roles && u.extra_roles.includes(r) ? 'checked' : '';
+            return '<div class="permission-item">' +
+                '<input type="checkbox" id="eu-mr-' + r + '" value="' + r + '" ' + checked + '>' +
+                '<label for="eu-mr-' + r + '">' + getRoleLabel(r) + '</label>' +
+                '</div>';
+        }).join('');
+
+        var modal = document.createElement('div');
+        modal.id = 'edit-user-modal';
+        modal.className = 'transaction-details-modal';
+        modal.innerHTML =
+            '<div class="transaction-details-content" style="max-width:520px;">' +
+            '<h4><i class="fas fa-user-edit" style="color:var(--warning);"></i> Modifier l\'utilisateur</h4>' +
+            '<div class="add-form-grid" style="margin-top:16px;">' +
+                '<div><label class="form-label">Nom complet *</label>' +
+                '<input type="text" id="eu-name" class="form-control" value="' + u.name + '"></div>' +
+                '<div><label class="form-label">Identifiant *</label>' +
+                '<input type="text" id="eu-username" class="form-control" value="' + u.username + '"></div>' +
+                '<div><label class="form-label">Rôle *</label>' +
+                '<select id="eu-role" class="form-control" onchange="toggleEditUserMulti()">' +
+                rolesOptions + '</select></div>' +
+                '<div><label class="form-label">Statut</label>' +
+                '<select id="eu-active" class="form-control">' +
+                '<option value="true"' + (u.active ? ' selected' : '') + '>Actif</option>' +
+                '<option value="false"' + (!u.active ? ' selected' : '') + '>Inactif</option>' +
+                '</select></div>' +
+            '</div>' +
+            '<div id="eu-multi-container" style="display:' + (u.role === 'multi' ? 'block' : 'none') + ';margin-top:12px;">' +
+            '<label class="form-label">Rôles combinés</label>' +
+            '<div class="permissions-grid">' + multiRolesHtml + '</div></div>' +
+            '<div class="card mt-3" style="background:#fff8e1;border-left-color:#ffc107;">' +
+            '<h5 style="color:#856404;margin-bottom:10px;"><i class="fas fa-key"></i> Changer le mot de passe (optionnel)</h5>' +
+            '<div class="add-form-grid">' +
+                '<div><label class="form-label">Nouveau mot de passe</label>' +
+                '<input type="password" id="eu-pwd" class="form-control" placeholder="Laisser vide pour ne pas changer"></div>' +
+                '<div><label class="form-label">Confirmer</label>' +
+                '<input type="password" id="eu-pwd2" class="form-control" placeholder="Répéter le nouveau mot de passe"></div>' +
+            '</div></div>' +
+            '<div class="d-flex gap-10 mt-3">' +
+                '<button class="btn btn-success" onclick="saveEditUser(\'' + id + '\' )"><i class="fas fa-save"></i> Enregistrer</button>' +
+                '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-user-modal\').remove()">Annuler</button>' +
+            '</div></div>';
+        document.body.appendChild(modal);
+    }).catch(function() { toast('Erreur chargement utilisateur', 'error'); });
+}
+
+function toggleEditUserMulti() {
+    var role = document.getElementById('eu-role').value;
+    var container = document.getElementById('eu-multi-container');
+    if (container) container.style.display = role === 'multi' ? 'block' : 'none';
+}
+
+async function saveEditUser(id) {
+    var name     = document.getElementById('eu-name').value.trim();
+    var username = document.getElementById('eu-username').value.trim();
+    var role     = document.getElementById('eu-role').value;
+    var active   = document.getElementById('eu-active').value === 'true';
+    var pwd      = document.getElementById('eu-pwd').value;
+    var pwd2     = document.getElementById('eu-pwd2').value;
+
+    if (!name || !username || !role) { toast('Remplir les champs obligatoires', 'error'); return; }
+    if (pwd && pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+    if (pwd && pwd.length < 6) { toast('Mot de passe trop court (min 6 caractères)', 'error'); return; }
+
+    var extraRoles = [];
+    if (role === 'multi') {
+        document.querySelectorAll('#eu-multi-container input[type=checkbox]:checked').forEach(function(cb) {
+            extraRoles.push(cb.value);
+        });
+        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles pour un compte multi-rôle', 'error'); return; }
+    }
+
+    try {
+        // Mettre à jour les infos de base
+        await apiCall(function() {
+            return API.updateUser(id, { name: name, active: active, username: username, role: role, extraRoles: extraRoles });
+        });
+
+        // Changer le mot de passe si fourni
+        if (pwd) {
+            await apiCall(function() {
+                return API.updateUserPassword(id, pwd);
+            });
+        }
+
+        toast('Utilisateur "' + name + '" mis à jour !', 'success');
+        document.getElementById('edit-user-modal').remove();
+        updateMedicationsSettingsList();
+    } catch(e) {}
 }
 
 // ─── PERMISSIONS SOUS-ADMIN ──────────────────────────────────
