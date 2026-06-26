@@ -433,6 +433,7 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
         });
     });
@@ -440,7 +441,7 @@ function setupNavigation() {
 
 function setupRoleBasedNavigation() {
     const role = state.currentRole;
-    const allSections = ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','settings'];
+    const allSections = ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','suppliers','settings'];
 
     let allowed;
     if (role === 'admin') {
@@ -2701,6 +2702,284 @@ async function savePrivileges(patientId) {
         await apiCall(() => API.updatePrivilege(patientId, { privilegeType, discountPercentage }));
         toast('Privilèges mis à jour!');
         searchAdminPatient();
+    } catch(e) {}
+}
+
+// ─── FOURNISSEURS ────────────────────────────────────────────
+var _currentSupplierId   = null;
+var _currentSupplierName = null;
+
+function toggleSupplierForm() {
+    var f = document.getElementById('supplier-add-form');
+    f.style.display = f.style.display === 'none' ? 'grid' : 'none';
+}
+
+async function loadSuppliers() {
+    try {
+        var suppliers = await apiCall(function() { return API.getSuppliers(); });
+        var list = document.getElementById('suppliers-list');
+        if (!suppliers.length) {
+            list.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun fournisseur enregistré.</div>';
+            return;
+        }
+        list.innerHTML = '<div class="table-container"><table><thead><tr>' +
+            '<th>Nom</th><th>Téléphone</th><th>Email</th><th>Dette totale</th><th>Actions</th>' +
+            '</tr></thead><tbody>' +
+            suppliers.map(function(s) {
+                var debt = parseFloat(s.total_debt || 0);
+                return '<tr>' +
+                    '<td><strong>' + s.name + '</strong>' + (s.note ? '<br><small class="text-muted">' + s.note + '</small>' : '') + '</td>' +
+                    '<td>' + (s.phone || '-') + '</td>' +
+                    '<td>' + (s.email || '-') + '</td>' +
+                    '<td><strong style="color:' + (debt > 0 ? '#dc3545' : '#28a745') + ';">' +
+                        debt.toLocaleString('fr-FR') + ' HTG</strong>' +
+                        (debt > 0 ? ' <span class="badge badge-danger">Dû</span>' : ' <span class="badge badge-success">OK</span>') +
+                    '</td>' +
+                    '<td><div class="d-flex gap-10">' +
+                        '<button class="btn btn-sm btn-primary" data-sid="' + s.id + '" data-sname="' + s.name + '" onclick="openSupplierDetail(this.dataset.sid,this.dataset.sname)"><i class="fas fa-eye"></i> Détails</button>' +
+                        '<i class="fas fa-eye"></i> Détails</button>' +
+                        '<button class="btn btn-sm btn-warning" data-sid="' + s.id + '" onclick="editSupplier(this.dataset.sid)"><i class="fas fa-edit"></i></button>' +
+                        '<i class="fas fa-edit"></i></button>' +
+                        '<button class="btn btn-sm btn-danger" data-sid="' + s.id + '" data-sname="' + s.name + '" onclick="deleteSupplierFn(this.dataset.sid,this.dataset.sname)"><i class="fas fa-trash"></i></button>' +
+                        '<i class="fas fa-trash"></i></button>' +
+                    '</div></td>' +
+                '</tr>';
+            }).join('') + '</tbody></table></div>';
+    } catch(e) {}
+}
+
+async function saveNewSupplier() {
+    var name    = document.getElementById('sup-name').value.trim();
+    var phone   = document.getElementById('sup-phone').value.trim();
+    var email   = document.getElementById('sup-email').value.trim();
+    var address = document.getElementById('sup-address').value.trim();
+    var note    = document.getElementById('sup-note').value.trim();
+    if (!name) { toast('Le nom est obligatoire', 'error'); return; }
+    try {
+        await apiCall(function() { return API.addSupplier({ name, phone, email, address, note }); });
+        toast('Fournisseur ajouté !', 'success');
+        toggleSupplierForm();
+        ['sup-name','sup-phone','sup-email','sup-address','sup-note'].forEach(function(id) {
+            var el = document.getElementById(id); if (el) el.value = '';
+        });
+        loadSuppliers();
+    } catch(e) {}
+}
+
+async function deleteSupplierFn(id, name) {
+    if (!confirm('Supprimer le fournisseur ' + name + ' ?')) return;
+    try {
+        await apiCall(function() { return API.deleteSupplier(id); });
+        toast('Fournisseur supprimé', 'warning');
+        loadSuppliers();
+    } catch(e) {}
+}
+
+async function editSupplier(id) {
+    var suppliers = await API.getSuppliers().catch(function() { return []; });
+    var s = suppliers.find(function(x) { return x.id === id; });
+    if (!s) return;
+    var modal = document.createElement('div');
+    modal.id = 'edit-supplier-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML =
+        '<div class="transaction-details-content" style="max-width:480px;">' +
+        '<h4><i class="fas fa-edit" style="color:var(--warning);"></i> Modifier le fournisseur</h4>' +
+        '<div class="add-form-grid" style="margin-top:14px;">' +
+        '<div><label class="form-label">Nom *</label><input type="text" id="es-name" class="form-control" value="' + s.name + '"></div>' +
+        '<div><label class="form-label">Téléphone</label><input type="text" id="es-phone" class="form-control" value="' + (s.phone||'') + '"></div>' +
+        '<div><label class="form-label">Email</label><input type="email" id="es-email" class="form-control" value="' + (s.email||'') + '"></div>' +
+        '<div><label class="form-label">Adresse</label><input type="text" id="es-address" class="form-control" value="' + (s.address||'') + '"></div>' +
+        '<div style="grid-column:1/-1"><label class="form-label">Note</label><input type="text" id="es-note" class="form-control" value="' + (s.note||'') + '"></div>' +
+        '</div>' +
+        '<div class="d-flex gap-10 mt-3">' +
+        '<button class="btn btn-success" data-sid="' + id + '" onclick="saveEditSupplier(this.dataset.sid)"><i class="fas fa-save"></i> Enregistrer</button>' +
+        '<i class="fas fa-save"></i> Enregistrer</button>' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-supplier-modal\').remove()">Annuler</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+}
+
+async function saveEditSupplier(id) {
+    var name    = document.getElementById('es-name').value.trim();
+    var phone   = document.getElementById('es-phone').value.trim();
+    var email   = document.getElementById('es-email').value.trim();
+    var address = document.getElementById('es-address').value.trim();
+    var note    = document.getElementById('es-note').value.trim();
+    if (!name) { toast('Le nom est obligatoire', 'error'); return; }
+    try {
+        await apiCall(function() { return API.updateSupplier(id, { name, phone, email, address, note }); });
+        toast('Fournisseur modifié !', 'success');
+        document.getElementById('edit-supplier-modal').remove();
+        loadSuppliers();
+        if (_currentSupplierId === id) {
+            _currentSupplierName = name;
+            document.getElementById('selected-supplier-name').textContent = name;
+        }
+    } catch(e) {}
+}
+
+async function openSupplierDetail(id, name) {
+    _currentSupplierId   = id;
+    _currentSupplierName = name;
+    document.getElementById('supplier-detail-card').style.display  = 'block';
+    document.getElementById('selected-supplier-name').textContent   = name;
+    document.getElementById('suppliers-list').closest('.card').style.display = 'none';
+    // Reset form
+    ['pur-desc','pur-total','pur-paid','pur-note'].forEach(function(i) {
+        var el = document.getElementById(i); if (el) el.value = '';
+    });
+    document.getElementById('purchase-balance-preview').innerHTML = '';
+    await loadSupplierPurchases();
+}
+
+function closeSupplierDetail() {
+    _currentSupplierId = null;
+    document.getElementById('supplier-detail-card').style.display  = 'none';
+    document.getElementById('suppliers-list').closest('.card').style.display = 'block';
+    loadSuppliers();
+}
+
+function updatePurchaseBalance() {
+    var total = parseFloat(document.getElementById('pur-total').value) || 0;
+    var paid  = parseFloat(document.getElementById('pur-paid').value)  || 0;
+    var due   = total - paid;
+    var preview = document.getElementById('purchase-balance-preview');
+    if (!total) { preview.innerHTML = ''; return; }
+    // Auto-set payment type
+    var typeEl = document.getElementById('pur-type');
+    if (paid === 0)    typeEl.value = 'credit';
+    else if (paid >= total) { typeEl.value = 'cash'; }
+    else               typeEl.value = 'partial';
+
+    preview.innerHTML = '<div class="d-flex gap-15 flex-wrap mt-2">' +
+        '<span class="badge badge-primary">Total: ' + total.toLocaleString('fr-FR') + ' HTG</span>' +
+        '<span class="badge badge-success">Payé: ' + paid.toLocaleString('fr-FR') + ' HTG</span>' +
+        '<span class="badge ' + (due > 0 ? 'badge-danger' : 'badge-success') + '">' +
+        'Restant: ' + Math.max(0, due).toLocaleString('fr-FR') + ' HTG</span>' +
+        '</div>';
+}
+
+async function savePurchase() {
+    var desc  = document.getElementById('pur-desc').value.trim();
+    var total = parseFloat(document.getElementById('pur-total').value);
+    var paid  = parseFloat(document.getElementById('pur-paid').value) || 0;
+    var type  = document.getElementById('pur-type').value;
+    var note  = document.getElementById('pur-note').value.trim();
+    if (!desc || isNaN(total) || total <= 0) { toast('Description et montant obligatoires', 'error'); return; }
+    if (paid > total) { toast('Le montant payé ne peut pas dépasser le total', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addSupplierPurchase({
+                supplierId:  _currentSupplierId,
+                description: desc,
+                totalAmount: total,
+                amountPaid:  paid,
+                paymentType: type,
+                note:        note,
+            });
+        });
+        var due = total - paid;
+        toast('Achat enregistré — ' + (due > 0 ? 'Dette: ' + due.toLocaleString('fr-FR') + ' HTG' : 'Payé intégralement'), 'success');
+        ['pur-desc','pur-total','pur-paid','pur-note'].forEach(function(i) {
+            var el = document.getElementById(i); if (el) el.value = '';
+        });
+        document.getElementById('purchase-balance-preview').innerHTML = '';
+        await loadSupplierPurchases();
+        updateDebtSummary();
+    } catch(e) {}
+}
+
+async function updateDebtSummary() {
+    var suppliers = await API.getSuppliers().catch(function() { return []; });
+    var s = suppliers.find(function(x) { return x.id === _currentSupplierId; });
+    if (!s) return;
+    var debt = parseFloat(s.total_debt || 0);
+    document.getElementById('supplier-debt-summary').innerHTML =
+        '<div class="d-flex gap-15 flex-wrap">' +
+        '<div style="background:' + (debt>0?'#f8d7da':'#d4edda') + ';padding:14px 20px;border-radius:10px;text-align:center;">' +
+        '<strong style="font-size:1.2rem;color:' + (debt>0?'#721c24':'#155724') + ';">' + debt.toLocaleString('fr-FR') + ' HTG</strong>' +
+        '<br><small>Dette totale actuelle</small></div>' +
+        '<div style="background:#d1ecf1;padding:14px 20px;border-radius:10px;text-align:center;">' +
+        '<strong style="font-size:1.2rem;color:#0c5460;">$' + (debt/state.exchangeRate).toFixed(2) + '</strong>' +
+        '<br><small>Équivalent USD</small></div>' +
+        '</div>';
+}
+
+async function loadSupplierPurchases() {
+    await updateDebtSummary();
+    try {
+        var purchases = await apiCall(function() {
+            return API.getSupplierPurchases({ supplierId: _currentSupplierId });
+        });
+        var container = document.getElementById('supplier-purchases-list');
+        if (!purchases.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun achat enregistré pour ce fournisseur.</div>';
+            return;
+        }
+        container.innerHTML = purchases.map(function(p) {
+            var total = parseFloat(p.total_amount);
+            var paid  = parseFloat(p.amount_paid);
+            var due   = parseFloat(p.amount_due);
+            var isPaid = due <= 0;
+            var statusColor = isPaid ? '#28a745' : p.payment_type === 'credit' ? '#dc3545' : '#856404';
+            var statusLabel = isPaid ? 'Soldé' : p.payment_type === 'credit' ? 'À crédit' : 'Partiel';
+            return '<div class="card mb-2" style="border-left-color:' + statusColor + ';">' +
+                '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                '<div>' +
+                '<h5 style="margin-bottom:4px;">' + p.description + '</h5>' +
+                '<small class="text-muted">' + (p.date||'-') + (p.note ? ' — ' + p.note : '') + '</small>' +
+                '</div>' +
+                '<span class="badge" style="background:' + statusColor + ';color:#fff;font-size:.8rem;">' + statusLabel + '</span>' +
+                '</div>' +
+                '<div class="d-flex gap-15 flex-wrap mt-2">' +
+                '<span>Total: <strong>' + total.toLocaleString('fr-FR') + ' HTG</strong></span>' +
+                '<span>Payé: <strong style="color:#28a745;">' + paid.toLocaleString('fr-FR') + ' HTG</strong></span>' +
+                (due > 0 ? '<span>Restant: <strong style="color:#dc3545;">' + due.toLocaleString('fr-FR') + ' HTG</strong></span>' : '') +
+                '</div>' +
+                (due > 0 ?
+                '<div class="d-flex gap-10 mt-2 align-center flex-wrap">' +
+                '<input type="number" class="form-control" id="pay-' + p.id + '" placeholder="Montant à payer (HTG)" min="0" max="' + due + '" style="width:200px;font-size:.88rem;">' +
+                '<input type="text" class="form-control" id="paynote-' + p.id + '" placeholder="Note paiement" style="width:180px;font-size:.88rem;">' +
+                '<button class="btn btn-success btn-sm" data-pid="' + p.id + '" onclick="paySupplierDebt(this.dataset.pid)"><i class="fas fa-money-bill-wave"></i> Payer</button>' +
+                '<i class="fas fa-money-bill-wave"></i> Payer</button>' +
+                '</div>' : '') +
+                '<div class="mt-2">' +
+                '<button class="btn btn-xs btn-danger" data-pid="' + p.id + '" onclick="deleteSupplierPurchaseFn(this.dataset.pid)"><i class="fas fa-trash"></i> Supprimer</button>' +
+                '<i class="fas fa-trash"></i> Supprimer</button>' +
+                '</div></div>';
+        }).join('');
+    } catch(e) {}
+}
+
+async function paySupplierDebt(purchaseId) {
+    var amountEl = document.getElementById('pay-' + purchaseId);
+    var noteEl   = document.getElementById('paynote-' + purchaseId);
+    var amount   = parseFloat(amountEl.value);
+    var note     = noteEl ? noteEl.value.trim() : '';
+    if (isNaN(amount) || amount <= 0) { toast('Entrer un montant valide', 'error'); return; }
+    try {
+        var result = await apiCall(function() {
+            return API.addSupplierPayment({
+                purchaseId:  purchaseId,
+                supplierId:  _currentSupplierId,
+                amount:      amount,
+                note:        note,
+            });
+        });
+        var remaining = parseFloat(result.remainingDue || 0);
+        toast('Paiement enregistré ! ' + (remaining > 0 ?
+            'Reste: ' + remaining.toLocaleString('fr-FR') + ' HTG' : 'Dette soldée !'), 'success');
+        await loadSupplierPurchases();
+    } catch(e) {}
+}
+
+async function deleteSupplierPurchaseFn(id) {
+    if (!confirm('Supprimer cet achat ?')) return;
+    try {
+        await apiCall(function() { return API.deleteSupplierPurchase(id); });
+        toast('Achat supprimé', 'warning');
+        await loadSupplierPurchases();
     } catch(e) {}
 }
 

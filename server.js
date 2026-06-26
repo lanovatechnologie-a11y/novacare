@@ -727,6 +727,177 @@ app.get('/stats', auth, adminOrSub, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════
+//  FOURNISSEURS
+// ════════════════════════════════════════════════════════════
+
+// Liste fournisseurs
+app.get('/suppliers', auth, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM suppliers ORDER BY name');
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Ajouter fournisseur
+app.post('/suppliers', auth, adminOnly, async (req, res) => {
+    try {
+        const { name, phone, email, address, note } = req.body;
+        const id = 'SUP' + Date.now();
+        const r = await pool.query(
+            'INSERT INTO suppliers(id,name,phone,email,address,note,total_debt) VALUES($1,$2,$3,$4,$5,$6,0) RETURNING *',
+            [id, name, phone||null, email||null, address||null, note||null]
+        );
+        res.status(201).json(r.rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Modifier fournisseur
+app.put('/suppliers/:id', auth, adminOnly, async (req, res) => {
+    try {
+        const { name, phone, email, address, note } = req.body;
+        await pool.query(
+            'UPDATE suppliers SET name=$1,phone=$2,email=$3,address=$4,note=$5 WHERE id=$6',
+            [name, phone||null, email||null, address||null, note||null, req.params.id]
+        );
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Supprimer fournisseur
+app.delete('/suppliers/:id', auth, adminOnly, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM suppliers WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── ACHATS FOURNISSEURS ──────────────────────────────────
+
+// Liste achats d'un fournisseur
+app.get('/supplier-purchases', auth, async (req, res) => {
+    try {
+        const { supplierId } = req.query;
+        let q = 'SELECT * FROM supplier_purchases WHERE 1=1';
+        const p = [];
+        if (supplierId) { p.push(supplierId); q += ' AND supplier_id=$' + p.length; }
+        q += ' ORDER BY date DESC';
+        res.json((await pool.query(q, p)).rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Enregistrer un achat
+app.post('/supplier-purchases', auth, adminOnly, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { supplierId, description, totalAmount, amountPaid, paymentType, note } = req.body;
+        // paymentType: 'cash' | 'credit' | 'partial'
+        const amountDue = parseFloat(totalAmount) - parseFloat(amountPaid || 0);
+        const id = 'PUR' + Date.now();
+        const r = await client.query(
+            `INSERT INTO supplier_purchases(id,supplier_id,description,total_amount,amount_paid,amount_due,payment_type,note,date,created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,CURRENT_DATE,$9) RETURNING *`,
+            [id, supplierId, description, totalAmount, amountPaid||0, amountDue, paymentType, note||null, req.user.username]
+        );
+        // Mettre à jour la dette totale du fournisseur
+        if (amountDue > 0) {
+            await client.query(
+                'UPDATE suppliers SET total_debt=total_debt+$1 WHERE id=$2',
+                [amountDue, supplierId]
+            );
+        }
+        await client.query('COMMIT');
+        res.status(201).json(r.rows[0]);
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// ─── PAIEMENTS PARTIELS ───────────────────────────────────
+
+// Liste des paiements d'un achat
+app.get('/supplier-payments', auth, async (req, res) => {
+    try {
+        const { purchaseId, supplierId } = req.query;
+        let q = 'SELECT * FROM supplier_payments WHERE 1=1';
+        const p = [];
+        if (purchaseId) { p.push(purchaseId); q += ' AND purchase_id=$' + p.length; }
+        if (supplierId) { p.push(supplierId); q += ' AND supplier_id=$' + p.length; }
+        q += ' ORDER BY date DESC';
+        res.json((await pool.query(q, p)).rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Enregistrer un paiement partiel
+app.post('/supplier-payments', auth, adminOnly, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { purchaseId, supplierId, amount, note } = req.body;
+
+        // Vérifier la dette restante sur cet achat
+        const pur = await client.query('SELECT * FROM supplier_purchases WHERE id=$1', [purchaseId]);
+        if (!pur.rows.length) throw new Error('Achat introuvable');
+        const purchase = pur.rows[0];
+        if (parseFloat(amount) > parseFloat(purchase.amount_due)) {
+            throw new Error('Paiement supérieur à la dette restante (' + purchase.amount_due + ' HTG)');
+        }
+
+        // Enregistrer le paiement
+        const id = 'PAY' + Date.now();
+        await client.query(
+            'INSERT INTO supplier_payments(id,purchase_id,supplier_id,amount,note,date,created_by) VALUES($1,$2,$3,$4,$5,CURRENT_DATE,$6)',
+            [id, purchaseId, supplierId, amount, note||null, req.user.username]
+        );
+
+        // Réduire la dette de l'achat
+        const newDue = parseFloat(purchase.amount_due) - parseFloat(amount);
+        const newPaid = parseFloat(purchase.amount_paid) + parseFloat(amount);
+        const status = newDue <= 0 ? 'paid' : 'partial';
+        await client.query(
+            'UPDATE supplier_purchases SET amount_due=$1, amount_paid=$2, payment_type=$3 WHERE id=$4',
+            [Math.max(0, newDue), newPaid, status, purchaseId]
+        );
+
+        // Réduire la dette totale du fournisseur
+        await client.query(
+            'UPDATE suppliers SET total_debt=GREATEST(0,total_debt-$1) WHERE id=$2',
+            [amount, supplierId]
+        );
+
+        await client.query('COMMIT');
+        res.status(201).json({ success: true, remainingDue: Math.max(0, newDue) });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// Supprimer un achat
+app.delete('/supplier-purchases/:id', auth, adminOnly, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await client.query('SELECT * FROM supplier_purchases WHERE id=$1', [req.params.id]);
+        if (r.rows.length) {
+            // Remettre la dette du fournisseur
+            await client.query(
+                'UPDATE suppliers SET total_debt=GREATEST(0,total_debt-$1) WHERE id=$2',
+                [r.rows[0].amount_due, r.rows[0].supplier_id]
+            );
+        }
+        await client.query('DELETE FROM supplier_payments WHERE purchase_id=$1', [req.params.id]);
+        await client.query('DELETE FROM supplier_purchases WHERE id=$1', [req.params.id]);
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// ════════════════════════════════════════════════════════════
 //  GESTION DE CAISSE — COMMISSIONS / RETRAITS
 // ════════════════════════════════════════════════════════════
 

@@ -112,6 +112,7 @@
                 <span id="message-badge" class="notification-badge hidden">0</span>
             </div>
             <div class="nav-tab" data-target="administration"><i class="fas fa-chart-bar"></i> Administration</div>
+            <div class="nav-tab" data-target="suppliers"><i class="fas fa-truck"></i> Fournisseurs</div>
             <div class="nav-tab" data-target="settings"><i class="fas fa-cog"></i> Paramètres</div>
         </nav>
 
@@ -746,6 +747,79 @@
                         <button id="edit-transaction" class="btn btn-warning">Modifier</button>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- ─── FOURNISSEURS ───────────────────────────── -->
+        <section id="suppliers" class="content">
+            <h2 class="section-title"><i class="fas fa-truck"></i> Gestion des Fournisseurs</h2>
+
+            <!-- Liste fournisseurs -->
+            <div class="card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-building"></i> Fournisseurs</h3>
+                    <button class="btn btn-success btn-sm" onclick="toggleSupplierForm()">
+                        <i class="fas fa-plus"></i> Nouveau fournisseur
+                    </button>
+                </div>
+                <div id="supplier-add-form" style="display:none;" class="add-form-grid" style="margin-top:12px;">
+                    <div><label class="form-label">Nom *</label><input type="text" id="sup-name" class="form-control" placeholder="Nom du fournisseur"></div>
+                    <div><label class="form-label">Téléphone</label><input type="text" id="sup-phone" class="form-control" placeholder="Téléphone"></div>
+                    <div><label class="form-label">Email</label><input type="email" id="sup-email" class="form-control" placeholder="Email"></div>
+                    <div><label class="form-label">Adresse</label><input type="text" id="sup-address" class="form-control" placeholder="Adresse"></div>
+                    <div><label class="form-label">Note</label><input type="text" id="sup-note" class="form-control" placeholder="Note"></div>
+                    <div style="display:flex;align-items:flex-end;gap:8px;">
+                        <button class="btn btn-success" onclick="saveNewSupplier()"><i class="fas fa-save"></i> Enregistrer</button>
+                        <button class="btn btn-secondary" onclick="toggleSupplierForm()">Annuler</button>
+                    </div>
+                </div>
+                <div id="suppliers-list" class="mt-3"></div>
+            </div>
+
+            <!-- Achats / Dettes -->
+            <div class="card" id="supplier-detail-card" style="display:none;">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-shopping-cart"></i> Achats — <span id="selected-supplier-name"></span></h3>
+                    <button class="btn btn-secondary btn-sm" onclick="closeSupplierDetail()">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </button>
+                </div>
+
+                <!-- Résumé dette -->
+                <div id="supplier-debt-summary" class="mb-3"></div>
+
+                <!-- Nouvel achat -->
+                <div class="card" style="background:#f8f9fa;margin-bottom:16px;">
+                    <h4><i class="fas fa-plus-circle" style="color:var(--success);"></i> Enregistrer un achat</h4>
+                    <div class="add-form-grid" style="margin-top:12px;">
+                        <div style="grid-column:1/-1"><label class="form-label">Description *</label>
+                            <input type="text" id="pur-desc" class="form-control" placeholder="Ex: Amoxicilline 500mg x 200, Seringues..."></div>
+                        <div><label class="form-label">Montant total (HTG) *</label>
+                            <input type="number" id="pur-total" class="form-control" placeholder="0.00" min="0" oninput="updatePurchaseBalance()"></div>
+                        <div><label class="form-label">Montant payé maintenant (HTG)</label>
+                            <input type="number" id="pur-paid" class="form-control" placeholder="0.00" min="0" oninput="updatePurchaseBalance()"></div>
+                        <div>
+                            <label class="form-label">Type de paiement</label>
+                            <select id="pur-type" class="form-control">
+                                <option value="cash">Cash (paiement total)</option>
+                                <option value="credit">À crédit (rien payé)</option>
+                                <option value="partial">Paiement partiel</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">Note</label>
+                            <input type="text" id="pur-note" class="form-control" placeholder="Note optionnelle"></div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-success" style="width:100%;" onclick="savePurchase()">
+                                <i class="fas fa-save"></i> Enregistrer l'achat
+                            </button>
+                        </div>
+                    </div>
+                    <div id="purchase-balance-preview" class="mt-2"></div>
+                </div>
+
+                <!-- Liste des achats -->
+                <h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Historique des achats</h4>
+                <div id="supplier-purchases-list"></div>
             </div>
         </section>
 
