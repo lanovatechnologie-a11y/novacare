@@ -2192,8 +2192,8 @@ async function renderAccountsDashboard(stats) {
     var [txAll, txToday, petiteCaisse, withdrawals] = await Promise.all([
         API.getTransactions({ status: 'paid' }).catch(function() { return []; }),
         API.getTransactions({ status: 'paid', date: today }).catch(function() { return []; }),
-        API.getPetiteCaisse().catch(function() { return []; }),
-        API.getCashWithdrawals().catch(function() { return []; }),
+        API.getPetiteCaisse ? API.getPetiteCaisse().catch(function() { return []; }) : Promise.resolve([]),
+        API.getCashWithdrawals ? API.getCashWithdrawals().catch(function() { return []; }) : Promise.resolve([]),
     ]);
 
     // Calcul par méthode de paiement (all time)
@@ -2605,10 +2605,10 @@ async function updateAdminStats() {
             }).join('') : '<p class="text-muted">Aucune donnée</p>') +
             '</div>';
 
-        // Section comptes multiples
-        await renderAccountsDashboard(stats);
-        // Section gestion de caisse (retraits/commissions)
-        await renderCashManagement(stats);
+        // Section comptes multiples (try séparé pour ne pas bloquer les stats)
+        try { await renderAccountsDashboard(stats); } catch(eAcc) { console.warn('Comptes:', eAcc.message); }
+        // Section gestion de caisse
+        try { await renderCashManagement(stats); } catch(eCash) { console.warn('Caisse:', eCash.message); }
 
         // Mettre à jour les anciens éléments si présents
         const revEl = document.getElementById('admin-total-revenue');
