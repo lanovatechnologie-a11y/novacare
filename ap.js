@@ -1,5 +1,4 @@
 // cashAccountsManager.js — Gestion des comptes de caisse dans l'administration
-// Ajoute un onglet "Caisses" avec les 6 comptes, leurs soldes et l'historique des mouvements.
 (function() {
     if (window.cashAccountsManagerReady) return;
     window.cashAccountsManagerReady = true;
@@ -199,7 +198,7 @@
             });
         }
 
-        // Dettes fournisseurs (uniquement si > 0)
+        // Dettes fournisseurs
         for (const sup of suppliers) {
             const debt = parseFloat(sup.total_debt || 0);
             if (debt > 0) {
@@ -237,7 +236,6 @@
         document.getElementById('cash-sub-dette').textContent = formatNumber(balances.dette) + ' HTG dû';
         document.getElementById('cash-sub-bancaire').textContent = formatNumber(balances.bancaire) + ' HTG';
 
-        // Mettre à jour le solde dans le modal
         document.getElementById('cash-modal-grande-balance').textContent = formatNumber(balances.grande) + ' HTG';
     }
 
@@ -388,7 +386,6 @@
             closeTransferModal();
             await refreshData();
 
-            // Notification interne (optionnelle)
             try {
                 await apiCall('POST', '/messages', {
                     recipient: 'admin',
@@ -408,19 +405,19 @@
     // ─── Création de l'UI ───────────────────────────────────────────
 
     function createUI() {
-        // Vérifier si l'écran existe déjà
         if (document.getElementById('cash-accounts-screen')) return;
 
-        const main = document.querySelector('.content-area');
+        // Utilisation de .container (modifié)
+        const main = document.querySelector('.container');
         if (!main) {
-            console.error('Élément .content-area introuvable');
+            console.error('Élément .container introuvable');
             return;
         }
 
-        // Écran des comptes de caisse
         const screen = document.createElement('section');
         screen.id = 'cash-accounts-screen';
-        screen.className = 'screen';
+        screen.className = 'content active'; // pour qu'il soit masqué par défaut
+        screen.style.display = 'none'; // on le cache jusqu'au clic sur l'onglet
         screen.innerHTML = `
             <div style="padding: 20px;">
                 <h2 class="section-title"><i class="fas fa-cash-register"></i> Gestion des Caisses</h2>
@@ -568,7 +565,6 @@
         `;
         document.body.appendChild(modal);
 
-        // Ajouter les styles manquants
         if (!document.getElementById('cash-styles')) {
             const style = document.createElement('style');
             style.id = 'cash-styles';
@@ -582,22 +578,18 @@
             document.head.appendChild(style);
         }
 
-        // Événements sur les filtres
         document.getElementById('cash-filter-account').addEventListener('change', applyFilters);
         document.getElementById('cash-filter-date-from').addEventListener('change', applyFilters);
         document.getElementById('cash-filter-date-to').addEventListener('change', applyFilters);
 
-        // Fermeture du modal en cliquant à l'extérieur
         document.getElementById('cash-transfer-modal').addEventListener('click', function(e) {
             if (e.target === this) closeTransferModal();
         });
 
-        // Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') closeTransferModal();
         });
 
-        // Exposer les fonctions globalement pour les boutons onclick
         window.refreshCashData = refreshData;
         window.filterByAccount = filterByAccount;
         window.applyFilters = applyFilters;
@@ -610,23 +602,27 @@
     // ─── Ajout de l'onglet "Caisses" dans la navigation ────────────
 
     function addTab() {
-        const nav = document.querySelector('.nav-bar');
+        // Utilisation de .nav-tabs (modifié)
+        const nav = document.querySelector('.nav-tabs');
         if (!nav) {
-            console.error('Navigation introuvable');
+            console.error('Navigation .nav-tabs introuvable');
             return;
         }
-        if (document.querySelector('.nav-item[data-tab="cash-accounts"]')) return;
+        if (document.querySelector('.nav-tab[data-target="cash-accounts"]')) return;
 
-        const tab = document.createElement('a');
-        tab.href = '#';
-        tab.className = 'nav-item';
-        tab.setAttribute('data-tab', 'cash-accounts');
-        tab.innerHTML = '<i class="fas fa-cash-register"></i><span>Caisses</span>';
+        const tab = document.createElement('div');
+        tab.className = 'nav-tab';
+        tab.setAttribute('data-target', 'cash-accounts');
+        tab.innerHTML = '<i class="fas fa-cash-register"></i> Caisses';
         tab.addEventListener('click', function(e) {
             e.preventDefault();
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            document.getElementById('cash-accounts-screen').classList.add('active');
+            document.querySelectorAll('.content').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(i => i.classList.remove('active'));
+            const screen = document.getElementById('cash-accounts-screen');
+            if (screen) {
+                screen.classList.add('active');
+                screen.style.display = 'block';
+            }
             this.classList.add('active');
             refreshData();
         });
@@ -638,10 +634,6 @@
     function init() {
         createUI();
         addTab();
-        // Ne pas charger les données automatiquement, l'utilisateur clique sur l'onglet pour charger
-        // Mais on peut précharger si déjà actif ?
-        // On attend le clic pour refreshData.
-        // On peut aussi définir un intervalle si besoin.
         console.log('📊 Gestion des Caisses chargée');
     }
 
