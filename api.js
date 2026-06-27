@@ -152,6 +152,19 @@ const API = (() => {
         },
         addSupplierPayment: (data) => request('POST', '/supplier-payments', data),
 
+        // ── Gestion de caisse (retraits / commissions) ────────
+        getCashWithdrawals: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/cash-withdrawals' + (qs ? '?' + qs : ''));
+        },
+        addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
+        deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
+
+        // ── Petite caisse ──────────────────────────────────────
+        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
+        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
+        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
+
         // ── Stats admin ───────────────────────────────────────
         getStats: (params = {}) => {
             const qs = new URLSearchParams(params).toString();
