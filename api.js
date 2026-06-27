@@ -60,10 +60,8 @@ const API = (() => {
         saveLabResult:     (id, result)  => request('PUT',  `/transactions/${id}/lab-result`, { result }),
         updateTransactionConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),
         deliverMedication: (id)          => request('PUT',  `/transactions/${id}/deliver`, {}),
-
-        // ── Transactions (Admin) ──────────────────────────────
-        updateTransaction: (id, data) => request('PUT',    `/transactions/${id}`, data),
-        deleteTransaction: (id)       => request('DELETE', `/transactions/${id}`),
+        updateTransaction: (id, data)    => request('PUT',    `/transactions/${id}`, data),
+        deleteTransaction: (id)          => request('DELETE', `/transactions/${id}`),
 
         // ── Signes vitaux ─────────────────────────────────────
         getVitals:    (patientId) => request('GET',  `/vitals/${patientId}`),
@@ -132,6 +130,27 @@ const API = (() => {
         },
         addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
         deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
+
+        // ── Fournisseurs ──────────────────────────────────────
+        getSuppliers:    ()          => request('GET',    '/suppliers'),
+        addSupplier:     (data)      => request('POST',   '/suppliers', data),
+        updateSupplier:  (id, data)  => request('PUT',    `/suppliers/${id}`, data),
+        deleteSupplier:  (id)        => request('DELETE', `/suppliers/${id}`),
+
+        // ── Achats fournisseurs ───────────────────────────────
+        getSupplierPurchases: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/supplier-purchases' + (qs ? '?' + qs : ''));
+        },
+        addSupplierPurchase:    (data) => request('POST',   '/supplier-purchases', data),
+        deleteSupplierPurchase: (id)   => request('DELETE', `/supplier-purchases/${id}`),
+
+        // ── Paiements partiels fournisseurs ───────────────────
+        getSupplierPayments: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/supplier-payments' + (qs ? '?' + qs : ''));
+        },
+        addSupplierPayment: (data) => request('POST', '/supplier-payments', data),
 
         // ── Stats admin ───────────────────────────────────────
         getStats: (params = {}) => {
