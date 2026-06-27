@@ -492,7 +492,10 @@ app.post('/consultations', auth, async (req, res) => {
 //  MÉDICAMENTS
 // ════════════════════════════════════════════════════════════
 app.get('/medications', auth, async (req, res) => {
-    res.json((await pool.query('SELECT * FROM medications ORDER BY name')).rows);
+    const r = await pool.query(
+        'SELECT m.*, s.name AS supplier_name FROM medications m LEFT JOIN suppliers s ON s.id=m.supplier_id ORDER BY m.name'
+    );
+    res.json(r.rows);
 });
 app.post('/medications', auth, async (req, res) => {
     try {
@@ -790,20 +793,28 @@ app.post('/supplier-purchases', auth, adminOnly, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { supplierId, description, totalAmount, amountPaid, paymentType, note } = req.body;
-        // paymentType: 'cash' | 'credit' | 'partial'
+        const { supplierId, description, totalAmount, amountPaid, paymentType, note,
+                medicationId, quantityReceived } = req.body;
         const amountDue = parseFloat(totalAmount) - parseFloat(amountPaid || 0);
         const id = 'PUR' + Date.now();
         const r = await client.query(
-            `INSERT INTO supplier_purchases(id,supplier_id,description,total_amount,amount_paid,amount_due,payment_type,note,date,created_by)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,CURRENT_DATE,$9) RETURNING *`,
-            [id, supplierId, description, totalAmount, amountPaid||0, amountDue, paymentType, note||null, req.user.username]
+            `INSERT INTO supplier_purchases(id,supplier_id,description,total_amount,amount_paid,amount_due,payment_type,note,medication_id,quantity_received,date,created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CURRENT_DATE,$11) RETURNING *`,
+            [id, supplierId, description, totalAmount, amountPaid||0, amountDue, paymentType,
+             note||null, medicationId||null, quantityReceived||null, req.user.username]
         );
-        // Mettre à jour la dette totale du fournisseur
+        // Mettre à jour la dette du fournisseur
         if (amountDue > 0) {
             await client.query(
                 'UPDATE suppliers SET total_debt=total_debt+$1 WHERE id=$2',
                 [amountDue, supplierId]
+            );
+        }
+        // Mettre à jour le stock du médicament + lier le fournisseur
+        if (medicationId && quantityReceived && parseInt(quantityReceived) > 0) {
+            await client.query(
+                'UPDATE medications SET quantity=quantity+$1, supplier_id=$2 WHERE id=$3',
+                [parseInt(quantityReceived), supplierId, medicationId]
             );
         }
         await client.query('COMMIT');
@@ -895,6 +906,35 @@ app.delete('/supplier-purchases/:id', auth, adminOnly, async (req, res) => {
         await client.query('ROLLBACK');
         res.status(500).json({ error: e.message });
     } finally { client.release(); }
+});
+
+// ════════════════════════════════════════════════════════════
+//  PETITE CAISSE — Transferts depuis grande caisse
+// ════════════════════════════════════════════════════════════
+
+app.get('/petite-caisse', auth, adminOnly, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM petite_caisse ORDER BY created_at DESC LIMIT 100');
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/petite-caisse', auth, adminOnly, async (req, res) => {
+    try {
+        const { amount, note, direction } = req.body;
+        // direction: 'in' = ajout depuis grande caisse, 'out' = dépense petite caisse
+        const id = 'PC' + Date.now();
+        const r = await pool.query(
+            'INSERT INTO petite_caisse(id,amount,note,direction,created_by) VALUES($1,$2,$3,$4,$5) RETURNING *',
+            [id, amount, note||null, direction||'in', req.user.username]
+        );
+        res.status(201).json(r.rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/petite-caisse/:id', auth, adminOnly, async (req, res) => {
+    await pool.query('DELETE FROM petite_caisse WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
 });
 
 // ════════════════════════════════════════════════════════════

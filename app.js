@@ -285,10 +285,13 @@ function setupLogin() {
             state.currentRole  = role;
             state.currentRoles = data.user.roles || [role]; // tous les rôles si compte multi
 
-            document.getElementById('current-username').textContent  = data.user.name;
-            document.getElementById('current-user-role').textContent = getRoleLabel(role) +
-                (state.currentRoles.length > 1 ? ' <span class="badge badge-warning" style="font-size:.7rem;">Multi-rôle</span>' : '');
-            document.getElementById('dashboard-role').textContent = getRoleLabel(role);
+            document.getElementById('current-username').textContent = data.user.name;
+            // Afficher tous les rôles si compte multi
+            var roleDisplay = state.currentRoles.length > 1
+                ? state.currentRoles.map(function(r) { return getRoleLabel(r); }).join(' + ')
+                : getRoleLabel(role);
+            document.getElementById('current-user-role').textContent = roleDisplay;
+            document.getElementById('dashboard-role').textContent    = roleDisplay;
 
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
@@ -468,7 +471,20 @@ function setupRoleBasedNavigation() {
             lab:       ['dashboard','laboratory','messaging'],
             pharmacy:  ['dashboard','pharmacy','messaging'],
         };
-        allowed = roleAccess[role] || ['dashboard'];
+
+        // Compte multi-rôle : union des sections de tous ses rôles
+        const roles = state.currentRoles || [role];
+        if (roles.length > 1) {
+            allowed = ['dashboard', 'messaging'];
+            roles.forEach(function(r) {
+                const sections = roleAccess[r] || [];
+                sections.forEach(function(s) {
+                    if (!allowed.includes(s)) allowed.push(s);
+                });
+            });
+        } else {
+            allowed = roleAccess[role] || ['dashboard'];
+        }
     }
 
     document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -1951,6 +1967,11 @@ async function updateMedicationStockDisplay() {
                 '<td><strong>' + m.quantity + '</strong> ' + (m.unit||'') + '</td>' +
                 '<td>' + m.price + ' HTG <span class="currency-tag usd">$' + htgToUsd(m.price) + '</span></td>' +
                 '<td>' + (location ? '<span class="badge badge-primary">' + location + '</span>' : '<span class="text-muted">-</span>') + '</td>' +
+            '<td>' + (m.supplier_id ?
+                '<span class="badge" style="background:#e8f5e9;color:#2e7d32;"><i class="fas fa-truck" style="margin-right:4px;"></i>' +
+                (function() {
+                    return m.supplier_name || m.supplier_id;
+                })() + '</span>' : '<span class="text-muted">-</span>') + '</td>' +
                 '<td>' + statusBadge + '</td>' +
             '</tr>';
         }).join('') +
@@ -2153,6 +2174,172 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ─── ADMINISTRATION ──────────────────────────────────────────
+// ─── COMPTES DE CAISSE ───────────────────────────────────────
+async function renderAccountsDashboard(stats) {
+    var section = document.getElementById('accounts-dashboard-section');
+    if (!section) {
+        section = document.createElement('div');
+        section.id = 'accounts-dashboard-section';
+        section.className = 'card mt-3';
+        var adminSection = document.getElementById('administration');
+        if (adminSection) adminSection.appendChild(section);
+    }
+
+    var today = new Date().toISOString().split('T')[0];
+    var rate  = state.exchangeRate || 130;
+
+    // Charger toutes les transactions payées + petite caisse
+    var [txAll, txToday, petiteCaisse, withdrawals] = await Promise.all([
+        API.getTransactions({ status: 'paid' }).catch(function() { return []; }),
+        API.getTransactions({ status: 'paid', date: today }).catch(function() { return []; }),
+        API.getPetiteCaisse().catch(function() { return []; }),
+        API.getCashWithdrawals().catch(function() { return []; }),
+    ]);
+
+    // Calcul par méthode de paiement (all time)
+    var methods = ['cash', 'moncash', 'natcash', 'card', 'virement'];
+    var methodLabels = { cash: 'Espèces', moncash: 'MonCash', natcash: 'NatCash', card: 'Carte', virement: 'Virement' };
+    var methodIcons  = { cash: 'fa-money-bill-wave', moncash: 'fa-mobile-alt', natcash: 'fa-wallet', card: 'fa-credit-card', virement: 'fa-exchange-alt' };
+    var methodColors = { cash: '#28a745', moncash: '#e91e63', natcash: '#ff5722', card: '#1a6bca', virement: '#9c27b0' };
+
+    var accounts = {};
+    methods.forEach(function(m) {
+        var txMethod  = txAll.filter(function(t)   { return (t.payment_method||'').toLowerCase() === m; });
+        var todayMeth = txToday.filter(function(t) { return (t.payment_method||'').toLowerCase() === m; });
+        var wdMeth    = withdrawals.filter(function(w) { return true; }); // retraits globaux
+        accounts[m] = {
+            total: txMethod.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0),
+            today: todayMeth.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0),
+            count: txMethod.length,
+        };
+    });
+
+    // Grande caisse = total tous paiements - retraits
+    var grandTotal  = txAll.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0);
+    var todayTotal  = txToday.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0);
+    var totalWd     = withdrawals.reduce(function(s,w) { return s+parseFloat(w.amount); }, 0);
+    var grandeCaisse = grandTotal - totalWd;
+
+    // Petite caisse = somme des transferts 'in' - somme des dépenses 'out'
+    var pcIn  = petiteCaisse.filter(function(p) { return p.direction === 'in'; })
+                            .reduce(function(s,p) { return s+parseFloat(p.amount); }, 0);
+    var pcOut = petiteCaisse.filter(function(p) { return p.direction === 'out'; })
+                            .reduce(function(s,p) { return s+parseFloat(p.amount); }, 0);
+    var pcSolde = pcIn - pcOut;
+
+    section.innerHTML =
+        '<h3><i class="fas fa-university" style="color:#1a6bca;"></i> Tableau des Comptes</h3>' +
+        '<p class="text-muted" style="margin-bottom:16px;font-size:.85rem;">Vue en temps réel de tous vos comptes de caisse</p>' +
+
+        // Grande caisse
+        '<div style="background:linear-gradient(135deg,#1a6bca,#0d4d9c);color:#fff;border-radius:12px;padding:20px;margin-bottom:16px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">' +
+        '<div>' +
+        '<p style="opacity:.8;font-size:.85rem;margin-bottom:4px;"><i class="fas fa-landmark"></i> GRANDE CAISSE</p>' +
+        '<h2 style="font-size:2rem;font-weight:700;margin-bottom:2px;">' + grandeCaisse.toLocaleString('fr-FR') + ' HTG</h2>' +
+        '<p style="opacity:.75;font-size:.88rem;">≈ $' + (grandeCaisse/rate).toFixed(2) + ' USD</p>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+        '<p style="opacity:.75;font-size:.82rem;">Aujourd'hui</p>' +
+        '<strong style="font-size:1.2rem;">' + todayTotal.toLocaleString('fr-FR') + ' HTG</strong>' +
+        '</div></div>' +
+        '<div style="display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;">' +
+        '<span style="opacity:.8;font-size:.82rem;"><i class="fas fa-arrow-down"></i> Encaissé: ' + grandTotal.toLocaleString('fr-FR') + ' HTG</span>' +
+        '<span style="opacity:.8;font-size:.82rem;"><i class="fas fa-arrow-up"></i> Retraits: ' + totalWd.toLocaleString('fr-FR') + ' HTG</span>' +
+        '</div></div>' +
+
+        // Comptes par méthode
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:20px;">' +
+        methods.map(function(m) {
+            var acc = accounts[m];
+            return '<div style="background:#fff;border-radius:10px;padding:16px;border:1px solid var(--border);border-left:4px solid ' + methodColors[m] + ';box-shadow:0 2px 8px rgba(0,0,0,.06);">' +
+                '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+                '<div style="width:36px;height:36px;border-radius:8px;background:' + methodColors[m] + ';display:flex;align-items:center;justify-content:center;color:#fff;">' +
+                '<i class="fas ' + methodIcons[m] + '"></i></div>' +
+                '<strong style="font-size:.9rem;">' + methodLabels[m] + '</strong></div>' +
+                '<div style="font-size:1.2rem;font-weight:700;color:' + methodColors[m] + ';">' + acc.total.toLocaleString('fr-FR') + '</div>' +
+                '<div style="font-size:.72rem;color:var(--muted);">HTG total (' + acc.count + ' tx)</div>' +
+                '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Aujourd'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
+                '</div>';
+        }).join('') +
+
+        // Petite caisse
+        '<div style="background:#fff;border-radius:10px;padding:16px;border:1px solid var(--border);border-left:4px solid #ff9800;box-shadow:0 2px 8px rgba(0,0,0,.06);">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+        '<div style="width:36px;height:36px;border-radius:8px;background:#ff9800;display:flex;align-items:center;justify-content:center;color:#fff;">' +
+        '<i class="fas fa-piggy-bank"></i></div>' +
+        '<strong style="font-size:.9rem;">Petite Caisse</strong></div>' +
+        '<div style="font-size:1.2rem;font-weight:700;color:#ff9800;">' + pcSolde.toLocaleString('fr-FR') + '</div>' +
+        '<div style="font-size:.72rem;color:var(--muted);">HTG disponible</div>' +
+        '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Reçu: ' + pcIn.toLocaleString('fr-FR') + ' | Dépensé: ' + pcOut.toLocaleString('fr-FR') + '</div>' +
+        '</div>' +
+        '</div>' +
+
+        // Gestion petite caisse
+        '<div class="card" style="background:#fff8e1;border-left-color:#ff9800;">' +
+        '<h4><i class="fas fa-piggy-bank" style="color:#ff9800;"></i> Gérer la Petite Caisse</h4>' +
+        '<div class="add-form-grid" style="margin-top:12px;">' +
+        '<div><label class="form-label">Opération</label>' +
+        '<select id="pc-direction" class="form-control">' +
+        '<option value="in">Transfert depuis grande caisse (+)</option>' +
+        '<option value="out">Dépense petite caisse (-)</option>' +
+        '</select></div>' +
+        '<div><label class="form-label">Montant (HTG) *</label>' +
+        '<input type="number" id="pc-amount" class="form-control" placeholder="0.00" min="0"></div>' +
+        '<div><label class="form-label">Note *</label>' +
+        '<input type="text" id="pc-note" class="form-control" placeholder="Ex: Achat fournitures, Transfert..."></div>' +
+        '<div style="display:flex;align-items:flex-end;">' +
+        '<button class="btn btn-warning" style="width:100%;color:#212529;" onclick="addPetiteCaisse()">' +
+        '<i class="fas fa-save"></i> Enregistrer</button></div>' +
+        '</div>' +
+        '</div>' +
+
+        // Historique petite caisse
+        (petiteCaisse.length ?
+        '<h4 style="margin:16px 0 10px;"><i class="fas fa-history"></i> Historique Petite Caisse</h4>' +
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Opération</th><th>Montant</th><th>Note</th><th>Par</th><th>Action</th></tr></thead><tbody>' +
+        petiteCaisse.slice(0,20).map(function(p) {
+            var isIn  = p.direction === 'in';
+            var amt   = parseFloat(p.amount);
+            return '<tr>' +
+                '<td>' + (p.date || new Date(p.created_at).toLocaleDateString('fr-FR')) + '</td>' +
+                '<td><span class="badge ' + (isIn ? 'badge-success' : 'badge-danger') + '">' +
+                (isIn ? '⬆ Transfert reçu' : '⬇ Dépense') + '</span></td>' +
+                '<td><strong style="color:' + (isIn?'#28a745':'#dc3545') + ';">' +
+                (isIn?'+':'-') + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
+                '<td>' + (p.note||'-') + '</td>' +
+                '<td>' + (p.created_by||'-') + '</td>' +
+                '<td><button class="btn btn-xs btn-danger" data-pid="' + p.id + '" onclick="deletePetiteCaisseFn(this.dataset.pid)">' +
+                '<i class="fas fa-trash"></i></button></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table></div>' : '');
+}
+
+async function addPetiteCaisse() {
+    var direction = document.getElementById('pc-direction').value;
+    var amount    = parseFloat(document.getElementById('pc-amount').value);
+    var note      = document.getElementById('pc-note').value.trim();
+    if (isNaN(amount) || amount <= 0) { toast('Entrer un montant valide', 'error'); return; }
+    if (!note) { toast('La note est obligatoire', 'error'); return; }
+    try {
+        await apiCall(function() { return API.addPetiteCaisse({ amount, note, direction }); });
+        var label = direction === 'in' ? '+' + amount.toLocaleString('fr-FR') + ' HTG transféré vers petite caisse' : amount.toLocaleString('fr-FR') + ' HTG dépensé depuis petite caisse';
+        toast(label, 'success');
+        document.getElementById('pc-amount').value = '';
+        document.getElementById('pc-note').value   = '';
+        updateAdminStats();
+    } catch(e) {}
+}
+
+async function deletePetiteCaisseFn(id) {
+    if (!confirm('Supprimer cette opération ?')) return;
+    try {
+        await apiCall(function() { return API.deletePetiteCaisse(id); });
+        toast('Opération supprimée', 'warning');
+        updateAdminStats();
+    } catch(e) {}
+}
+
 // ─── GESTION DE CAISSE ───────────────────────────────────────
 async function renderCashManagement(stats) {
     var section = document.getElementById('cash-management-section');
@@ -2418,6 +2605,8 @@ async function updateAdminStats() {
             }).join('') : '<p class="text-muted">Aucune donnée</p>') +
             '</div>';
 
+        // Section comptes multiples
+        await renderAccountsDashboard(stats);
         // Section gestion de caisse (retraits/commissions)
         await renderCashManagement(stats);
 
@@ -2826,11 +3015,41 @@ async function openSupplierDetail(id, name) {
     document.getElementById('selected-supplier-name').textContent   = name;
     document.getElementById('suppliers-list').closest('.card').style.display = 'none';
     // Reset form
-    ['pur-desc','pur-total','pur-paid','pur-note'].forEach(function(i) {
+    ['pur-desc','pur-total','pur-paid','pur-note','pur-qty'].forEach(function(i) {
         var el = document.getElementById(i); if (el) el.value = '';
     });
     document.getElementById('purchase-balance-preview').innerHTML = '';
+    document.getElementById('pur-stock-info').textContent = '';
+    // Charger les médicaments dans le select
+    await loadMedicationsForPurchase();
     await loadSupplierPurchases();
+}
+
+async function loadMedicationsForPurchase() {
+    var sel = document.getElementById('pur-medication');
+    if (!sel) return;
+    var meds = state.medications.length ? state.medications : await API.getMedications().catch(function(){return [];});
+    sel.innerHTML = '<option value="">Aucun / Autre article</option>' +
+        meds.map(function(m) {
+            return '<option value="' + m.id + '" data-stock="' + m.quantity + '" data-unit="' + (m.unit||'unités') + '">' +
+                m.name + ' (' + m.form + ') — Stock: ' + m.quantity + ' ' + (m.unit||'') + '</option>';
+        }).join('');
+}
+
+function onMedicationSelect() {
+    var sel = document.getElementById('pur-medication');
+    var opt = sel.options[sel.selectedIndex];
+    var info = document.getElementById('pur-stock-info');
+    if (!opt || !opt.dataset.stock) { info.textContent = ''; return; }
+    info.innerHTML = '<i class="fas fa-boxes" style="color:#1a6bca;"></i> Stock actuel: <strong>' +
+        opt.dataset.stock + ' ' + (opt.dataset.unit||'unités') + '</strong>' +
+        ' → après réception: <strong id="stock-after">?</strong>';
+    document.getElementById('pur-qty').addEventListener('input', function() {
+        var qty = parseInt(this.value) || 0;
+        var current = parseInt(opt.dataset.stock) || 0;
+        var afterEl = document.getElementById('stock-after');
+        if (afterEl) afterEl.textContent = (current + qty) + ' ' + (opt.dataset.unit||'unités');
+    });
 }
 
 function closeSupplierDetail() {
@@ -2861,30 +3080,51 @@ function updatePurchaseBalance() {
 }
 
 async function savePurchase() {
-    var desc  = document.getElementById('pur-desc').value.trim();
-    var total = parseFloat(document.getElementById('pur-total').value);
-    var paid  = parseFloat(document.getElementById('pur-paid').value) || 0;
-    var type  = document.getElementById('pur-type').value;
-    var note  = document.getElementById('pur-note').value.trim();
+    var desc   = document.getElementById('pur-desc').value.trim();
+    var total  = parseFloat(document.getElementById('pur-total').value);
+    var paid   = parseFloat(document.getElementById('pur-paid').value) || 0;
+    var type   = document.getElementById('pur-type').value;
+    var note   = document.getElementById('pur-note').value.trim();
+    var medSel = document.getElementById('pur-medication');
+    var medId  = medSel ? medSel.value : '';
+    var qty    = parseInt(document.getElementById('pur-qty').value) || 0;
+    var medName = medSel && medId ? medSel.options[medSel.selectedIndex].text.split(' (')[0] : '';
+
     if (!desc || isNaN(total) || total <= 0) { toast('Description et montant obligatoires', 'error'); return; }
     if (paid > total) { toast('Le montant payé ne peut pas dépasser le total', 'error'); return; }
+    if (medId && qty <= 0) { toast('Entrer la quantité reçue', 'error'); return; }
+
+    // Auto-compléter la description si médicament sélectionné
+    if (medId && medName && !desc.includes(medName)) {
+        var descEl = document.getElementById('pur-desc');
+        if (!descEl.value.trim()) descEl.value = medName + (qty ? ' x ' + qty : '');
+        desc = descEl.value.trim();
+    }
+
     try {
         await apiCall(function() {
             return API.addSupplierPurchase({
-                supplierId:  _currentSupplierId,
-                description: desc,
-                totalAmount: total,
-                amountPaid:  paid,
-                paymentType: type,
-                note:        note,
+                supplierId:        _currentSupplierId,
+                description:       desc,
+                totalAmount:       total,
+                amountPaid:        paid,
+                paymentType:       type,
+                note:              note,
+                medicationId:      medId || null,
+                quantityReceived:  qty   || null,
             });
         });
         var due = total - paid;
-        toast('Achat enregistré — ' + (due > 0 ? 'Dette: ' + due.toLocaleString('fr-FR') + ' HTG' : 'Payé intégralement'), 'success');
-        ['pur-desc','pur-total','pur-paid','pur-note'].forEach(function(i) {
+        var stockMsg = medId && qty ? ' | Stock +' + qty + ' unités' : '';
+        toast('Achat enregistré — ' + (due > 0 ? 'Dette: ' + due.toLocaleString('fr-FR') + ' HTG' : 'Payé intégralement') + stockMsg, 'success');
+        ['pur-desc','pur-total','pur-paid','pur-note','pur-qty'].forEach(function(i) {
             var el = document.getElementById(i); if (el) el.value = '';
         });
+        if (medSel) medSel.value = '';
         document.getElementById('purchase-balance-preview').innerHTML = '';
+        document.getElementById('pur-stock-info').textContent = '';
+        // Rafraîchir les médicaments en mémoire
+        state.medications = await API.getMedications().catch(function(){return state.medications;});
         await loadSupplierPurchases();
         updateDebtSummary();
     } catch(e) {}
@@ -2932,6 +3172,15 @@ async function loadSupplierPurchases() {
                 '</div>' +
                 '<span class="badge" style="background:' + statusColor + ';color:#fff;font-size:.8rem;">' + statusLabel + '</span>' +
                 '</div>' +
+                (p.medication_id ?
+                '<div class="alert alert-info mt-2" style="padding:8px 12px;font-size:.82rem;">' +
+                '<i class="fas fa-pills"></i> Médicament: <strong>' +
+                (function() {
+                    var med = state.medications.find(function(m) { return m.id === p.medication_id; });
+                    return med ? med.name : p.medication_id;
+                })() +
+                (p.quantity_received ? ' — Qté reçue: <strong>+' + p.quantity_received + '</strong>' : '') +
+                '</div>' : '') +
                 '<div class="d-flex gap-15 flex-wrap mt-2">' +
                 '<span>Total: <strong>' + total.toLocaleString('fr-FR') + ' HTG</strong></span>' +
                 '<span>Payé: <strong style="color:#28a745;">' + paid.toLocaleString('fr-FR') + ' HTG</strong></span>' +
