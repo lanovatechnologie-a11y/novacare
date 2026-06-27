@@ -2240,7 +2240,7 @@ async function renderAccountsDashboard(stats) {
         '<p style="opacity:.75;font-size:.88rem;">≈ $' + (grandeCaisse/rate).toFixed(2) + ' USD</p>' +
         '</div>' +
         '<div style="text-align:right;">' +
-        '<p style="opacity:.75;font-size:.82rem;">Aujourd'hui</p>' +
+        '<p style="opacity:.75;font-size:.82rem;">Aujourd\'hui</p>' +
         '<strong style="font-size:1.2rem;">' + todayTotal.toLocaleString('fr-FR') + ' HTG</strong>' +
         '</div></div>' +
         '<div style="display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;">' +
@@ -2259,7 +2259,7 @@ async function renderAccountsDashboard(stats) {
                 '<strong style="font-size:.9rem;">' + methodLabels[m] + '</strong></div>' +
                 '<div style="font-size:1.2rem;font-weight:700;color:' + methodColors[m] + ';">' + acc.total.toLocaleString('fr-FR') + '</div>' +
                 '<div style="font-size:.72rem;color:var(--muted);">HTG total (' + acc.count + ' tx)</div>' +
-                '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Aujourd'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
+                '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Aujourd\'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
                 '</div>';
         }).join('') +
 
@@ -3571,7 +3571,7 @@ async function deleteMedicationSettings(id) {
 }
 // ─── MODIFIER UTILISATEUR ────────────────────────────────────
 function openEditUserModal(userId) {
-    // Chercher l'utilisateur dans le DOM (on recharge depuis l'API)
+    // Chercher l\'utilisateur dans le DOM (on recharge depuis l'API)
     API.getUsers().then(function(users) {
         var u = users.find(function(x) { return String(x.id) === String(userId); });
         if (!u) { toast('Utilisateur introuvable', 'error'); return; }
