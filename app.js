@@ -965,7 +965,7 @@ async function updateRoleDashboard() {
                         <div class="stat-info"><h3>${unread.count}</h3><p>Messages non lus</p></div>
                     </div>
                 </div>
-                <div class="alert alert-info mt-3"><i class="fas fa-info-circle"></i> Utilisez l'onglet <strong>Infirmier</strong> pour saisir les signes vitaux.</div>`;
+                <div class="alert alert-info mt-3"><i class="fas fa-info-circle"></i> Utilisez l\'onglet <strong>Infirmier</strong> pour saisir les signes vitaux.</div>`;
         } else if (role === 'doctor') {
             const apps = await apiCall(() => API.getAppointments({ doctor: state.currentUser.username, fromDate: today }));
             const unread = await API.getUnreadCount().catch(() => ({ count: 0 }));
@@ -1101,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('consultation-modification-secretary')?.classList.add('hidden');
     });
 
-    // Formulaire d'enregistrement patient
+    // Formulaire d\'enregistrement patient
     document.getElementById('patient-registration-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const fullName           = document.getElementById('patient-fullname').value;
@@ -1890,7 +1890,7 @@ function enterLabResult(txId) {
         <h4><i class="fas fa-flask" style="color:var(--warning);"></i> Saisir résultat</h4>
         <div class="form-group mt-3">
             <label class="form-label">Résultat (texte)</label>
-            <textarea id="lab-result-text" class="form-control" rows="5" placeholder="Résultat de l'analyse..."></textarea>
+            <textarea id="lab-result-text" class="form-control" rows="5" placeholder="Résultat de l\'analyse..."></textarea>
         </div>
         <div class="form-group">
             <label class="form-label">Ou image</label>
@@ -3232,6 +3232,134 @@ async function deleteSupplierPurchaseFn(id) {
     } catch(e) {}
 }
 
+// ─── COMPTES PATIENTS (Paramètres) ───────────────────────────
+var _pacCurrentPatient = null;
+
+function togglePacPwd() {
+    var i = document.getElementById('pac-pwd');
+    var e = document.getElementById('pac-eye');
+    if (!i) return;
+    if (i.type === 'password') { i.type = 'text'; e.className = 'fas fa-eye-slash'; }
+    else { i.type = 'password'; e.className = 'fas fa-eye'; }
+}
+
+async function searchPatientForAccount() {
+    var search = document.getElementById('pac-search').value.trim();
+    if (!search) { toast('Entrer un ID ou nom de patient', 'error'); return; }
+    try {
+        var patients = await apiCall(function() { return API.getPatients({ search: search }); });
+        if (!patients.length) { toast('Patient non trouvé', 'error'); return; }
+        var p = patients[0];
+        _pacCurrentPatient = p;
+        document.getElementById('pac-patient-info').innerHTML =
+            '<div class="d-flex align-center gap-15 mb-2">' +
+            '<div class="stat-icon" style="background:#17a2b8;width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;">' +
+            '<i class="fas fa-user"></i></div>' +
+            '<div>' +
+            '<strong style="font-size:1rem;">' + p.full_name + '</strong>' +
+            '<br><span class="badge badge-primary">' + p.id + '</span>' +
+            ' <span class="text-muted" style="font-size:.82rem;">Tél: ' + (p.phone||'-') + '</span>' +
+            '</div></div>' +
+            '<div class="alert alert-info" style="font-size:.82rem;margin-bottom:0;">' +
+            '<i class="fas fa-info-circle"></i> Le patient se connectera avec l\'ID <strong>' + p.id + '</strong> et ce mot de passe sur <strong>/patient.html</strong>' +
+            '</div>';
+        document.getElementById('pac-result').style.display = 'block';
+        document.getElementById('pac-pwd').value  = '';
+        document.getElementById('pac-pwd2').value = '';
+        document.getElementById('pac-pwd').focus();
+    } catch(e) {}
+}
+
+async function createPatientAccountFromSettings() {
+    if (!_pacCurrentPatient) { toast('Chercher un patient d\'abord', 'error'); return; }
+    var pwd  = document.getElementById('pac-pwd').value;
+    var pwd2 = document.getElementById('pac-pwd2').value;
+    if (!pwd || pwd.length < 4) { toast('Mot de passe trop court (min 4 caractères)', 'error'); return; }
+    if (pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+    try {
+        await apiCall(function() { return API.createPatientAccount(_pacCurrentPatient.id, pwd); });
+        toast('Compte créé pour ' + _pacCurrentPatient.full_name + ' ! ID: ' + _pacCurrentPatient.id, 'success');
+        document.getElementById('pac-pwd').value  = '';
+        document.getElementById('pac-pwd2').value = '';
+        // Rafraîchir la liste si visible
+        if (document.getElementById('pac-all-patients-list').children.length > 1) {
+            loadAllPatientsAccounts();
+        }
+    } catch(e) {}
+}
+
+async function revokePatientAccountFromSettings() {
+    if (!_pacCurrentPatient) return;
+    if (!confirm('Révoquer l\'accès de ' + _pacCurrentPatient.full_name + ' ?')) return;
+    try {
+        await apiCall(function() { return API.deletePatientAccount(_pacCurrentPatient.id); });
+        toast('Accès révoqué pour ' + _pacCurrentPatient.full_name, 'warning');
+        document.getElementById('pac-result').style.display = 'none';
+        _pacCurrentPatient = null;
+        document.getElementById('pac-search').value = '';
+        if (document.getElementById('pac-all-patients-list').children.length > 1) {
+            loadAllPatientsAccounts();
+        }
+    } catch(e) {}
+}
+
+async function loadAllPatientsAccounts() {
+    var container = document.getElementById('pac-all-patients-list');
+    container.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
+    try {
+        var patients = await API.getPatients({}).catch(function() { return []; });
+        var accounts = await API.getUsers().catch(function() { return []; }); // pour référence future
+
+        if (!patients.length) {
+            container.innerHTML = '<p class="text-muted">Aucun patient enregistré.</p>';
+            return;
+        }
+
+        container.innerHTML =
+            '<div class="table-container"><table><thead><tr>' +
+            '<th>ID</th><th>Nom</th><th>Téléphone</th><th>Type</th><th>Action</th>' +
+            '</tr></thead><tbody>' +
+            patients.map(function(p) {
+                return '<tr>' +
+                    '<td><strong>' + p.id + '</strong></td>' +
+                    '<td>' + p.full_name + '</td>' +
+                    '<td>' + (p.phone||'-') + '</td>' +
+                    '<td>' + p.type + (p.vip?' <span class="vip-tag">VIP</span>':'') + '</td>' +
+                    '<td>' +
+                    '<button class="btn btn-sm btn-info" data-pid="' + p.id + '" data-pname="' + p.full_name + '" ' +
+                    'onclick="quickSetPassword(this.dataset.pid, this.dataset.pname)">' +
+                    '<i class="fas fa-key"></i> Définir MDP</button>' +
+                    '</td></tr>';
+            }).join('') +
+            '</tbody></table></div>' +
+            '<p class="text-muted mt-2" style="font-size:.8rem;"><i class="fas fa-info-circle"></i> ' +
+            patients.length + ' patient(s) au total. Cliquez "Définir MDP" pour créer ou modifier le mot de passe.</p>';
+    } catch(e) {
+        container.innerHTML = '<div class="alert alert-danger">Erreur chargement</div>';
+    }
+}
+
+function quickSetPassword(patientId, patientName) {
+    // Remplir le formulaire de recherche avec ce patient
+    document.getElementById('pac-search').value = patientId;
+    _pacCurrentPatient = { id: patientId, full_name: patientName };
+    document.getElementById('pac-patient-info').innerHTML =
+        '<div class="d-flex align-center gap-15 mb-2">' +
+        '<div class="stat-icon" style="background:#17a2b8;width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;">' +
+        '<i class="fas fa-user"></i></div>' +
+        '<div><strong style="font-size:1rem;">' + patientName + '</strong>' +
+        '<br><span class="badge badge-primary">' + patientId + '</span></div></div>' +
+        '<div class="alert alert-info" style="font-size:.82rem;margin-bottom:0;">' +
+        '<i class="fas fa-info-circle"></i> ID de connexion: <strong>' + patientId + '</strong>' +
+        '</div>';
+    document.getElementById('pac-result').style.display = 'block';
+    document.getElementById('pac-pwd').value  = '';
+    document.getElementById('pac-pwd2').value = '';
+    // Scroll vers le formulaire
+    document.getElementById('pac-result').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('pac-pwd').focus();
+}
+
 // ─── PARAMÈTRES ──────────────────────────────────────────────
 async function updateSettingsDisplay() {
     // Types de consultation
@@ -3571,7 +3699,7 @@ async function deleteMedicationSettings(id) {
 }
 // ─── MODIFIER UTILISATEUR ────────────────────────────────────
 function openEditUserModal(userId) {
-    // Chercher l\'utilisateur dans le DOM (on recharge depuis l'API)
+    // Chercher l\'utilisateur dans le DOM (on recharge depuis l\'API)
     API.getUsers().then(function(users) {
         var u = users.find(function(x) { return String(x.id) === String(userId); });
         if (!u) { toast('Utilisateur introuvable', 'error'); return; }

@@ -987,6 +987,60 @@
                 </div>
             </div>
 
+            <!-- Comptes Patients -->
+            <div class="card" id="patient-accounts-card">
+                <h3><i class="fas fa-user-lock" style="color:#17a2b8;"></i> Comptes Espace Patient
+                    <span class="badge badge-info" style="font-size:.75rem;margin-left:8px;">Admin seulement</span>
+                </h3>
+                <p class="text-muted" style="margin-bottom:14px;font-size:.85rem;">
+                    Créez ou modifiez les mots de passe des patients pour qu'ils accèdent à leur espace sur <strong>/patient.html</strong>
+                </p>
+
+                <!-- Recherche rapide -->
+                <div class="d-flex gap-15 mb-3">
+                    <input type="text" id="pac-search" class="form-control" placeholder="Rechercher un patient par ID ou nom...">
+                    <button class="btn btn-primary" onclick="searchPatientForAccount()">
+                        <i class="fas fa-search"></i> Chercher
+                    </button>
+                </div>
+
+                <!-- Résultat recherche -->
+                <div id="pac-result" style="display:none;" class="card" style="background:#f8f9fa;margin-bottom:16px;">
+                    <div id="pac-patient-info"></div>
+                    <div class="add-form-grid" style="margin-top:12px;">
+                        <div>
+                            <label class="form-label"><i class="fas fa-key" style="color:#28a745;"></i> Nouveau mot de passe</label>
+                            <div class="pass-wrap" style="position:relative;">
+                                <input type="password" id="pac-pwd" class="form-control" placeholder="Minimum 4 caractères" style="padding-right:44px;">
+                                <button type="button" onclick="togglePacPwd()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6c757d;">
+                                    <i class="fas fa-eye" id="pac-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">Confirmer le mot de passe</label>
+                            <input type="password" id="pac-pwd2" class="form-control" placeholder="Répéter le mot de passe">
+                        </div>
+                        <div style="display:flex;align-items:flex-end;gap:8px;">
+                            <button class="btn btn-success" onclick="createPatientAccountFromSettings()">
+                                <i class="fas fa-save"></i> Créer / Mettre à jour
+                            </button>
+                            <button class="btn btn-danger" onclick="revokePatientAccountFromSettings()">
+                                <i class="fas fa-ban"></i> Révoquer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liste tous les patients avec statut compte -->
+                <h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Tous les patients</h4>
+                <div id="pac-all-patients-list">
+                    <button class="btn btn-secondary btn-sm" onclick="loadAllPatientsAccounts()">
+                        <i class="fas fa-sync"></i> Charger la liste
+                    </button>
+                </div>
+            </div>
+
             <!-- Gestion des utilisateurs -->
             <div class="card">
                 <h3><i class="fas fa-users"></i> Gestion des Utilisateurs</h3>
