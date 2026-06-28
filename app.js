@@ -1298,6 +1298,67 @@ async function printPatientCard(patientId) {
     } catch(e) {}
 }
 
+// ─── REMBOURSEMENTS ──────────────────────────────────────────
+async function loadPatientTransactionsForRefund() {
+    var search = document.getElementById('refund-patient-search').value.trim();
+    if (!search) { toast('Entrer un ID ou nom de patient', 'error'); return; }
+    var container = document.getElementById('refund-transactions-list');
+    container.innerHTML = '<div style="text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin"></i></div>';
+    try {
+        var patients = await API.getPatients({ search: search }).catch(function() { return []; });
+        if (!patients.length) { container.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>'; return; }
+        var p = patients[0];
+        var txs = await API.getTransactions({ patientId: p.id, status: 'paid' }).catch(function() { return []; });
+        var refundable = txs.filter(function(t) { return t.status === 'paid' && t.type !== 'refunded'; });
+
+        if (!refundable.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucune transaction remboursable pour <strong>' + p.full_name + '</strong>.</div>';
+            return;
+        }
+
+        container.innerHTML =
+            '<div class="alert alert-warning" style="margin-bottom:12px;">' +
+            '<i class="fas fa-user"></i> <strong>' + p.full_name + '</strong> — ' + refundable.length + ' transaction(s) remboursable(s)</div>' +
+            refundable.map(function(t) {
+                var amt = parseFloat(t.amount);
+                var typeIcon = t.type === 'medication' ? 'fa-pills' : t.type === 'lab' ? 'fa-flask' : 'fa-stethoscope';
+                return '<div class="card mb-2" style="border-left-color:#dc3545;">' +
+                    '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                    '<div>' +
+                    '<h5 style="margin-bottom:4px;"><i class="fas ' + typeIcon + '" style="color:#1a6bca;margin-right:6px;"></i>' + t.service + '</h5>' +
+                    '<small class="text-muted">Date: ' + (t.date||'-') + ' | Méthode: ' + (t.payment_method||'-') + '</small>' +
+                    '</div>' +
+                    '<div style="text-align:right;">' +
+                    '<strong style="font-size:1.1rem;color:#28a745;">' + amt.toLocaleString('fr-FR') + ' HTG</strong>' +
+                    '<br><small class="text-muted">≈ $' + htgToUsd(amt) + '</small>' +
+                    '</div></div>' +
+                    '<div class="mt-2">' +
+                    '<input type="text" id="reason-' + t.id + '" class="form-control" placeholder="Raison du remboursement (optionnel)" style="margin-bottom:8px;">' +
+                    '<div class="d-flex gap-10 flex-wrap">' +
+                    '<button class="btn btn-danger btn-sm" data-tid="' + t.id + '" onclick="processRefund(this.dataset.tid,\'refund\')">' +
+                    '<i class="fas fa-undo-alt"></i> Rembourser ' + amt.toLocaleString('fr-FR') + ' HTG</button>' +
+                    '</div></div></div>';
+            }).join('');
+    } catch(e) {
+        container.innerHTML = '<div class="alert alert-danger">Erreur: ' + e.message + '</div>';
+    }
+}
+
+async function processRefund(transactionId, refundType) {
+    var reason = document.getElementById('reason-' + transactionId)?.value.trim() || '';
+    if (!confirm('Confirmer le remboursement de cette transaction ?')) return;
+    try {
+        var result = await apiCall(function() {
+            return API.addRefund({ transactionId, reason, refundType });
+        });
+        toast('Remboursement de ' + parseFloat(result.amount).toLocaleString('fr-FR') + ' HTG effectué pour ' + result.patientName + ' !', 'success');
+        loadPatientTransactionsForRefund();
+        // Notification admin
+        await notifyAdmin('↩️ Remboursement effectué',
+            result.patientName + ' — ' + parseFloat(result.amount).toLocaleString('fr-FR') + ' HTG remboursé. Service: ' + result.service);
+    } catch(e) {}
+}
+
 // ─── RAPPORTS CAISSE ─────────────────────────────────────────
 async function loadCashierReports(period) {
     const today = new Date();
@@ -2569,6 +2630,22 @@ async function updateAdminStats() {
 
         // Mettre à jour le tableau des transactions
         updateRecentTransactionsTable(stats.recentTransactions);
+
+        // Afficher total remboursements si disponible
+        if (stats.totalRefunds > 0) {
+            var refundEl = document.getElementById('admin-refunds-info');
+            if (!refundEl) {
+                refundEl = document.createElement('div');
+                refundEl.id = 'admin-refunds-info';
+                refundEl.className = 'alert alert-warning mt-2';
+                var statsGrid = document.getElementById('admin-stats-grid');
+                if (statsGrid) statsGrid.after(refundEl);
+            }
+            refundEl.innerHTML = '<i class="fas fa-undo-alt"></i> Total remboursements: <strong>' +
+                parseFloat(stats.totalRefunds).toLocaleString('fr-FR') + ' HTG</strong> — ' +
+                'Revenus nets (après remboursements): <strong>' +
+                (parseFloat(stats.totalRevenue)).toLocaleString('fr-FR') + ' HTG</strong>';
+        }
 
         // Mettre à jour section rapports par poste
         let agentSection = document.getElementById('admin-by-agent-section');

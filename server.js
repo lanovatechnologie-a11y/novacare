@@ -701,7 +701,7 @@ app.get('/stats', auth, adminOrSub, async (req, res) => {
         if (type && type !== 'all') { txParams.push(type); txFilter += ' AND type=$' + txParams.length; }
 
         const [totalP, todayP, revenue, unpaid, lowStock, recentTx,
-               todayRev, weekRev, byType, byAgent] = await Promise.all([
+               todayRev, weekRev, byType, byAgent, refundsTotal] = await Promise.all([
             pool.query('SELECT COUNT(*) FROM patients'),
             pool.query('SELECT COUNT(*) FROM patients WHERE registration_date=$1', [today]),
             pool.query("SELECT COALESCE(SUM(amount),0) FROM transactions " + txFilter + " AND status='paid'", txParams),
@@ -712,15 +712,18 @@ app.get('/stats', auth, adminOrSub, async (req, res) => {
             pool.query("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE status='paid' AND date>=$1", [weekStart]),
             pool.query("SELECT type, COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM transactions " + txFilter + " AND status='paid' GROUP BY type", txParams),
             pool.query("SELECT payment_agent, COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM transactions " + txFilter + " AND status='paid' AND payment_agent IS NOT NULL GROUP BY payment_agent ORDER BY total DESC", txParams),
+            pool.query("SELECT COALESCE(SUM(amount),0) FROM refunds WHERE 1=1").catch(function() { return { rows: [{ coalesce: 0 }] }; }),
         ]);
 
+        const totalRefundsAmt = parseFloat(refundsTotal.rows[0].coalesce) || 0;
         res.json({
             totalPatients:      parseInt(totalP.rows[0].count),
             todayPatients:      parseInt(todayP.rows[0].count),
-            totalRevenue:       parseFloat(revenue.rows[0].coalesce),
+            totalRevenue:       parseFloat(revenue.rows[0].coalesce) - totalRefundsAmt,
             todayRevenue:       parseFloat(todayRev.rows[0].coalesce),
             weekRevenue:        parseFloat(weekRev.rows[0].coalesce),
             unpaidCount:        parseInt(unpaid.rows[0].count),
+            totalRefunds:       totalRefundsAmt,
             lowStock:           lowStock.rows,
             recentTransactions: recentTx.rows,
             byType:             byType.rows,
@@ -905,6 +908,108 @@ app.delete('/supplier-purchases/:id', auth, adminOnly, async (req, res) => {
     } catch(e) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// ════════════════════════════════════════════════════════════
+//  REMBOURSEMENTS / RETOURS
+// ════════════════════════════════════════════════════════════
+
+// Liste des remboursements
+app.get('/refunds', auth, async (req, res) => {
+    try {
+        const { patientId, fromDate, toDate } = req.query;
+        let q = 'SELECT * FROM refunds WHERE 1=1';
+        const p = [];
+        if (patientId) { p.push(patientId); q += ' AND patient_id=$' + p.length; }
+        if (fromDate)  { p.push(fromDate);  q += ' AND date>=$' + p.length; }
+        if (toDate)    { p.push(toDate);    q += ' AND date<=$' + p.length; }
+        q += ' ORDER BY created_at DESC';
+        res.json((await pool.query(q, p)).rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Enregistrer un remboursement
+app.post('/refunds', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { transactionId, reason, refundType, exchangeTransactionId } = req.body;
+        // refundType: 'refund' = remboursement, 'exchange' = échange
+
+        // Récupérer la transaction originale
+        const txRes = await client.query('SELECT * FROM transactions WHERE id=$1', [transactionId]);
+        if (!txRes.rows.length) throw new Error('Transaction introuvable');
+        const tx = txRes.rows[0];
+        if (tx.status !== 'paid') throw new Error('Seules les transactions payées peuvent être remboursées');
+
+        const id = 'REF' + Date.now();
+
+        // Enregistrer le remboursement
+        await client.query(
+            `INSERT INTO refunds(id,transaction_id,patient_id,patient_name,service,amount,refund_type,reason,date,created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,CURRENT_DATE,$9)`,
+            [id, transactionId, tx.patient_id, tx.patient_name, tx.service,
+             tx.amount, refundType||'refund', reason||null, req.user.username]
+        );
+
+        // Marquer la transaction originale comme remboursée
+        await client.query(
+            "UPDATE transactions SET status='refunded', refund_id=$1 WHERE id=$2",
+            [id, transactionId]
+        );
+
+        // Si c'est un retour médicament → remettre en stock
+        if (tx.type === 'medication' && tx.medication_id && tx.quantity) {
+            await client.query(
+                'UPDATE medications SET quantity=quantity+$1 WHERE id=$2',
+                [tx.quantity, tx.medication_id]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.status(201).json({
+            id,
+            amount: tx.amount,
+            service: tx.service,
+            patientName: tx.patient_name
+        });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// Supprimer un remboursement (annuler le remboursement)
+app.delete('/refunds/:id', auth, adminOnly, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await client.query('SELECT * FROM refunds WHERE id=$1', [req.params.id]);
+        if (!r.rows.length) throw new Error('Remboursement introuvable');
+        const refund = r.rows[0];
+
+        // Remettre la transaction en statut payé
+        await client.query(
+            "UPDATE transactions SET status='paid', refund_id=NULL WHERE id=$1",
+            [refund.transaction_id]
+        );
+
+        // Si médicament → réduire le stock à nouveau
+        const tx = await client.query('SELECT * FROM transactions WHERE id=$1', [refund.transaction_id]);
+        if (tx.rows.length && tx.rows[0].type === 'medication' && tx.rows[0].medication_id && tx.rows[0].quantity) {
+            await client.query(
+                'UPDATE medications SET quantity=GREATEST(0,quantity-$1) WHERE id=$2',
+                [tx.rows[0].quantity, tx.rows[0].medication_id]
+            );
+        }
+
+        await client.query('DELETE FROM refunds WHERE id=$1', [req.params.id]);
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: e.message });
     } finally { client.release(); }
 });
 

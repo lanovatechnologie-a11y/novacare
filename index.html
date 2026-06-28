@@ -429,6 +429,19 @@
                 <div id="cashier-report-result"></div>
             </div>
 
+            <!-- Section remboursements -->
+            <div class="card mt-3">
+                <h3><i class="fas fa-undo-alt" style="color:#dc3545;"></i> Remboursement / Retour</h3>
+                <p class="text-muted" style="font-size:.85rem;margin-bottom:12px;">Rechercher la transaction à rembourser ou échanger.</p>
+                <div class="d-flex gap-15 mb-3">
+                    <input type="text" id="refund-patient-search" class="form-control" placeholder="ID patient ou nom...">
+                    <button class="btn btn-secondary" onclick="loadPatientTransactionsForRefund()">
+                        <i class="fas fa-search"></i> Chercher
+                    </button>
+                </div>
+                <div id="refund-transactions-list"></div>
+            </div>
+
             <div id="external-medications-container" class="hidden card mt-3">
                 <h3><i class="fas fa-exclamation-triangle"></i> Médicaments à acheter ailleurs</h3>
                 <div id="external-medications-list"></div>
