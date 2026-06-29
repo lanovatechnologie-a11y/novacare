@@ -465,12 +465,12 @@ function setupRoleBasedNavigation() {
         if (perms.settings)       allowed.push('settings');
     } else {
         const roleAccess = {
-            secretary: ['dashboard','secretary','messaging'],
+            secretary: ['dashboard','secretary','messaging','hospitalization'],
             cashier:   ['dashboard','cashier','messaging'],
-            nurse:     ['dashboard','nurse','messaging'],
-            doctor:    ['dashboard','doctor','messaging'],
+            nurse:     ['dashboard','nurse','messaging','hospitalization'],
+            doctor:    ['dashboard','doctor','messaging','hospitalization'],
             lab:       ['dashboard','laboratory','messaging'],
-            pharmacy:  ['dashboard','pharmacy','messaging'],
+            pharmacy:  ['dashboard','pharmacy','messaging','hospitalization'],
         };
 
         // Compte multi-rôle : union des sections de tous ses rôles
