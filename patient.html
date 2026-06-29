@@ -2,6 +2,12 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<!-- PWA : manifest et icônes (fichiers à la racine) -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="NovaCare">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Espace Patient — NovaCare</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -814,6 +820,12 @@ window.addEventListener('DOMContentLoaded', async function() {
         }
     }
 });
+// === ENREGISTREMENT DU SERVICE WORKER ===
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js')
+    .then(() => console.log('Service Worker enregistré'))
+    .catch(err => console.warn('Erreur SW:', err));
+}
 </script>
 </body>
 </html>
