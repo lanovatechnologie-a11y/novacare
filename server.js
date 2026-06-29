@@ -912,6 +912,225 @@ app.delete('/supplier-purchases/:id', auth, adminOnly, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════
+//  HOSPITALISATION
+// ════════════════════════════════════════════════════════════
+
+// ─── Liste des hospitalisations ──────────────────────────────
+app.get('/hospitalizations', auth, async (req, res) => {
+    try {
+        const { status, patientId } = req.query;
+        let q = `SELECT h.*, p.full_name, p.phone, p.birth_date, p.type
+                 FROM hospitalizations h
+                 JOIN patients p ON p.id = h.patient_id
+                 WHERE 1=1`;
+        const params = [];
+        if (status)    { params.push(status);    q += ' AND h.status=$'    + params.length; }
+        if (patientId) { params.push(patientId); q += ' AND h.patient_id=$'+ params.length; }
+        q += ' ORDER BY h.admission_date DESC, h.created_at DESC';
+        res.json((await pool.query(q, params)).rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/hospitalizations/:id', auth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            `SELECT h.*, p.full_name, p.phone, p.birth_date
+             FROM hospitalizations h JOIN patients p ON p.id=h.patient_id
+             WHERE h.id=$1`, [req.params.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Hospitalisation introuvable' });
+        res.json(r.rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Admettre un patient ─────────────────────────────────────
+app.post('/hospitalizations', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { patientId, room, bed, reason, doctorUsername, depositAmount } = req.body;
+        const id = 'HOSP' + Date.now();
+        await client.query(
+            `INSERT INTO hospitalizations(id,patient_id,room,bed,admission_reason,doctor,status,deposit,balance,admission_date,created_by)
+             VALUES($1,$2,$3,$4,$5,$6,'active',$7,$7,CURRENT_DATE,$8)`,
+            [id, patientId, room||null, bed||null, reason||null,
+             doctorUsername||req.user.username, parseFloat(depositAmount||0), req.user.username]
+        );
+        // Enregistrer le dépôt initial comme transaction si > 0
+        if (parseFloat(depositAmount||0) > 0) {
+            const tid = 'DEP' + Date.now();
+            await client.query(
+                `INSERT INTO hosp_deposits(id,hospitalization_id,patient_id,amount,note,created_by)
+                 VALUES($1,$2,$3,$4,'Dépôt initial à l''admission',$5)`,
+                [tid, id, patientId, depositAmount, req.user.username]
+            );
+        }
+        await client.query('COMMIT');
+        res.status(201).json({ id });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// ─── Modifier hospitalisation (chambre, statut, médecin) ──────
+app.put('/hospitalizations/:id', auth, async (req, res) => {
+    try {
+        const { room, bed, status, dischargeDate, dischargeNote, doctor } = req.body;
+        const p = [], sets = [];
+        if (room !== undefined)          { p.push(room);          sets.push('room=$'+p.length); }
+        if (bed !== undefined)           { p.push(bed);           sets.push('bed=$'+p.length); }
+        if (status !== undefined)        { p.push(status);        sets.push('status=$'+p.length); }
+        if (dischargeDate !== undefined) { p.push(dischargeDate); sets.push('discharge_date=$'+p.length); }
+        if (dischargeNote !== undefined) { p.push(dischargeNote); sets.push('discharge_note=$'+p.length); }
+        if (doctor !== undefined)        { p.push(doctor);        sets.push('doctor=$'+p.length); }
+        if (!sets.length) return res.json({ success: true });
+        p.push(req.params.id);
+        await pool.query('UPDATE hospitalizations SET '+sets.join(',')+' WHERE id=$'+p.length, p);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Dépôts ───────────────────────────────────────────────────
+app.get('/hosp-deposits/:hospId', auth, async (req, res) => {
+    const r = await pool.query(
+        'SELECT * FROM hosp_deposits WHERE hospitalization_id=$1 ORDER BY created_at DESC',
+        [req.params.hospId]);
+    res.json(r.rows);
+});
+
+app.post('/hosp-deposits', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { hospitalizationId, patientId, amount, note } = req.body;
+        const id = 'DEP' + Date.now();
+        await client.query(
+            'INSERT INTO hosp_deposits(id,hospitalization_id,patient_id,amount,note,created_by) VALUES($1,$2,$3,$4,$5,$6)',
+            [id, hospitalizationId, patientId, amount, note||null, req.user.username]
+        );
+        // Augmenter le solde
+        await client.query(
+            'UPDATE hospitalizations SET deposit=deposit+$1, balance=balance+$1 WHERE id=$2',
+            [amount, hospitalizationId]
+        );
+        await client.query('COMMIT');
+        res.status(201).json({ id, success: true });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// ─── Prescriptions hospitalisation ───────────────────────────
+app.get('/hosp-prescriptions/:hospId', auth, async (req, res) => {
+    const r = await pool.query(
+        'SELECT * FROM hosp_prescriptions WHERE hospitalization_id=$1 ORDER BY created_at DESC',
+        [req.params.hospId]);
+    res.json(r.rows);
+});
+
+app.post('/hosp-prescriptions', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { hospitalizationId, patientId, medicationId, medicationName,
+                dosage, frequency, duration, route, note, pricePerUnit, quantity } = req.body;
+        const id = 'RX' + Date.now();
+        const totalPrice = parseFloat(pricePerUnit||0) * parseInt(quantity||1);
+        await client.query(
+            `INSERT INTO hosp_prescriptions(id,hospitalization_id,patient_id,medication_id,medication_name,
+             dosage,frequency,duration,route,note,price_per_unit,quantity,total_price,prescribed_by,status)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending')`,
+            [id, hospitalizationId, patientId, medicationId||null, medicationName,
+             dosage, frequency||null, duration||null, route||null, note||null,
+             pricePerUnit||0, quantity||1, totalPrice, req.user.username]
+        );
+        // Déduire du solde ou créer une dette
+        await client.query(
+            'UPDATE hospitalizations SET balance=balance-$1 WHERE id=$2',
+            [totalPrice, hospitalizationId]
+        );
+        // Réduire le stock si médicament en inventaire
+        if (medicationId && quantity) {
+            await client.query(
+                'UPDATE medications SET quantity=GREATEST(0,quantity-$1) WHERE id=$2',
+                [quantity, medicationId]
+            );
+        }
+        await client.query('COMMIT');
+        res.status(201).json({ id, totalPrice });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+app.put('/hosp-prescriptions/:id', auth, async (req, res) => {
+    const { status, administeredAt, administeredBy, nurseNote } = req.body;
+    await pool.query(
+        'UPDATE hosp_prescriptions SET status=$1, administered_at=$2, administered_by=$3, nurse_note=$4 WHERE id=$5',
+        [status, administeredAt||null, administeredBy||null, nurseNote||null, req.params.id]
+    );
+    res.json({ success: true });
+});
+
+// ─── Suivi infirmier ──────────────────────────────────────────
+app.get('/hosp-nursing/:hospId', auth, async (req, res) => {
+    const r = await pool.query(
+        'SELECT * FROM hosp_nursing_notes WHERE hospitalization_id=$1 ORDER BY created_at DESC',
+        [req.params.hospId]);
+    res.json(r.rows);
+});
+
+app.post('/hosp-nursing', auth, async (req, res) => {
+    try {
+        const { hospitalizationId, patientId, temperature, bloodPressure,
+                pulse, oxygenSat, weight, generalState, notes } = req.body;
+        const id = 'NUR' + Date.now();
+        const r = await pool.query(
+            `INSERT INTO hosp_nursing_notes(id,hospitalization_id,patient_id,temperature,blood_pressure,
+             pulse,oxygen_sat,weight,general_state,notes,recorded_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+            [id, hospitalizationId, patientId, temperature||null, bloodPressure||null,
+             pulse||null, oxygenSat||null, weight||null, generalState||null,
+             notes||null, req.user.username]
+        );
+        res.status(201).json(r.rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Services hospitalisation (radios, analyses spéciales) ───
+app.post('/hosp-services', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { hospitalizationId, patientId, service, amount, note } = req.body;
+        const id = 'HSVC' + Date.now();
+        await client.query(
+            `INSERT INTO hosp_services(id,hospitalization_id,patient_id,service,amount,note,created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7)`,
+            [id, hospitalizationId, patientId, service, amount, note||null, req.user.username]
+        );
+        await client.query(
+            'UPDATE hospitalizations SET balance=balance-$1 WHERE id=$2',
+            [amount, hospitalizationId]
+        );
+        await client.query('COMMIT');
+        res.status(201).json({ id });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+app.get('/hosp-services/:hospId', auth, async (req, res) => {
+    const r = await pool.query(
+        'SELECT * FROM hosp_services WHERE hospitalization_id=$1 ORDER BY created_at DESC',
+        [req.params.hospId]);
+    res.json(r.rows);
+});
+
+// ════════════════════════════════════════════════════════════
 //  REMBOURSEMENTS / RETOURS
 // ════════════════════════════════════════════════════════════
 

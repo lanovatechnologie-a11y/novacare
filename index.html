@@ -112,6 +112,7 @@
                 <span id="message-badge" class="notification-badge hidden">0</span>
             </div>
             <div class="nav-tab" data-target="administration"><i class="fas fa-chart-bar"></i> Administration</div>
+            <div class="nav-tab" data-target="hospitalization"><i class="fas fa-bed"></i> Hospitalisation</div>
             <div class="nav-tab" data-target="suppliers"><i class="fas fa-truck"></i> Fournisseurs</div>
             <div class="nav-tab" data-target="settings"><i class="fas fa-cog"></i> Paramètres</div>
         </nav>
@@ -758,6 +759,208 @@
                     <div class="mt-3 d-flex gap-10">
                         <button id="close-transaction-details" class="btn btn-secondary">Fermer</button>
                         <button id="edit-transaction" class="btn btn-warning">Modifier</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── HOSPITALISATION ─────────────────────── -->
+        <section id="hospitalization" class="content">
+            <h2 class="section-title"><i class="fas fa-bed"></i> Hospitalisation</h2>
+
+            <!-- Admettre un patient -->
+            <div class="card" id="admit-patient-card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-plus-circle" style="color:#28a745;"></i> Admettre un patient</h3>
+                    <button class="btn btn-success btn-sm" onclick="toggleAdmitForm()"><i class="fas fa-plus"></i> Nouvelle admission</button>
+                </div>
+                <div id="admit-form" style="display:none;">
+                    <div class="add-form-grid" style="margin-top:12px;">
+                        <div style="grid-column:1/-1">
+                            <label class="form-label">Rechercher le patient *</label>
+                            <div class="d-flex gap-10">
+                                <input type="text" id="hosp-patient-search" class="form-control" placeholder="ID ou nom du patient">
+                                <button class="btn btn-primary" onclick="searchPatientForHosp()"><i class="fas fa-search"></i></button>
+                            </div>
+                            <div id="hosp-patient-found" style="display:none;" class="mt-2"></div>
+                        </div>
+                        <div><label class="form-label">Chambre</label><input type="text" id="hosp-room" class="form-control" placeholder="Ex: Chambre 3"></div>
+                        <div><label class="form-label">Lit</label><input type="text" id="hosp-bed" class="form-control" placeholder="Ex: Lit A"></div>
+                        <div style="grid-column:1/-1"><label class="form-label">Motif d'admission *</label>
+                            <textarea id="hosp-reason" class="form-control" rows="2" placeholder="Raison de l'hospitalisation..."></textarea></div>
+                        <div><label class="form-label">Médecin responsable</label>
+                            <select id="hosp-doctor" class="form-control"></select></div>
+                        <div><label class="form-label"><i class="fas fa-money-bill-wave" style="color:#28a745;"></i> Dépôt initial (HTG)</label>
+                            <input type="number" id="hosp-deposit" class="form-control" placeholder="0.00" min="0"></div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-success" style="width:100%;" onclick="admitPatient()">
+                                <i class="fas fa-bed"></i> Admettre</button></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liste des patients hospitalisés -->
+            <div class="card mt-3">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
+                    <div class="d-flex gap-10">
+                        <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')">Actifs</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
+                    </div>
+                </div>
+                <div id="hospitalizations-list" class="mt-2"></div>
+            </div>
+
+            <!-- Détail d'une hospitalisation -->
+            <div id="hosp-detail-section" style="display:none;" class="mt-3">
+                <div class="card">
+                    <div class="settings-section-header">
+                        <h3 id="hosp-detail-title"><i class="fas fa-user-injured"></i> Dossier patient</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="closeHospDetail()"><i class="fas fa-arrow-left"></i> Retour</button>
+                    </div>
+
+                    <!-- Résumé financier -->
+                    <div id="hosp-financial-summary" class="mb-3"></div>
+
+                    <!-- Tabs internes -->
+                    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;overflow-x:auto;">
+                        <button class="hosp-tab-btn active" onclick="showHospTab('nursing')" data-tab="nursing" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;"><i class="fas fa-user-nurse"></i> Suivi infirmier</button>
+                        <button class="hosp-tab-btn" onclick="showHospTab('prescriptions')" data-tab="prescriptions" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-prescription"></i> Prescriptions</button>
+                        <button class="hosp-tab-btn" onclick="showHospTab('deposits')" data-tab="deposits" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-money-bill-wave"></i> Dépôts</button>
+                        <button class="hosp-tab-btn" onclick="showHospTab('services')" data-tab="services" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-clipboard-list"></i> Services</button>
+                    </div>
+
+                    <!-- Suivi infirmier -->
+                    <div id="hosp-tab-nursing" class="hosp-tab-content">
+                        <div class="card" style="background:#f0fff4;">
+                            <h4><i class="fas fa-heartbeat" style="color:#dc3545;"></i> Enregistrer un suivi</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Température (°C)</label><input type="number" id="nur-temp" class="form-control" placeholder="37.0" step="0.1"></div>
+                                <div><label class="form-label">Tension artérielle</label><input type="text" id="nur-bp" class="form-control" placeholder="120/80"></div>
+                                <div><label class="form-label">Pouls (bpm)</label><input type="number" id="nur-pulse" class="form-control" placeholder="72"></div>
+                                <div><label class="form-label">Saturation O2 (%)</label><input type="number" id="nur-o2" class="form-control" placeholder="98"></div>
+                                <div><label class="form-label">Poids (kg)</label><input type="number" id="nur-weight" class="form-control" placeholder="70" step="0.1"></div>
+                                <div><label class="form-label">État général</label>
+                                    <select id="nur-state" class="form-control">
+                                        <option value="">Sélectionner...</option>
+                                        <option value="Bon">Bon</option>
+                                        <option value="Stable">Stable</option>
+                                        <option value="Moyen">Moyen</option>
+                                        <option value="Critique">Critique</option>
+                                        <option value="Amélioré">Amélioré</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column:1/-1"><label class="form-label">Notes infirmières</label>
+                                    <textarea id="nur-notes" class="form-control" rows="2" placeholder="Observations, soins effectués..."></textarea></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-success" style="width:100%;" onclick="saveNursingNote()">
+                                        <i class="fas fa-save"></i> Enregistrer</button></div>
+                            </div>
+                        </div>
+                        <div id="nursing-notes-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Prescriptions -->
+                    <div id="hosp-tab-prescriptions" class="hosp-tab-content" style="display:none;">
+                        <div class="card" style="background:#f0f4ff;">
+                            <h4><i class="fas fa-prescription" style="color:#6f42c1;"></i> Nouvelle prescription</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Médicament *</label>
+                                    <select id="rx-medication" class="form-control" onchange="onRxMedSelect()">
+                                        <option value="">Sélectionner...</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Ou saisir le nom</label>
+                                    <input type="text" id="rx-med-name" class="form-control" placeholder="Médicament hors stock"></div>
+                                <div><label class="form-label">Dosage *</label>
+                                    <input type="text" id="rx-dosage" class="form-control" placeholder="Ex: 500mg, 2 comprimés"></div>
+                                <div><label class="form-label">Fréquence *</label>
+                                    <select id="rx-frequency" class="form-control">
+                                        <option value="1x/jour">1x par jour</option>
+                                        <option value="2x/jour">2x par jour</option>
+                                        <option value="3x/jour">3x par jour</option>
+                                        <option value="4x/jour">4x par jour</option>
+                                        <option value="Toutes les 4h">Toutes les 4h</option>
+                                        <option value="Toutes les 6h">Toutes les 6h</option>
+                                        <option value="Toutes les 8h">Toutes les 8h</option>
+                                        <option value="Toutes les 12h">Toutes les 12h</option>
+                                        <option value="Au besoin">Au besoin</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Durée</label>
+                                    <input type="text" id="rx-duration" class="form-control" placeholder="Ex: 5 jours, 1 semaine"></div>
+                                <div><label class="form-label">Voie d'administration</label>
+                                    <select id="rx-route" class="form-control">
+                                        <option value="Orale">Orale</option>
+                                        <option value="Injectable IV">Injectable IV</option>
+                                        <option value="Injectable IM">Injectable IM</option>
+                                        <option value="Sous-cutanée">Sous-cutanée</option>
+                                        <option value="Topique">Topique</option>
+                                        <option value="Rectale">Rectale</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Quantité à délivrer</label>
+                                    <input type="number" id="rx-qty" class="form-control" placeholder="1" min="1" value="1"></div>
+                                <div><label class="form-label">Prix/unité (HTG)</label>
+                                    <input type="number" id="rx-price" class="form-control" placeholder="0.00" min="0"></div>
+                                <div style="grid-column:1/-1"><label class="form-label">Note pour l'infirmière</label>
+                                    <textarea id="rx-note" class="form-control" rows="2" placeholder="Instructions spéciales pour l'administration..."></textarea></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-primary" style="width:100%;" onclick="savePrescription()">
+                                        <i class="fas fa-prescription"></i> Prescrire</button></div>
+                            </div>
+                            <div id="rx-cost-preview" class="mt-2"></div>
+                        </div>
+                        <div id="prescriptions-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Dépôts -->
+                    <div id="hosp-tab-deposits" class="hosp-tab-content" style="display:none;">
+                        <div class="card" style="background:#f0fff4;">
+                            <h4><i class="fas fa-money-bill-wave" style="color:#28a745;"></i> Ajouter un dépôt</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Montant (HTG) *</label>
+                                    <input type="number" id="dep-amount" class="form-control" placeholder="0.00" min="0"></div>
+                                <div><label class="form-label">Note</label>
+                                    <input type="text" id="dep-note" class="form-control" placeholder="Ex: Versement famille..."></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-success" style="width:100%;" onclick="addDeposit()">
+                                        <i class="fas fa-plus"></i> Ajouter</button></div>
+                            </div>
+                        </div>
+                        <div id="deposits-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Services supplémentaires -->
+                    <div id="hosp-tab-services" class="hosp-tab-content" style="display:none;">
+                        <div class="card" style="background:#fff8f0;">
+                            <h4><i class="fas fa-clipboard-list" style="color:#ff9800;"></i> Ajouter un service</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Service *</label>
+                                    <input type="text" id="svc-name" class="form-control" placeholder="Ex: Radio, Analyse spéciale..."></div>
+                                <div><label class="form-label">Montant (HTG) *</label>
+                                    <input type="number" id="svc-amount" class="form-control" placeholder="0.00" min="0"></div>
+                                <div><label class="form-label">Note</label>
+                                    <input type="text" id="svc-note" class="form-control" placeholder="Note optionnelle"></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-warning" style="width:100%;color:#212529;" onclick="addHospService()">
+                                        <i class="fas fa-plus"></i> Ajouter</button></div>
+                            </div>
+                        </div>
+                        <div id="hosp-services-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Sortie du patient -->
+                    <div class="card mt-3" style="border-left-color:#dc3545;">
+                        <h4><i class="fas fa-sign-out-alt" style="color:#dc3545;"></i> Sortie du patient</h4>
+                        <div class="add-form-grid">
+                            <div><label class="form-label">Note de sortie</label>
+                                <textarea id="discharge-note" class="form-control" rows="2" placeholder="Résumé de séjour, instructions de sortie..."></textarea></div>
+                            <div style="display:flex;align-items:flex-end;">
+                                <button class="btn btn-danger" style="width:100%;" onclick="dischargePatient()">
+                                    <i class="fas fa-sign-out-alt"></i> Sortie du patient</button></div>
+                        </div>
                     </div>
                 </div>
             </div>
