@@ -4448,7 +4448,7 @@ function loadSubAdminPermissionsUI() {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('save-sub-admin-permissions')?.addEventListener('click', async () => {
         const perms = {};
-        ['secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','settings','users','exchangeRate'].forEach(key => {
+        ['secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','hospitalization','suppliers','settings','users','exchangeRate'].forEach(key => {
             const el = document.getElementById(`perm-${key}`);
             if (el) perms[key] = el.checked;
         });
