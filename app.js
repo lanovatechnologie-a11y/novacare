@@ -436,6 +436,7 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'hospitalization') { loadHospitalizations('active'); loadDoctorsForHosp(); }
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
         });
@@ -2903,6 +2904,431 @@ var _currentSupplierName = null;
 function toggleSupplierForm() {
     var f = document.getElementById('supplier-add-form');
     f.style.display = f.style.display === 'none' ? 'grid' : 'none';
+}
+
+
+// ─── HOSPITALISATION ─────────────────────────────────────────
+var _currentHospId = null;
+var _currentHospPatient = null;
+
+function toggleAdmitForm() {
+    var f = document.getElementById('admit-form');
+    if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loadDoctorsForHosp() {
+    var sel = document.getElementById('hosp-doctor');
+    if (!sel) return;
+    var users = await API.getUsers().catch(function() { return []; });
+    var doctors = users.filter(function(u) {
+        return u.active && (u.role === 'doctor' || (u.extra_roles && u.extra_roles.includes('doctor')));
+    });
+    sel.innerHTML = '<option value="">Sélectionner un médecin</option>' +
+        doctors.map(function(d) { return '<option value="' + d.username + '">' + d.name + '</option>'; }).join('');
+}
+
+async function searchPatientForHosp() {
+    var search = document.getElementById('hosp-patient-search').value.trim();
+    if (!search) return;
+    var patients = await API.getPatients({ search: search }).catch(function() { return []; });
+    var div = document.getElementById('hosp-patient-found');
+    if (!patients.length) {
+        div.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>';
+        div.style.display = 'block';
+        return;
+    }
+    var p = patients[0];
+    div.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> <strong>' + p.full_name + '</strong> — ' + p.id + '</div>';
+    div.style.display = 'block';
+    div.dataset.patientId   = p.id;
+    div.dataset.patientName = p.full_name;
+}
+
+async function admitPatient() {
+    var div = document.getElementById('hosp-patient-found');
+    var patientId   = div.dataset.patientId;
+    var patientName = div.dataset.patientName;
+    if (!patientId) { toast('Chercher un patient d\'abord', 'error'); return; }
+    var room    = document.getElementById('hosp-room').value.trim();
+    var bed     = document.getElementById('hosp-bed').value.trim();
+    var reason  = document.getElementById('hosp-reason').value.trim();
+    var doctor  = document.getElementById('hosp-doctor').value;
+    var deposit = parseFloat(document.getElementById('hosp-deposit').value) || 0;
+    if (!reason) { toast('Le motif est obligatoire', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.admitPatient({ patientId, room, bed, reason, doctorUsername: doctor, depositAmount: deposit });
+        });
+        toast(patientName + ' admis en hospitalisation !', 'success');
+        toggleAdmitForm();
+        document.getElementById('hosp-patient-search').value = '';
+        document.getElementById('hosp-patient-found').style.display = 'none';
+        ['hosp-room','hosp-bed','hosp-reason','hosp-deposit'].forEach(function(id) {
+            var el = document.getElementById(id); if (el) el.value = '';
+        });
+        loadHospitalizations('active');
+    } catch(e) {}
+}
+
+async function loadHospitalizations(status) {
+    var container = document.getElementById('hospitalizations-list');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
+    try {
+        var params = {};
+        if (status) params.status = status;
+        var hosps = await API.getHospitalizations(params);
+        if (!hosps.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-bed"></i> Aucune hospitalisation ' + (status === 'active' ? 'en cours' : '') + '.</div>';
+            return;
+        }
+        var stateColors = { active: '#28a745', discharged: '#6c757d' };
+        var stateLabels = { active: 'Hospitalisé', discharged: 'Sorti' };
+        container.innerHTML = hosps.map(function(h) {
+            var balance = parseFloat(h.balance || 0);
+            var isDebt  = balance < 0;
+            var days    = Math.floor((new Date() - new Date(h.admission_date)) / (1000*60*60*24));
+            return '<div class="card mb-2" style="border-left:4px solid '+(stateColors[h.status]||'#6c757d')+';padding:14px;">' +
+                '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                '<div>' +
+                '<h4 style="margin-bottom:4px;">' + h.full_name + '</h4>' +
+                '<small class="text-muted">' +
+                (h.room ? h.room + (h.bed ? ' / ' + h.bed : '') + ' | ' : '') +
+                'Admis le ' + h.admission_date + ' (' + days + ' j)' +
+                (h.doctor ? ' | Dr. ' + h.doctor : '') +
+                '</small><br><small class="text-muted">' + (h.admission_reason||'-') + '</small>' +
+                '</div>' +
+                '<div style="text-align:right;">' +
+                '<span class="badge" style="background:'+(stateColors[h.status]||'#6c757d')+';color:#fff;padding:4px 10px;">' + (stateLabels[h.status]||h.status) + '</span><br>' +
+                '<strong style="color:'+(isDebt?'#dc3545':'#28a745')+'">' +
+                (isDebt ? 'Dette: '+Math.abs(balance).toLocaleString('fr-FR') : 'Solde: '+balance.toLocaleString('fr-FR')) + ' HTG</strong>' +
+                '</div></div>' +
+                '<div class="d-flex gap-10 mt-2">' +
+                '<button class="btn btn-primary btn-sm" data-hid="' + h.id + '" data-hname="' + h.full_name + '" onclick="openHospDetail(this.dataset.hid,this.dataset.hname)"><i class="fas fa-folder-open"></i> Dossier</button>' +
+                (h.status === 'active' ? '<button class="btn btn-danger btn-sm" data-hid="' + h.id + '" onclick="quickDischarge(this.dataset.hid)"><i class="fas fa-sign-out-alt"></i> Sortie rapide</button>' : '') +
+                '</div></div>';
+        }).join('');
+    } catch(e) { container.innerHTML = '<div class="alert alert-danger">Erreur: ' + e.message + '</div>'; }
+}
+
+async function openHospDetail(hospId, patientName) {
+    _currentHospId = hospId;
+    document.getElementById('hosp-detail-section').style.display = 'block';
+    document.getElementById('admit-patient-card').style.display = 'none';
+    document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
+    document.getElementById('hosp-detail-title').innerHTML = '<i class="fas fa-user-injured"></i> ' + patientName;
+    var meds = state.medications && state.medications.length ? state.medications : await API.getMedications().catch(function(){return[];});
+    state.medications = meds;
+    var rxSel = document.getElementById('rx-medication');
+    if (rxSel) {
+        rxSel.innerHTML = '<option value="">Sélectionner du stock...</option>' +
+            meds.map(function(m) {
+                return '<option value="'+m.id+'" data-price="'+m.price+'" data-stock="'+m.quantity+'">'+m.name+' — Stock: '+m.quantity+' — '+m.price+' HTG</option>';
+            }).join('');
+    }
+    await refreshHospDetail();
+    showHospTab('nursing');
+}
+
+async function refreshHospDetail() {
+    var hosp = await API.getHospitalization(_currentHospId).catch(function(){return null;});
+    if (!hosp) return;
+    _currentHospPatient = hosp;
+    var balance = parseFloat(hosp.balance || 0);
+    var deposit = parseFloat(hosp.deposit || 0);
+    var isDebt  = balance < 0;
+    var el = document.getElementById('hosp-financial-summary');
+    if (el) el.innerHTML =
+        '<div class="d-flex gap-15 flex-wrap">' +
+        '<div style="background:#d4edda;padding:12px 18px;border-radius:10px;text-align:center;">' +
+        '<strong style="font-size:1.1rem;color:#155724;">'+deposit.toLocaleString('fr-FR')+' HTG</strong><br><small>Total déposé</small></div>' +
+        '<div style="background:'+(isDebt?'#f8d7da':'#d4edda')+';padding:12px 18px;border-radius:10px;text-align:center;">' +
+        '<strong style="font-size:1.1rem;color:'+(isDebt?'#721c24':'#155724')+'">' +
+        (isDebt?'⚠️ Dette: '+Math.abs(balance).toLocaleString('fr-FR'):'✅ Solde: '+balance.toLocaleString('fr-FR'))+' HTG</strong>' +
+        '<br><small>Solde actuel</small></div>' +
+        '</div>';
+}
+
+function closeHospDetail() {
+    _currentHospId = null;
+    _currentHospPatient = null;
+    document.getElementById('hosp-detail-section').style.display = 'none';
+    document.getElementById('admit-patient-card').style.display = 'block';
+    document.getElementById('hospitalizations-list').closest('.card').style.display = 'block';
+    loadHospitalizations('active');
+}
+
+function showHospTab(tab) {
+    document.querySelectorAll('.hosp-tab-content').forEach(function(el) { el.style.display = 'none'; });
+    document.querySelectorAll('.hosp-tab-btn').forEach(function(btn) {
+        var isActive = btn.dataset.tab === tab;
+        btn.style.color        = isActive ? 'var(--primary)' : 'var(--muted)';
+        btn.style.borderBottom = isActive ? '3px solid var(--primary)' : '3px solid transparent';
+    });
+    var tabEl = document.getElementById('hosp-tab-' + tab);
+    if (tabEl) tabEl.style.display = 'block';
+    if (tab === 'nursing')       loadNursingNotes();
+    else if (tab === 'prescriptions') loadPrescriptions();
+    else if (tab === 'deposits') loadDeposits();
+    else if (tab === 'services') loadHospServices();
+}
+
+async function saveNursingNote() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var data = {
+        hospitalizationId: _currentHospId,
+        patientId:    _currentHospPatient.patient_id,
+        temperature:  document.getElementById('nur-temp').value   || null,
+        bloodPressure:document.getElementById('nur-bp').value     || null,
+        pulse:        document.getElementById('nur-pulse').value  || null,
+        oxygenSat:    document.getElementById('nur-o2').value     || null,
+        weight:       document.getElementById('nur-weight').value || null,
+        generalState: document.getElementById('nur-state').value  || null,
+        notes:        document.getElementById('nur-notes').value  || null,
+    };
+    try {
+        await apiCall(function() { return API.addHospNursing(data); });
+        toast('Suivi enregistré !', 'success');
+        ['nur-temp','nur-bp','nur-pulse','nur-o2','nur-weight','nur-notes'].forEach(function(id){
+            var el=document.getElementById(id); if(el) el.value='';
+        });
+        document.getElementById('nur-state').value = '';
+        loadNursingNotes();
+    } catch(e) {}
+}
+
+async function loadNursingNotes() {
+    if (!_currentHospId) return;
+    var notes = await API.getHospNursing(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('nursing-notes-list');
+    if (!container) return;
+    if (!notes.length) { container.innerHTML = '<div class="alert alert-info">Aucun suivi enregistré.</div>'; return; }
+    var stateColors = { Bon:'#28a745', Stable:'#17a2b8', Moyen:'#ffc107', Critique:'#dc3545', Amélioré:'#28a745' };
+    container.innerHTML = notes.map(function(n) {
+        var vitals = [
+            n.temperature    ? 'T°: '+n.temperature+'°C'    : null,
+            n.blood_pressure ? 'TA: '+n.blood_pressure       : null,
+            n.pulse          ? 'Pouls: '+n.pulse+' bpm'      : null,
+            n.oxygen_sat     ? 'O2: '+n.oxygen_sat+'%'       : null,
+            n.weight         ? 'Poids: '+n.weight+' kg'      : null,
+        ].filter(Boolean);
+        return '<div class="card mb-2" style="border-left:4px solid '+(stateColors[n.general_state]||'#17a2b8')+';padding:12px;">' +
+            '<div class="d-flex justify-between align-center">' +
+            '<strong>'+new Date(n.created_at).toLocaleString('fr-FR')+'</strong>' +
+            ' — Par: <em>'+(n.recorded_by||'-')+'</em>' +
+            (n.general_state ? ' <span class="badge" style="background:'+(stateColors[n.general_state]||'#17a2b8')+';color:#fff;">'+n.general_state+'</span>' : '') +
+            '</div>' +
+            (vitals.length ? '<div class="mt-2" style="display:flex;gap:6px;flex-wrap:wrap;">'+vitals.map(function(v){return '<span class="badge badge-info">'+v+'</span>';}).join('')+'</div>' : '') +
+            (n.notes ? '<p class="mt-2" style="font-size:.88rem;">'+n.notes+'</p>' : '') +
+            '</div>';
+    }).join('');
+}
+
+function onRxMedSelect() {
+    var sel = document.getElementById('rx-medication');
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.dataset.price) return;
+    document.getElementById('rx-price').value = opt.dataset.price;
+    document.getElementById('rx-med-name').value = '';
+    updateRxCost();
+}
+
+function updateRxCost() {
+    var qty   = parseInt(document.getElementById('rx-qty').value) || 0;
+    var price = parseFloat(document.getElementById('rx-price').value) || 0;
+    var total = qty * price;
+    var prev  = document.getElementById('rx-cost-preview');
+    if (prev) prev.innerHTML = total > 0 ?
+        '<span class="badge badge-primary">Coût: '+total.toLocaleString('fr-FR')+' HTG</span>' : '';
+}
+
+async function savePrescription() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var medSel  = document.getElementById('rx-medication');
+    var medId   = medSel ? medSel.value : '';
+    var medName = medId
+        ? medSel.options[medSel.selectedIndex].text.split(' —')[0]
+        : document.getElementById('rx-med-name').value.trim();
+    var dosage  = document.getElementById('rx-dosage').value.trim();
+    var freq    = document.getElementById('rx-frequency').value;
+    var dur     = document.getElementById('rx-duration').value.trim();
+    var route   = document.getElementById('rx-route').value;
+    var qty     = parseInt(document.getElementById('rx-qty').value) || 1;
+    var price   = parseFloat(document.getElementById('rx-price').value) || 0;
+    var note    = document.getElementById('rx-note').value.trim();
+    if (!medName || !dosage) { toast('Médicament et dosage obligatoires', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addHospPrescription({
+                hospitalizationId: _currentHospId,
+                patientId:   _currentHospPatient.patient_id,
+                medicationId: medId || null,
+                medicationName: medName,
+                dosage, frequency: freq, duration: dur,
+                route, note, pricePerUnit: price, quantity: qty,
+            });
+        });
+        toast('Prescription enregistrée — '+(qty*price).toLocaleString('fr-FR')+' HTG déduit', 'success');
+        ['rx-med-name','rx-dosage','rx-duration','rx-note'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+        if (medSel) medSel.value = '';
+        document.getElementById('rx-qty').value = '1';
+        document.getElementById('rx-price').value = '';
+        document.getElementById('rx-cost-preview').innerHTML = '';
+        loadPrescriptions();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function loadPrescriptions() {
+    if (!_currentHospId) return;
+    var rxs = await API.getHospPrescriptions(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('prescriptions-list');
+    if (!container) return;
+    if (!rxs.length) { container.innerHTML = '<div class="alert alert-info">Aucune prescription.</div>'; return; }
+    var statusColors = { pending:'#ffc107', administered:'#28a745', skipped:'#dc3545' };
+    var statusLabels = { pending:'En attente', administered:'Administré', skipped:'Sauté' };
+    container.innerHTML = rxs.map(function(rx) {
+        return '<div class="card mb-2" style="border-left:4px solid #6f42c1;padding:12px;">' +
+            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+            '<div>' +
+            '<h5 style="color:#6f42c1;margin-bottom:4px;">'+rx.medication_name+'</h5>' +
+            '<div style="font-size:.85rem;display:flex;gap:10px;flex-wrap:wrap;">' +
+            '<span>'+rx.dosage+'</span>' +
+            (rx.frequency ? '<span>'+rx.frequency+'</span>' : '') +
+            (rx.duration  ? '<span>'+rx.duration+'</span>'  : '') +
+            '<span>'+(rx.route||'Orale')+'</span>' +
+            '</div>' +
+            (rx.note ? '<p style="font-size:.82rem;background:#fff3cd;padding:4px 8px;border-radius:4px;margin-top:6px;">'+rx.note+'</p>' : '') +
+            '<small class="text-muted">Qté: '+rx.quantity+' × '+parseFloat(rx.price_per_unit||0).toLocaleString('fr-FR')+' HTG = <strong>'+parseFloat(rx.total_price||0).toLocaleString('fr-FR')+' HTG</strong> | Par: '+(rx.prescribed_by||'-')+'</small>' +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            '<span class="badge" style="background:'+(statusColors[rx.status]||'#ffc107')+';color:'+(rx.status==='pending'?'#212529':'#fff')+';padding:4px 10px;">'+(statusLabels[rx.status]||rx.status)+'</span>' +
+            (rx.status === 'pending' ?
+            '<br><div class="d-flex gap-6 mt-2">' +
+            '<button class="btn btn-xs btn-success" data-rxid="'+rx.id+'" onclick="markAdministered(this.dataset.rxid)"><i class="fas fa-check"></i> Administré</button>' +
+            '<button class="btn btn-xs btn-secondary" data-rxid="'+rx.id+'" onclick="markSkipped(this.dataset.rxid)"><i class="fas fa-times"></i> Sauté</button>' +
+            '</div>' : '') +
+            '</div></div></div>';
+    }).join('');
+}
+
+async function markAdministered(rxId) {
+    await apiCall(function() {
+        return API.updateHospPrescription(rxId, { status: 'administered', administeredAt: new Date().toISOString(), administeredBy: state.currentUser?.username });
+    });
+    toast('Médicament administré !', 'success');
+    loadPrescriptions();
+}
+async function markSkipped(rxId) {
+    await apiCall(function() { return API.updateHospPrescription(rxId, { status: 'skipped' }); });
+    toast('Dose sautée enregistrée', 'warning');
+    loadPrescriptions();
+}
+
+async function addDeposit() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var amount = parseFloat(document.getElementById('dep-amount').value);
+    var note   = document.getElementById('dep-note').value.trim();
+    if (isNaN(amount) || amount <= 0) { toast('Montant invalide', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addHospDeposit({ hospitalizationId: _currentHospId, patientId: _currentHospPatient.patient_id, amount, note });
+        });
+        toast('Dépôt de '+amount.toLocaleString('fr-FR')+' HTG enregistré !', 'success');
+        document.getElementById('dep-amount').value = '';
+        document.getElementById('dep-note').value   = '';
+        loadDeposits();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function loadDeposits() {
+    if (!_currentHospId) return;
+    var deps = await API.getHospDeposits(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('deposits-list');
+    if (!container) return;
+    if (!deps.length) { container.innerHTML = '<div class="alert alert-info">Aucun dépôt.</div>'; return; }
+    var total = deps.reduce(function(s,d){return s+parseFloat(d.amount);},0);
+    container.innerHTML =
+        '<div style="background:#d4edda;padding:10px 16px;border-radius:8px;margin-bottom:10px;">Total déposé: <strong>'+total.toLocaleString('fr-FR')+' HTG</strong></div>' +
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
+        deps.map(function(d) {
+            return '<tr><td>'+new Date(d.created_at).toLocaleString('fr-FR')+'</td>' +
+                '<td><strong style="color:#28a745;">+'+parseFloat(d.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
+                '<td>'+(d.note||'-')+'</td><td>'+(d.created_by||'-')+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+}
+
+async function addHospService() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var service = document.getElementById('svc-name').value.trim();
+    var amount  = parseFloat(document.getElementById('svc-amount').value);
+    var note    = document.getElementById('svc-note').value.trim();
+    if (!service || isNaN(amount) || amount <= 0) { toast('Service et montant obligatoires', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addHospService({ hospitalizationId: _currentHospId, patientId: _currentHospPatient.patient_id, service, amount, note });
+        });
+        toast('Service ajouté — '+amount.toLocaleString('fr-FR')+' HTG déduit', 'success');
+        document.getElementById('svc-name').value   = '';
+        document.getElementById('svc-amount').value = '';
+        document.getElementById('svc-note').value   = '';
+        loadHospServices();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function loadHospServices() {
+    if (!_currentHospId) return;
+    var svcs = await API.getHospServices(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('hosp-services-list');
+    if (!container) return;
+    if (!svcs.length) { container.innerHTML = '<div class="alert alert-info">Aucun service ajouté.</div>'; return; }
+    var total = svcs.reduce(function(s,v){return s+parseFloat(v.amount);},0);
+    container.innerHTML =
+        '<div style="background:#f8d7da;padding:10px 16px;border-radius:8px;margin-bottom:10px;">Total services: <strong>'+total.toLocaleString('fr-FR')+' HTG</strong></div>' +
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Note</th></tr></thead><tbody>' +
+        svcs.map(function(s) {
+            return '<tr><td>'+new Date(s.created_at).toLocaleDateString('fr-FR')+'</td>' +
+                '<td>'+s.service+'</td>' +
+                '<td><strong style="color:#dc3545;">-'+parseFloat(s.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
+                '<td>'+(s.note||'-')+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+}
+
+async function dischargePatient() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var note    = document.getElementById('discharge-note').value.trim();
+    var balance = parseFloat(_currentHospPatient.balance || 0);
+    var debtInfo = balance < 0
+        ? ' | Dette: ' + Math.abs(balance).toLocaleString('fr-FR') + ' HTG'
+        : ' | Solde: ' + balance.toLocaleString('fr-FR') + ' HTG';
+    if (!confirm('Confirmer la sortie de ' + _currentHospPatient.full_name + ' ?' + debtInfo)) return;
+    try {
+        await apiCall(function() {
+            return API.updateHospitalization(_currentHospId, {
+                status: 'discharged',
+                dischargeDate: new Date().toISOString().split('T')[0],
+                dischargeNote: note,
+            });
+        });
+        toast(_currentHospPatient.full_name + ' sorti(e) avec succès !', 'success');
+        closeHospDetail();
+    } catch(e) {}
+}
+
+async function quickDischarge(hospId) {
+    if (!confirm('Confirmer la sortie du patient ?')) return;
+    try {
+        await apiCall(function() {
+            return API.updateHospitalization(hospId, {
+                status: 'discharged',
+                dischargeDate: new Date().toISOString().split('T')[0],
+            });
+        });
+        toast('Patient sorti', 'success');
+        loadHospitalizations('active');
+    } catch(e) {}
 }
 
 async function loadSuppliers() {

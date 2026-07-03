@@ -131,6 +131,11 @@ const API = (() => {
         addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
         deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
 
+        // ── Petite caisse ─────────────────────────────────────
+        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
+        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
+        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
+
         // ── Fournisseurs ──────────────────────────────────────
         getSuppliers:    ()          => request('GET',    '/suppliers'),
         addSupplier:     (data)      => request('POST',   '/suppliers', data),
@@ -152,18 +157,35 @@ const API = (() => {
         },
         addSupplierPayment: (data) => request('POST', '/supplier-payments', data),
 
-        // ── Gestion de caisse (retraits / commissions) ────────
-        getCashWithdrawals: (params = {}) => {
+        // ── Remboursements ────────────────────────────────────
+        getRefunds:   (params = {}) => {
             const qs = new URLSearchParams(params).toString();
-            return request('GET', '/cash-withdrawals' + (qs ? '?' + qs : ''));
+            return request('GET', '/refunds' + (qs ? '?' + qs : ''));
         },
-        addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
-        deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
+        addRefund:    (data) => request('POST',   '/refunds', data),
+        deleteRefund: (id)   => request('DELETE', `/refunds/${id}`),
 
-        // ── Petite caisse ──────────────────────────────────────
-        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
-        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
-        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
+        // ── Hospitalisation ───────────────────────────────────
+        getHospitalizations:   (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/hospitalizations' + (qs ? '?' + qs : ''));
+        },
+        getHospitalization:    (id)       => request('GET',  `/hospitalizations/${id}`),
+        admitPatient:          (data)     => request('POST', '/hospitalizations', data),
+        updateHospitalization: (id, data) => request('PUT',  `/hospitalizations/${id}`, data),
+
+        getHospDeposits:  (hospId)   => request('GET',  `/hosp-deposits/${hospId}`),
+        addHospDeposit:   (data)     => request('POST', '/hosp-deposits', data),
+
+        getHospPrescriptions:   (hospId)   => request('GET',  `/hosp-prescriptions/${hospId}`),
+        addHospPrescription:    (data)     => request('POST', '/hosp-prescriptions', data),
+        updateHospPrescription: (id, data) => request('PUT',  `/hosp-prescriptions/${id}`, data),
+
+        getHospNursing: (hospId) => request('GET',  `/hosp-nursing/${hospId}`),
+        addHospNursing: (data)   => request('POST', '/hosp-nursing', data),
+
+        addHospService:  (data)   => request('POST', '/hosp-services', data),
+        getHospServices: (hospId) => request('GET',  `/hosp-services/${hospId}`),
 
         // ── Stats admin ───────────────────────────────────────
         getStats: (params = {}) => {
