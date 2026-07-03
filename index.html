@@ -1389,5 +1389,32 @@
 <script src="config.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
+<div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:11px;padding:8px;max-height:200px;overflow-y:auto;z-index:99999;display:none;">
+<strong>DEBUG</strong> <button onclick="document.getElementById('debug-panel').style.display='none'" style="color:red;background:none;border:none;cursor:pointer;">X</button>
+<div id="debug-log"></div>
+</div>
+<button onclick="document.getElementById('debug-panel').style.display='block'" 
+style="position:fixed;bottom:70px;left:10px;z-index:99999;background:#ff0;color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:bold;">DEBUG</button>
+<script>
+function dbg(msg) {
+    var el = document.getElementById('debug-log');
+    if (el) el.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + msg + '</div>';
+    console.log(msg);
+}
+// Override console.error
+var origErr = console.error;
+console.error = function() { dbg('ERR: ' + Array.from(arguments).join(' ')); origErr.apply(console, arguments); };
+window.onerror = function(msg, src, line) { dbg('JS ERROR: ' + msg + ' L' + line); };
+// Vérifier après 2 secondes
+setTimeout(function() {
+    var tab = document.querySelector('[data-target="hospitalization"]');
+    dbg('Tab hosp: ' + (tab ? 'TROUVÉ' : 'INTROUVABLE'));
+    if (tab) dbg('Classes: ' + tab.className);
+    var section = document.getElementById('hospitalization');
+    dbg('Section hosp: ' + (section ? 'TROUVÉE' : 'INTROUVABLE'));
+    dbg('API.admitPatient: ' + (typeof API !== "undefined" && API.admitPatient ? 'OK' : 'MANQUANT'));
+    dbg('loadHospitalizations: ' + (typeof loadHospitalizations !== "undefined" ? 'OK' : 'MANQUANT'));
+}, 3000);
+</script>
 </body>
 </html>
