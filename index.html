@@ -764,6 +764,58 @@
             </div>
         </section>
 
+        <!-- ─── RAPPORTS ──────────────────────────────── -->
+        <section id="reports" class="content">
+            <h2 class="section-title"><i class="fas fa-file-alt"></i> Rapports & Statistiques</h2>
+
+            <!-- Filtres globaux -->
+            <div class="card mb-3">
+                <h3><i class="fas fa-filter" style="color:#1a6bca;"></i> Filtres</h3>
+                <div class="add-form-grid" style="margin-top:12px;">
+                    <div><label class="form-label">Date début</label>
+                        <input type="date" id="rpt-from" class="form-control"></div>
+                    <div><label class="form-label">Date fin</label>
+                        <input type="date" id="rpt-to" class="form-control"></div>
+                    <div><label class="form-label">Utilisateur / Agent</label>
+                        <select id="rpt-agent" class="form-control">
+                            <option value="">Tous les agents</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button class="btn btn-primary" style="width:100%;" onclick="generateReports()">
+                            <i class="fas fa-search"></i> Générer les rapports
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs de rapports -->
+            <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;background:#fff;border-radius:8px 8px 0 0;">
+                <button class="rpt-tab-btn active" data-rpt="transactions" onclick="showRptTab('transactions')"
+                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;">
+                    <i class="fas fa-receipt"></i> Transactions</button>
+                <button class="rpt-tab-btn" data-rpt="patients" onclick="showRptTab('patients')"
+                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
+                    <i class="fas fa-users"></i> Patients</button>
+                <button class="rpt-tab-btn" data-rpt="medications" onclick="showRptTab('medications')"
+                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
+                    <i class="fas fa-pills"></i> Médicaments</button>
+                <button class="rpt-tab-btn" data-rpt="agents" onclick="showRptTab('agents')"
+                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
+                    <i class="fas fa-user-tie"></i> Par agent</button>
+                <button class="rpt-tab-btn" data-rpt="hospitalization" onclick="showRptTab('hospitalization')"
+                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
+                    <i class="fas fa-bed"></i> Hospitalisation</button>
+            </div>
+
+            <!-- Contenu rapports -->
+            <div id="rpt-tab-transactions" class="rpt-tab-content"></div>
+            <div id="rpt-tab-patients"     class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-medications"  class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-agents"       class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-hospitalization" class="rpt-tab-content" style="display:none;"></div>
+        </section>
+
         <!-- ─── HOSPITALISATION ─────────────────────── -->
         <section id="hospitalization" class="content">
             <h2 class="section-title"><i class="fas fa-bed"></i> Hospitalisation</h2>
@@ -1389,32 +1441,5 @@
 <script src="config.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
-<div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:11px;padding:8px;max-height:200px;overflow-y:auto;z-index:99999;display:none;">
-<strong>DEBUG</strong> <button onclick="document.getElementById('debug-panel').style.display='none'" style="color:red;background:none;border:none;cursor:pointer;">X</button>
-<div id="debug-log"></div>
-</div>
-<button onclick="document.getElementById('debug-panel').style.display='block'" 
-style="position:fixed;bottom:70px;left:10px;z-index:99999;background:#ff0;color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:bold;">DEBUG</button>
-<script>
-function dbg(msg) {
-    var el = document.getElementById('debug-log');
-    if (el) el.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + msg + '</div>';
-    console.log(msg);
-}
-// Override console.error
-var origErr = console.error;
-console.error = function() { dbg('ERR: ' + Array.from(arguments).join(' ')); origErr.apply(console, arguments); };
-window.onerror = function(msg, src, line) { dbg('JS ERROR: ' + msg + ' L' + line); };
-// Vérifier après 2 secondes
-setTimeout(function() {
-    var tab = document.querySelector('[data-target="hospitalization"]');
-    dbg('Tab hosp: ' + (tab ? 'TROUVÉ' : 'INTROUVABLE'));
-    if (tab) dbg('Classes: ' + tab.className);
-    var section = document.getElementById('hospitalization');
-    dbg('Section hosp: ' + (section ? 'TROUVÉE' : 'INTROUVABLE'));
-    dbg('API.admitPatient: ' + (typeof API !== "undefined" && API.admitPatient ? 'OK' : 'MANQUANT'));
-    dbg('loadHospitalizations: ' + (typeof loadHospitalizations !== "undefined" ? 'OK' : 'MANQUANT'));
-}, 3000);
-</script>
 </body>
 </html>

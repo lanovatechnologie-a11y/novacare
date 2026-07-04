@@ -436,6 +436,7 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'reports')         { initReports(); }
             else if (target === 'hospitalization') { loadHospitalizations('active'); loadDoctorsForHosp(); }
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
@@ -445,7 +446,7 @@ function setupNavigation() {
 
 function setupRoleBasedNavigation() {
     const role = state.currentRole;
-    const allSections = ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','hospitalization','suppliers','settings'];
+    const allSections = ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','reports','hospitalization','suppliers','settings'];
 
     let allowed;
     if (role === 'admin') {
@@ -462,15 +463,16 @@ function setupRoleBasedNavigation() {
         if (perms.pharmacy)       allowed.push('pharmacy');
         if (perms.messaging)        allowed.push('messaging');
         if (perms.administration)   allowed.push('administration');
+        if (perms.reports !== false)         allowed.push('reports');
         if (perms.hospitalization !== false) allowed.push('hospitalization');
         if (perms.suppliers !== false)       allowed.push('suppliers');
         if (perms.settings)         allowed.push('settings');
     } else {
         const roleAccess = {
-            secretary: ['dashboard','secretary','messaging','hospitalization'],
-            cashier:   ['dashboard','cashier','messaging','hospitalization'],
+            secretary: ['dashboard','secretary','messaging','hospitalization','reports'],
+            cashier:   ['dashboard','cashier','messaging','hospitalization','reports'],
             nurse:     ['dashboard','nurse','messaging','hospitalization'],
-            doctor:    ['dashboard','doctor','messaging','hospitalization'],
+            doctor:    ['dashboard','doctor','messaging','hospitalization','reports'],
             lab:       ['dashboard','laboratory','messaging','hospitalization'],
             pharmacy:  ['dashboard','pharmacy','messaging','hospitalization'],
         };
@@ -2906,6 +2908,320 @@ function toggleSupplierForm() {
     f.style.display = f.style.display === 'none' ? 'grid' : 'none';
 }
 
+
+
+// ─── RAPPORTS ─────────────────────────────────────────────────
+var _currentRptTab = 'transactions';
+
+async function initReports() {
+    // Initialiser les dates par défaut (mois en cours)
+    var now   = new Date();
+    var from  = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    var to    = now.toISOString().split('T')[0];
+    var fromEl = document.getElementById('rpt-from');
+    var toEl   = document.getElementById('rpt-to');
+    if (fromEl && !fromEl.value) fromEl.value = from;
+    if (toEl   && !toEl.value)   toEl.value   = to;
+
+    // Charger les agents dans le select
+    var agentSel = document.getElementById('rpt-agent');
+    if (agentSel && agentSel.options.length <= 1) {
+        var users = await API.getUsers().catch(function() { return []; });
+        users.forEach(function(u) {
+            var opt = document.createElement('option');
+            opt.value = u.username;
+            opt.textContent = u.name + ' (' + u.role + ')';
+            agentSel.appendChild(opt);
+        });
+    }
+    generateReports();
+}
+
+function showRptTab(tab) {
+    _currentRptTab = tab;
+    document.querySelectorAll('.rpt-tab-content').forEach(function(el) { el.style.display = 'none'; });
+    document.querySelectorAll('.rpt-tab-btn').forEach(function(btn) {
+        var isActive = btn.dataset.rpt === tab;
+        btn.style.color        = isActive ? 'var(--primary)' : 'var(--muted)';
+        btn.style.borderBottom = isActive ? '3px solid var(--primary)' : '3px solid transparent';
+    });
+    var el = document.getElementById('rpt-tab-' + tab);
+    if (el) el.style.display = 'block';
+    generateReports();
+}
+
+async function generateReports() {
+    var from  = document.getElementById('rpt-from').value;
+    var to    = document.getElementById('rpt-to').value;
+    var agent = document.getElementById('rpt-agent').value;
+    var tab   = _currentRptTab;
+
+    var el = document.getElementById('rpt-tab-' + tab);
+    if (!el) return;
+    el.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i><p class="mt-2">Chargement...</p></div>';
+
+    var rate = state.exchangeRate || 130;
+
+    function fmtHTG(v) { return parseFloat(v||0).toLocaleString('fr-FR') + ' HTG'; }
+    function fmtUSD(v) { return '$' + (parseFloat(v||0)/rate).toFixed(2); }
+    function statCard(icon, label, value, sub, color) {
+        return '<div style="background:#fff;border-radius:10px;padding:16px;border:1px solid var(--border);border-left:4px solid '+(color||'#1a6bca')+';">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+            '<i class="fas '+icon+'" style="color:'+(color||'#1a6bca')+';font-size:1.2rem;"></i>' +
+            '<strong>'+label+'</strong></div>' +
+            '<div style="font-size:1.3rem;font-weight:700;color:'+(color||'#1a6bca')+';">'+value+'</div>' +
+            (sub ? '<div style="font-size:.8rem;color:var(--muted);margin-top:4px;">'+sub+'</div>' : '') +
+            '</div>';
+    }
+
+    try {
+        if (tab === 'transactions') {
+            var params = { status: 'all' };
+            if (from) params.fromDate = from;
+            if (to)   params.toDate   = to;
+            var txs = await API.getTransactions(params);
+            if (agent) txs = txs.filter(function(t) { return t.payment_agent === agent || t.created_by === agent; });
+
+            var paid   = txs.filter(function(t) { return t.status === 'paid'; });
+            var unpaid = txs.filter(function(t) { return t.status === 'unpaid'; });
+            var refunded = txs.filter(function(t) { return t.status === 'refunded'; });
+            var totalPaid   = paid.reduce(function(s,t)  { return s + parseFloat(t.amount); }, 0);
+            var totalUnpaid = unpaid.reduce(function(s,t) { return s + parseFloat(t.amount); }, 0);
+
+            // Grouper par type
+            var byType = {};
+            paid.forEach(function(t) {
+                if (!byType[t.type]) byType[t.type] = { count: 0, total: 0 };
+                byType[t.type].count++;
+                byType[t.type].total += parseFloat(t.amount);
+            });
+
+            // Grouper par méthode de paiement
+            var byMethod = {};
+            paid.forEach(function(t) {
+                var m = t.payment_method || 'Non précisé';
+                if (!byMethod[m]) byMethod[m] = { count: 0, total: 0 };
+                byMethod[m].count++;
+                byMethod[m].total += parseFloat(t.amount);
+            });
+
+            el.innerHTML =
+                // Cartes résumé
+                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
+                statCard('fa-check-circle', 'Total encaissé', fmtHTG(totalPaid), fmtUSD(totalPaid) + ' | ' + paid.length + ' tx', '#28a745') +
+                statCard('fa-clock', 'Non payé', fmtHTG(totalUnpaid), unpaid.length + ' transactions', '#dc3545') +
+                statCard('fa-undo-alt', 'Remboursés', refunded.length + ' tx', '', '#ffc107') +
+                statCard('fa-list', 'Total transactions', txs.length + ' tx', 'Période sélectionnée', '#1a6bca') +
+                '</div>' +
+
+                // Par type de service
+                '<div class="card mb-3">' +
+                '<h4><i class="fas fa-chart-bar"></i> Par type de service</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>Type</th><th>Transactions</th><th>Total HTG</th><th>Total USD</th></tr></thead><tbody>' +
+                Object.entries(byType).map(function(e) {
+                    var typeLabels = { consultation: 'Consultation', lab: 'Laboratoire', medication: 'Médicaments', external: 'Services externes' };
+                    return '<tr><td><strong>'+(typeLabels[e[0]]||e[0])+'</strong></td>' +
+                        '<td>'+e[1].count+'</td>' +
+                        '<td>'+fmtHTG(e[1].total)+'</td>' +
+                        '<td>'+fmtUSD(e[1].total)+'</td></tr>';
+                }).join('') + '</tbody></table></div></div>' +
+
+                // Par méthode de paiement
+                '<div class="card mb-3">' +
+                '<h4><i class="fas fa-credit-card"></i> Par méthode de paiement</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>Méthode</th><th>Transactions</th><th>Total HTG</th><th>Total USD</th></tr></thead><tbody>' +
+                Object.entries(byMethod).map(function(e) {
+                    return '<tr><td><strong>'+e[0]+'</strong></td>' +
+                        '<td>'+e[1].count+'</td>' +
+                        '<td>'+fmtHTG(e[1].total)+'</td>' +
+                        '<td>'+fmtUSD(e[1].total)+'</td></tr>';
+                }).join('') + '</tbody></table></div></div>' +
+
+                // Liste détaillée
+                '<div class="card">' +
+                '<h4><i class="fas fa-list"></i> Détail des transactions (' + txs.length + ')</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Agent</th></tr></thead><tbody>' +
+                txs.slice(0, 100).map(function(t) {
+                    var statusClass = t.status === 'paid' ? 'status-paid' : t.status === 'refunded' ? 'status-partial' : 'status-unpaid';
+                    var statusLabel = t.status === 'paid' ? 'Payé' : t.status === 'refunded' ? 'Remboursé' : 'Non payé';
+                    return '<tr><td>'+(t.date||'-')+'</td>' +
+                        '<td>'+t.patient_name+'</td>' +
+                        '<td>'+t.service+'</td>' +
+                        '<td><strong>'+fmtHTG(t.amount)+'</strong></td>' +
+                        '<td><span class="'+statusClass+'">'+statusLabel+'</span></td>' +
+                        '<td>'+(t.payment_method||'-')+'</td>' +
+                        '<td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
+                }).join('') + '</tbody></table></div>' +
+                (txs.length > 100 ? '<p class="text-muted mt-2"><i class="fas fa-info-circle"></i> Affichage limité à 100 lignes.</p>' : '') +
+                '</div>';
+
+        } else if (tab === 'patients') {
+            var params2 = {};
+            if (from) params2.date = from;
+            var patients = await API.getPatients({});
+            if (from || to) {
+                patients = patients.filter(function(p) {
+                    var d = p.registration_date || (p.created_at ? p.created_at.split('T')[0] : '');
+                    return (!from || d >= from) && (!to || d <= to);
+                });
+            }
+            var vip       = patients.filter(function(p) { return p.vip; });
+            var sponsored = patients.filter(function(p) { return p.sponsored; });
+            var types     = {};
+            patients.forEach(function(p) {
+                types[p.type] = (types[p.type]||0) + 1;
+            });
+
+            el.innerHTML =
+                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
+                statCard('fa-users',       'Total patients',  patients.length + ' patients', 'Période sélectionnée', '#1a6bca') +
+                statCard('fa-star',        'VIP',             vip.length + ' patients',       '', '#ffc107') +
+                statCard('fa-hand-holding-heart', 'Sponsorisés', sponsored.length + ' patients', '', '#6f42c1') +
+                '</div>' +
+                '<div class="card mb-3">' +
+                '<h4><i class="fas fa-chart-pie"></i> Par type de patient</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>Type</th><th>Nombre</th><th>%</th></tr></thead><tbody>' +
+                Object.entries(types).map(function(e) {
+                    return '<tr><td><strong>'+e[0]+'</strong></td><td>'+e[1]+'</td><td>'+(e[1]/patients.length*100).toFixed(1)+'%</td></tr>';
+                }).join('') + '</tbody></table></div></div>' +
+                '<div class="card">' +
+                '<h4><i class="fas fa-list"></i> Liste des patients ('+patients.length+')</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>ID</th><th>Nom</th><th>Type</th><th>Téléphone</th><th>Date</th><th>Privilège</th></tr></thead><tbody>' +
+                patients.slice(0,100).map(function(p) {
+                    return '<tr><td><strong>'+p.id+'</strong></td>' +
+                        '<td>'+p.full_name+'</td>' +
+                        '<td>'+p.type+'</td>' +
+                        '<td>'+(p.phone||'-')+'</td>' +
+                        '<td>'+(p.registration_date||'-')+'</td>' +
+                        '<td>'+(p.vip?'<span class="vip-tag">VIP</span>':p.sponsored?'<span class="badge badge-primary">Sponsorisé</span>':'-')+'</td></tr>';
+                }).join('') + '</tbody></table></div></div>';
+
+        } else if (tab === 'medications') {
+            var meds = await API.getMedications();
+            var lowStock  = meds.filter(function(m) { return m.quantity <= m.alert_threshold && m.quantity > 0; });
+            var outStock  = meds.filter(function(m) { return m.quantity === 0; });
+            var okStock   = meds.filter(function(m) { return m.quantity > m.alert_threshold; });
+            var totalValue = meds.reduce(function(s,m) { return s + parseFloat(m.price||0) * parseInt(m.quantity||0); }, 0);
+
+            el.innerHTML =
+                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
+                statCard('fa-pills',         'Total médicaments', meds.length + ' références', '', '#1a6bca') +
+                statCard('fa-check-circle',  'Stock OK',          okStock.length + ' références', '', '#28a745') +
+                statCard('fa-exclamation-triangle', 'Stock faible', lowStock.length + ' références', '', '#ffc107') +
+                statCard('fa-times-circle',  'Rupture',           outStock.length + ' références', '', '#dc3545') +
+                statCard('fa-dollar-sign',   'Valeur totale stock', fmtHTG(totalValue), fmtUSD(totalValue), '#6f42c1') +
+                '</div>' +
+                (outStock.length ? '<div class="alert alert-danger mb-3"><i class="fas fa-times-circle"></i> <strong>'+outStock.length+' médicament(s) en rupture:</strong> ' + outStock.map(function(m){return m.name;}).join(', ') + '</div>' : '') +
+                (lowStock.length ? '<div class="alert alert-warning mb-3"><i class="fas fa-exclamation-triangle"></i> <strong>'+lowStock.length+' médicament(s) en stock faible:</strong> ' + lowStock.map(function(m){return m.name+'('+m.quantity+')';}).join(', ') + '</div>' : '') +
+                '<div class="card">' +
+                '<h4><i class="fas fa-list"></i> État du stock complet</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>Médicament</th><th>Forme</th><th>Stock</th><th>Alerte</th><th>Prix</th><th>Valeur stock</th><th>Emplacement</th><th>Fournisseur</th></tr></thead><tbody>' +
+                meds.map(function(m) {
+                    var cls = m.quantity === 0 ? 'out-of-stock' : m.quantity <= m.alert_threshold ? 'low-stock' : '';
+                    var loc = (m.espace||'') + (m.espace && m.etagere ? '/' : '') + (m.etagere||'');
+                    return '<tr class="'+cls+'">' +
+                        '<td><strong>'+m.name+'</strong></td>' +
+                        '<td>'+(m.form||'-')+'</td>' +
+                        '<td><strong style="color:'+(m.quantity===0?'#dc3545':m.quantity<=m.alert_threshold?'#856404':'#155724')+';">'+m.quantity+'</strong></td>' +
+                        '<td>'+m.alert_threshold+'</td>' +
+                        '<td>'+fmtHTG(m.price)+'</td>' +
+                        '<td>'+fmtHTG(parseFloat(m.price||0)*parseInt(m.quantity||0))+'</td>' +
+                        '<td>'+(loc||'-')+'</td>' +
+                        '<td>'+(m.supplier_name||'-')+'</td></tr>';
+                }).join('') + '</tbody></table></div></div>';
+
+        } else if (tab === 'agents') {
+            var txParams3 = { status: 'paid' };
+            if (from) txParams3.fromDate = from;
+            if (to)   txParams3.toDate   = to;
+            var paidTxs = await API.getTransactions(txParams3);
+            var wds = await API.getCashWithdrawals({ fromDate: from, toDate: to }).catch(function(){return[];});
+
+            var agentData = {};
+            paidTxs.forEach(function(t) {
+                var a = t.payment_agent || t.created_by || 'Inconnu';
+                if (!agentData[a]) agentData[a] = { count: 0, total: 0, withdrawn: 0, methods: {} };
+                agentData[a].count++;
+                agentData[a].total += parseFloat(t.amount);
+                var m = t.payment_method || 'Non précisé';
+                agentData[a].methods[m] = (agentData[a].methods[m]||0) + parseFloat(t.amount);
+            });
+            wds.forEach(function(w) {
+                var a = w.agent_username;
+                if (agentData[a]) agentData[a].withdrawn += parseFloat(w.amount);
+            });
+
+            if (agent) {
+                var filtered = {};
+                if (agentData[agent]) filtered[agent] = agentData[agent];
+                agentData = filtered;
+            }
+
+            el.innerHTML = Object.keys(agentData).length === 0 ?
+                '<div class="alert alert-info">Aucune donnée pour la période sélectionnée.</div>' :
+                Object.entries(agentData).map(function(e) {
+                    var a = e[0], d = e[1];
+                    var net = d.total - d.withdrawn;
+                    return '<div class="card mb-3">' +
+                        '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                        '<h4><i class="fas fa-user-tie" style="color:#1a6bca;"></i> ' + a + '</h4>' +
+                        '<span class="badge badge-primary">'+d.count+' transactions</span>' +
+                        '</div>' +
+                        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0;">' +
+                        statCard('fa-arrow-down',   'Encaissé',  fmtHTG(d.total),     fmtUSD(d.total),     '#28a745') +
+                        statCard('fa-arrow-up',     'Retraits',  fmtHTG(d.withdrawn), fmtUSD(d.withdrawn), '#dc3545') +
+                        statCard('fa-wallet',       'Net caisse',fmtHTG(net),          fmtUSD(net),         net>=0?'#1a6bca':'#dc3545') +
+                        '</div>' +
+                        '<h5 style="margin-bottom:8px;">Par méthode de paiement:</h5>' +
+                        '<div class="table-container"><table><thead><tr><th>Méthode</th><th>Total HTG</th><th>Total USD</th></tr></thead><tbody>' +
+                        Object.entries(d.methods).map(function(me) {
+                            return '<tr><td>'+me[0]+'</td><td>'+fmtHTG(me[1])+'</td><td>'+fmtUSD(me[1])+'</td></tr>';
+                        }).join('') + '</tbody></table></div></div>';
+                }).join('');
+
+        } else if (tab === 'hospitalization') {
+            var hosps = await API.getHospitalizations({}).catch(function(){return[];});
+            if (from || to) {
+                hosps = hosps.filter(function(h) {
+                    var d = h.admission_date || '';
+                    return (!from || d >= from) && (!to || d <= to);
+                });
+            }
+            var active     = hosps.filter(function(h) { return h.status === 'active'; });
+            var discharged = hosps.filter(function(h) { return h.status === 'discharged'; });
+            var totalDep   = hosps.reduce(function(s,h) { return s + parseFloat(h.deposit||0); }, 0);
+            var totalDebt  = hosps.filter(function(h) { return parseFloat(h.balance||0) < 0; })
+                                   .reduce(function(s,h) { return s + Math.abs(parseFloat(h.balance)); }, 0);
+
+            el.innerHTML =
+                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
+                statCard('fa-bed',          'Total admissions', hosps.length,         'Période sélectionnée', '#1a6bca') +
+                statCard('fa-hospital-user','Actuellement hospitalisés', active.length,     '', '#28a745') +
+                statCard('fa-sign-out-alt', 'Sorties',          discharged.length,    '', '#6c757d') +
+                statCard('fa-money-bill',   'Total dépôts',     fmtHTG(totalDep),     fmtUSD(totalDep), '#28a745') +
+                statCard('fa-exclamation',  'Dettes restantes', fmtHTG(totalDebt),    fmtUSD(totalDebt), '#dc3545') +
+                '</div>' +
+                '<div class="card">' +
+                '<h4><i class="fas fa-list"></i> Détail des hospitalisations</h4>' +
+                '<div class="table-container mt-2"><table><thead><tr><th>Patient</th><th>Chambre</th><th>Admission</th><th>Sortie</th><th>Médecin</th><th>Dépôt</th><th>Solde</th><th>Statut</th></tr></thead><tbody>' +
+                hosps.map(function(h) {
+                    var balance = parseFloat(h.balance||0);
+                    return '<tr>' +
+                        '<td><strong>'+(h.full_name||h.patient_id)+'</strong></td>' +
+                        '<td>'+(h.room||'-')+(h.bed?' / '+h.bed:'')+'</td>' +
+                        '<td>'+(h.admission_date||'-')+'</td>' +
+                        '<td>'+(h.discharge_date||'—')+'</td>' +
+                        '<td>'+(h.doctor||'-')+'</td>' +
+                        '<td>'+fmtHTG(h.deposit)+'</td>' +
+                        '<td style="color:'+(balance<0?'#dc3545':'#28a745')+'"><strong>'+fmtHTG(balance)+'</strong></td>' +
+                        '<td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalisé':'Sorti')+'</span></td>' +
+                    '</tr>';
+                }).join('') + '</tbody></table></div></div>';
+        }
+    } catch(e) {
+        el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
+    }
+}
 
 // ─── HOSPITALISATION ─────────────────────────────────────────
 var _currentHospId = null;
