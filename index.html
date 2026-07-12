@@ -767,8 +767,6 @@
         <!-- ─── RAPPORTS ──────────────────────────────── -->
         <section id="reports" class="content">
             <h2 class="section-title"><i class="fas fa-file-alt"></i> Rapports & Statistiques</h2>
-
-            <!-- Filtres globaux -->
             <div class="card mb-3">
                 <h3><i class="fas fa-filter" style="color:#1a6bca;"></i> Filtres</h3>
                 <div class="add-form-grid" style="margin-top:12px;">
@@ -776,43 +774,30 @@
                         <input type="date" id="rpt-from" class="form-control"></div>
                     <div><label class="form-label">Date fin</label>
                         <input type="date" id="rpt-to" class="form-control"></div>
-                    <div><label class="form-label">Utilisateur / Agent</label>
+                    <div><label class="form-label">Agent / Utilisateur</label>
                         <select id="rpt-agent" class="form-control">
                             <option value="">Tous les agents</option>
                         </select>
                     </div>
                     <div style="display:flex;align-items:flex-end;">
                         <button class="btn btn-primary" style="width:100%;" onclick="generateReports()">
-                            <i class="fas fa-search"></i> Générer les rapports
-                        </button>
+                            <i class="fas fa-search"></i> Générer</button>
                     </div>
                 </div>
             </div>
-
-            <!-- Tabs de rapports -->
-            <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;background:#fff;border-radius:8px 8px 0 0;">
-                <button class="rpt-tab-btn active" data-rpt="transactions" onclick="showRptTab('transactions')"
-                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;">
-                    <i class="fas fa-receipt"></i> Transactions</button>
-                <button class="rpt-tab-btn" data-rpt="patients" onclick="showRptTab('patients')"
-                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
-                    <i class="fas fa-users"></i> Patients</button>
-                <button class="rpt-tab-btn" data-rpt="medications" onclick="showRptTab('medications')"
-                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
-                    <i class="fas fa-pills"></i> Médicaments</button>
-                <button class="rpt-tab-btn" data-rpt="agents" onclick="showRptTab('agents')"
-                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
-                    <i class="fas fa-user-tie"></i> Par agent</button>
-                <button class="rpt-tab-btn" data-rpt="hospitalization" onclick="showRptTab('hospitalization')"
-                    style="padding:12px 18px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;">
-                    <i class="fas fa-bed"></i> Hospitalisation</button>
+            <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;background:#fff;border-radius:8px 8px 0 0;flex-wrap:nowrap;">
+                <button class="rpt-tab-btn active" data-rpt="transactions" onclick="showRptTab('transactions')" style="padding:10px 14px;border:none;background:var(--primary-light);font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;"><i class="fas fa-receipt"></i> Transactions</button>
+                <button class="rpt-tab-btn" data-rpt="patients"      onclick="showRptTab('patients')"      style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-users"></i> Patients</button>
+                <button class="rpt-tab-btn" data-rpt="medications"   onclick="showRptTab('medications')"   style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-pills"></i> Médicaments</button>
+                <button class="rpt-tab-btn" data-rpt="suppliers"     onclick="showRptTab('suppliers')"     style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-truck"></i> Fournisseurs</button>
+                <button class="rpt-tab-btn" data-rpt="users"         onclick="showRptTab('users')"         style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-user-tie"></i> Utilisateurs</button>
+                <button class="rpt-tab-btn" data-rpt="hospitalization" onclick="showRptTab('hospitalization')" style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-bed"></i> Hospitalisation</button>
             </div>
-
-            <!-- Contenu rapports -->
-            <div id="rpt-tab-transactions" class="rpt-tab-content"></div>
-            <div id="rpt-tab-patients"     class="rpt-tab-content" style="display:none;"></div>
-            <div id="rpt-tab-medications"  class="rpt-tab-content" style="display:none;"></div>
-            <div id="rpt-tab-agents"       class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-transactions"    class="rpt-tab-content"></div>
+            <div id="rpt-tab-patients"        class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-medications"     class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-suppliers"       class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-users"           class="rpt-tab-content" style="display:none;"></div>
             <div id="rpt-tab-hospitalization" class="rpt-tab-content" style="display:none;"></div>
         </section>
 

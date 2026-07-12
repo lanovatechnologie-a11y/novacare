@@ -436,8 +436,6 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
-            else if (target === 'reports')         { initReports(); }
-            else if (target === 'hospitalization') { loadHospitalizations('active'); loadDoctorsForHosp(); }
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
         });
@@ -463,16 +461,15 @@ function setupRoleBasedNavigation() {
         if (perms.pharmacy)       allowed.push('pharmacy');
         if (perms.messaging)        allowed.push('messaging');
         if (perms.administration)   allowed.push('administration');
-        if (perms.reports !== false)         allowed.push('reports');
         if (perms.hospitalization !== false) allowed.push('hospitalization');
         if (perms.suppliers !== false)       allowed.push('suppliers');
         if (perms.settings)         allowed.push('settings');
     } else {
         const roleAccess = {
-            secretary: ['dashboard','secretary','messaging','hospitalization','reports'],
-            cashier:   ['dashboard','cashier','messaging','hospitalization','reports'],
+            secretary: ['dashboard','secretary','messaging','hospitalization'],
+            cashier:   ['dashboard','cashier','messaging','hospitalization'],
             nurse:     ['dashboard','nurse','messaging','hospitalization'],
-            doctor:    ['dashboard','doctor','messaging','hospitalization','reports'],
+            doctor:    ['dashboard','doctor','messaging','hospitalization'],
             lab:       ['dashboard','laboratory','messaging','hospitalization'],
             pharmacy:  ['dashboard','pharmacy','messaging','hospitalization'],
         };
@@ -2610,9 +2607,9 @@ async function updateAdminStats() {
             }).join('') : '<p class="text-muted">Aucune donnée</p>') +
             '</div>';
 
-        // Section comptes multiples (try séparé pour ne pas bloquer les stats)
+        // Section comptes + décaissements + caisse
         try { await renderAccountsDashboard(stats); } catch(eAcc) { console.warn('Comptes:', eAcc.message); }
-        // Section gestion de caisse
+        try { await loadDecaissements(); } catch(eDec) { console.warn('Dec:', eDec.message); }
         try { await renderCashManagement(stats); } catch(eCash) { console.warn('Caisse:', eCash.message); }
 
         // Mettre à jour les anciens éléments si présents
@@ -2906,745 +2903,6 @@ var _currentSupplierName = null;
 function toggleSupplierForm() {
     var f = document.getElementById('supplier-add-form');
     f.style.display = f.style.display === 'none' ? 'grid' : 'none';
-}
-
-
-
-// ─── RAPPORTS ─────────────────────────────────────────────────
-var _currentRptTab = 'transactions';
-
-async function initReports() {
-    // Initialiser les dates par défaut (mois en cours)
-    var now   = new Date();
-    var from  = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    var to    = now.toISOString().split('T')[0];
-    var fromEl = document.getElementById('rpt-from');
-    var toEl   = document.getElementById('rpt-to');
-    if (fromEl && !fromEl.value) fromEl.value = from;
-    if (toEl   && !toEl.value)   toEl.value   = to;
-
-    // Charger les agents dans le select
-    var agentSel = document.getElementById('rpt-agent');
-    if (agentSel && agentSel.options.length <= 1) {
-        var users = await API.getUsers().catch(function() { return []; });
-        users.forEach(function(u) {
-            var opt = document.createElement('option');
-            opt.value = u.username;
-            opt.textContent = u.name + ' (' + u.role + ')';
-            agentSel.appendChild(opt);
-        });
-    }
-    generateReports();
-}
-
-function showRptTab(tab) {
-    _currentRptTab = tab;
-    document.querySelectorAll('.rpt-tab-content').forEach(function(el) { el.style.display = 'none'; });
-    document.querySelectorAll('.rpt-tab-btn').forEach(function(btn) {
-        var isActive = btn.dataset.rpt === tab;
-        btn.style.color        = isActive ? 'var(--primary)' : 'var(--muted)';
-        btn.style.borderBottom = isActive ? '3px solid var(--primary)' : '3px solid transparent';
-    });
-    var el = document.getElementById('rpt-tab-' + tab);
-    if (el) el.style.display = 'block';
-    generateReports();
-}
-
-async function generateReports() {
-    var from  = document.getElementById('rpt-from').value;
-    var to    = document.getElementById('rpt-to').value;
-    var agent = document.getElementById('rpt-agent').value;
-    var tab   = _currentRptTab;
-
-    var el = document.getElementById('rpt-tab-' + tab);
-    if (!el) return;
-    el.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i><p class="mt-2">Chargement...</p></div>';
-
-    var rate = state.exchangeRate || 130;
-
-    function fmtHTG(v) { return parseFloat(v||0).toLocaleString('fr-FR') + ' HTG'; }
-    function fmtUSD(v) { return '$' + (parseFloat(v||0)/rate).toFixed(2); }
-    function statCard(icon, label, value, sub, color) {
-        return '<div style="background:#fff;border-radius:10px;padding:16px;border:1px solid var(--border);border-left:4px solid '+(color||'#1a6bca')+';">' +
-            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
-            '<i class="fas '+icon+'" style="color:'+(color||'#1a6bca')+';font-size:1.2rem;"></i>' +
-            '<strong>'+label+'</strong></div>' +
-            '<div style="font-size:1.3rem;font-weight:700;color:'+(color||'#1a6bca')+';">'+value+'</div>' +
-            (sub ? '<div style="font-size:.8rem;color:var(--muted);margin-top:4px;">'+sub+'</div>' : '') +
-            '</div>';
-    }
-
-    try {
-        if (tab === 'transactions') {
-            var params = { status: 'all' };
-            if (from) params.fromDate = from;
-            if (to)   params.toDate   = to;
-            var txs = await API.getTransactions(params);
-            if (agent) txs = txs.filter(function(t) { return t.payment_agent === agent || t.created_by === agent; });
-
-            var paid   = txs.filter(function(t) { return t.status === 'paid'; });
-            var unpaid = txs.filter(function(t) { return t.status === 'unpaid'; });
-            var refunded = txs.filter(function(t) { return t.status === 'refunded'; });
-            var totalPaid   = paid.reduce(function(s,t)  { return s + parseFloat(t.amount); }, 0);
-            var totalUnpaid = unpaid.reduce(function(s,t) { return s + parseFloat(t.amount); }, 0);
-
-            // Grouper par type
-            var byType = {};
-            paid.forEach(function(t) {
-                if (!byType[t.type]) byType[t.type] = { count: 0, total: 0 };
-                byType[t.type].count++;
-                byType[t.type].total += parseFloat(t.amount);
-            });
-
-            // Grouper par méthode de paiement
-            var byMethod = {};
-            paid.forEach(function(t) {
-                var m = t.payment_method || 'Non précisé';
-                if (!byMethod[m]) byMethod[m] = { count: 0, total: 0 };
-                byMethod[m].count++;
-                byMethod[m].total += parseFloat(t.amount);
-            });
-
-            el.innerHTML =
-                // Cartes résumé
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
-                statCard('fa-check-circle', 'Total encaissé', fmtHTG(totalPaid), fmtUSD(totalPaid) + ' | ' + paid.length + ' tx', '#28a745') +
-                statCard('fa-clock', 'Non payé', fmtHTG(totalUnpaid), unpaid.length + ' transactions', '#dc3545') +
-                statCard('fa-undo-alt', 'Remboursés', refunded.length + ' tx', '', '#ffc107') +
-                statCard('fa-list', 'Total transactions', txs.length + ' tx', 'Période sélectionnée', '#1a6bca') +
-                '</div>' +
-
-                // Par type de service
-                '<div class="card mb-3">' +
-                '<h4><i class="fas fa-chart-bar"></i> Par type de service</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>Type</th><th>Transactions</th><th>Total HTG</th><th>Total USD</th></tr></thead><tbody>' +
-                Object.entries(byType).map(function(e) {
-                    var typeLabels = { consultation: 'Consultation', lab: 'Laboratoire', medication: 'Médicaments', external: 'Services externes' };
-                    return '<tr><td><strong>'+(typeLabels[e[0]]||e[0])+'</strong></td>' +
-                        '<td>'+e[1].count+'</td>' +
-                        '<td>'+fmtHTG(e[1].total)+'</td>' +
-                        '<td>'+fmtUSD(e[1].total)+'</td></tr>';
-                }).join('') + '</tbody></table></div></div>' +
-
-                // Par méthode de paiement
-                '<div class="card mb-3">' +
-                '<h4><i class="fas fa-credit-card"></i> Par méthode de paiement</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>Méthode</th><th>Transactions</th><th>Total HTG</th><th>Total USD</th></tr></thead><tbody>' +
-                Object.entries(byMethod).map(function(e) {
-                    return '<tr><td><strong>'+e[0]+'</strong></td>' +
-                        '<td>'+e[1].count+'</td>' +
-                        '<td>'+fmtHTG(e[1].total)+'</td>' +
-                        '<td>'+fmtUSD(e[1].total)+'</td></tr>';
-                }).join('') + '</tbody></table></div></div>' +
-
-                // Liste détaillée
-                '<div class="card">' +
-                '<h4><i class="fas fa-list"></i> Détail des transactions (' + txs.length + ')</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Agent</th></tr></thead><tbody>' +
-                txs.slice(0, 100).map(function(t) {
-                    var statusClass = t.status === 'paid' ? 'status-paid' : t.status === 'refunded' ? 'status-partial' : 'status-unpaid';
-                    var statusLabel = t.status === 'paid' ? 'Payé' : t.status === 'refunded' ? 'Remboursé' : 'Non payé';
-                    return '<tr><td>'+(t.date||'-')+'</td>' +
-                        '<td>'+t.patient_name+'</td>' +
-                        '<td>'+t.service+'</td>' +
-                        '<td><strong>'+fmtHTG(t.amount)+'</strong></td>' +
-                        '<td><span class="'+statusClass+'">'+statusLabel+'</span></td>' +
-                        '<td>'+(t.payment_method||'-')+'</td>' +
-                        '<td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
-                }).join('') + '</tbody></table></div>' +
-                (txs.length > 100 ? '<p class="text-muted mt-2"><i class="fas fa-info-circle"></i> Affichage limité à 100 lignes.</p>' : '') +
-                '</div>';
-
-        } else if (tab === 'patients') {
-            var params2 = {};
-            if (from) params2.date = from;
-            var patients = await API.getPatients({});
-            if (from || to) {
-                patients = patients.filter(function(p) {
-                    var d = p.registration_date || (p.created_at ? p.created_at.split('T')[0] : '');
-                    return (!from || d >= from) && (!to || d <= to);
-                });
-            }
-            var vip       = patients.filter(function(p) { return p.vip; });
-            var sponsored = patients.filter(function(p) { return p.sponsored; });
-            var types     = {};
-            patients.forEach(function(p) {
-                types[p.type] = (types[p.type]||0) + 1;
-            });
-
-            el.innerHTML =
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
-                statCard('fa-users',       'Total patients',  patients.length + ' patients', 'Période sélectionnée', '#1a6bca') +
-                statCard('fa-star',        'VIP',             vip.length + ' patients',       '', '#ffc107') +
-                statCard('fa-hand-holding-heart', 'Sponsorisés', sponsored.length + ' patients', '', '#6f42c1') +
-                '</div>' +
-                '<div class="card mb-3">' +
-                '<h4><i class="fas fa-chart-pie"></i> Par type de patient</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>Type</th><th>Nombre</th><th>%</th></tr></thead><tbody>' +
-                Object.entries(types).map(function(e) {
-                    return '<tr><td><strong>'+e[0]+'</strong></td><td>'+e[1]+'</td><td>'+(e[1]/patients.length*100).toFixed(1)+'%</td></tr>';
-                }).join('') + '</tbody></table></div></div>' +
-                '<div class="card">' +
-                '<h4><i class="fas fa-list"></i> Liste des patients ('+patients.length+')</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>ID</th><th>Nom</th><th>Type</th><th>Téléphone</th><th>Date</th><th>Privilège</th></tr></thead><tbody>' +
-                patients.slice(0,100).map(function(p) {
-                    return '<tr><td><strong>'+p.id+'</strong></td>' +
-                        '<td>'+p.full_name+'</td>' +
-                        '<td>'+p.type+'</td>' +
-                        '<td>'+(p.phone||'-')+'</td>' +
-                        '<td>'+(p.registration_date||'-')+'</td>' +
-                        '<td>'+(p.vip?'<span class="vip-tag">VIP</span>':p.sponsored?'<span class="badge badge-primary">Sponsorisé</span>':'-')+'</td></tr>';
-                }).join('') + '</tbody></table></div></div>';
-
-        } else if (tab === 'medications') {
-            var meds = await API.getMedications();
-            var lowStock  = meds.filter(function(m) { return m.quantity <= m.alert_threshold && m.quantity > 0; });
-            var outStock  = meds.filter(function(m) { return m.quantity === 0; });
-            var okStock   = meds.filter(function(m) { return m.quantity > m.alert_threshold; });
-            var totalValue = meds.reduce(function(s,m) { return s + parseFloat(m.price||0) * parseInt(m.quantity||0); }, 0);
-
-            el.innerHTML =
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
-                statCard('fa-pills',         'Total médicaments', meds.length + ' références', '', '#1a6bca') +
-                statCard('fa-check-circle',  'Stock OK',          okStock.length + ' références', '', '#28a745') +
-                statCard('fa-exclamation-triangle', 'Stock faible', lowStock.length + ' références', '', '#ffc107') +
-                statCard('fa-times-circle',  'Rupture',           outStock.length + ' références', '', '#dc3545') +
-                statCard('fa-dollar-sign',   'Valeur totale stock', fmtHTG(totalValue), fmtUSD(totalValue), '#6f42c1') +
-                '</div>' +
-                (outStock.length ? '<div class="alert alert-danger mb-3"><i class="fas fa-times-circle"></i> <strong>'+outStock.length+' médicament(s) en rupture:</strong> ' + outStock.map(function(m){return m.name;}).join(', ') + '</div>' : '') +
-                (lowStock.length ? '<div class="alert alert-warning mb-3"><i class="fas fa-exclamation-triangle"></i> <strong>'+lowStock.length+' médicament(s) en stock faible:</strong> ' + lowStock.map(function(m){return m.name+'('+m.quantity+')';}).join(', ') + '</div>' : '') +
-                '<div class="card">' +
-                '<h4><i class="fas fa-list"></i> État du stock complet</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>Médicament</th><th>Forme</th><th>Stock</th><th>Alerte</th><th>Prix</th><th>Valeur stock</th><th>Emplacement</th><th>Fournisseur</th></tr></thead><tbody>' +
-                meds.map(function(m) {
-                    var cls = m.quantity === 0 ? 'out-of-stock' : m.quantity <= m.alert_threshold ? 'low-stock' : '';
-                    var loc = (m.espace||'') + (m.espace && m.etagere ? '/' : '') + (m.etagere||'');
-                    return '<tr class="'+cls+'">' +
-                        '<td><strong>'+m.name+'</strong></td>' +
-                        '<td>'+(m.form||'-')+'</td>' +
-                        '<td><strong style="color:'+(m.quantity===0?'#dc3545':m.quantity<=m.alert_threshold?'#856404':'#155724')+';">'+m.quantity+'</strong></td>' +
-                        '<td>'+m.alert_threshold+'</td>' +
-                        '<td>'+fmtHTG(m.price)+'</td>' +
-                        '<td>'+fmtHTG(parseFloat(m.price||0)*parseInt(m.quantity||0))+'</td>' +
-                        '<td>'+(loc||'-')+'</td>' +
-                        '<td>'+(m.supplier_name||'-')+'</td></tr>';
-                }).join('') + '</tbody></table></div></div>';
-
-        } else if (tab === 'agents') {
-            var txParams3 = { status: 'paid' };
-            if (from) txParams3.fromDate = from;
-            if (to)   txParams3.toDate   = to;
-            var paidTxs = await API.getTransactions(txParams3);
-            var wds = await API.getCashWithdrawals({ fromDate: from, toDate: to }).catch(function(){return[];});
-
-            var agentData = {};
-            paidTxs.forEach(function(t) {
-                var a = t.payment_agent || t.created_by || 'Inconnu';
-                if (!agentData[a]) agentData[a] = { count: 0, total: 0, withdrawn: 0, methods: {} };
-                agentData[a].count++;
-                agentData[a].total += parseFloat(t.amount);
-                var m = t.payment_method || 'Non précisé';
-                agentData[a].methods[m] = (agentData[a].methods[m]||0) + parseFloat(t.amount);
-            });
-            wds.forEach(function(w) {
-                var a = w.agent_username;
-                if (agentData[a]) agentData[a].withdrawn += parseFloat(w.amount);
-            });
-
-            if (agent) {
-                var filtered = {};
-                if (agentData[agent]) filtered[agent] = agentData[agent];
-                agentData = filtered;
-            }
-
-            el.innerHTML = Object.keys(agentData).length === 0 ?
-                '<div class="alert alert-info">Aucune donnée pour la période sélectionnée.</div>' :
-                Object.entries(agentData).map(function(e) {
-                    var a = e[0], d = e[1];
-                    var net = d.total - d.withdrawn;
-                    return '<div class="card mb-3">' +
-                        '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
-                        '<h4><i class="fas fa-user-tie" style="color:#1a6bca;"></i> ' + a + '</h4>' +
-                        '<span class="badge badge-primary">'+d.count+' transactions</span>' +
-                        '</div>' +
-                        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0;">' +
-                        statCard('fa-arrow-down',   'Encaissé',  fmtHTG(d.total),     fmtUSD(d.total),     '#28a745') +
-                        statCard('fa-arrow-up',     'Retraits',  fmtHTG(d.withdrawn), fmtUSD(d.withdrawn), '#dc3545') +
-                        statCard('fa-wallet',       'Net caisse',fmtHTG(net),          fmtUSD(net),         net>=0?'#1a6bca':'#dc3545') +
-                        '</div>' +
-                        '<h5 style="margin-bottom:8px;">Par méthode de paiement:</h5>' +
-                        '<div class="table-container"><table><thead><tr><th>Méthode</th><th>Total HTG</th><th>Total USD</th></tr></thead><tbody>' +
-                        Object.entries(d.methods).map(function(me) {
-                            return '<tr><td>'+me[0]+'</td><td>'+fmtHTG(me[1])+'</td><td>'+fmtUSD(me[1])+'</td></tr>';
-                        }).join('') + '</tbody></table></div></div>';
-                }).join('');
-
-        } else if (tab === 'hospitalization') {
-            var hosps = await API.getHospitalizations({}).catch(function(){return[];});
-            if (from || to) {
-                hosps = hosps.filter(function(h) {
-                    var d = h.admission_date || '';
-                    return (!from || d >= from) && (!to || d <= to);
-                });
-            }
-            var active     = hosps.filter(function(h) { return h.status === 'active'; });
-            var discharged = hosps.filter(function(h) { return h.status === 'discharged'; });
-            var totalDep   = hosps.reduce(function(s,h) { return s + parseFloat(h.deposit||0); }, 0);
-            var totalDebt  = hosps.filter(function(h) { return parseFloat(h.balance||0) < 0; })
-                                   .reduce(function(s,h) { return s + Math.abs(parseFloat(h.balance)); }, 0);
-
-            el.innerHTML =
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">' +
-                statCard('fa-bed',          'Total admissions', hosps.length,         'Période sélectionnée', '#1a6bca') +
-                statCard('fa-hospital-user','Actuellement hospitalisés', active.length,     '', '#28a745') +
-                statCard('fa-sign-out-alt', 'Sorties',          discharged.length,    '', '#6c757d') +
-                statCard('fa-money-bill',   'Total dépôts',     fmtHTG(totalDep),     fmtUSD(totalDep), '#28a745') +
-                statCard('fa-exclamation',  'Dettes restantes', fmtHTG(totalDebt),    fmtUSD(totalDebt), '#dc3545') +
-                '</div>' +
-                '<div class="card">' +
-                '<h4><i class="fas fa-list"></i> Détail des hospitalisations</h4>' +
-                '<div class="table-container mt-2"><table><thead><tr><th>Patient</th><th>Chambre</th><th>Admission</th><th>Sortie</th><th>Médecin</th><th>Dépôt</th><th>Solde</th><th>Statut</th></tr></thead><tbody>' +
-                hosps.map(function(h) {
-                    var balance = parseFloat(h.balance||0);
-                    return '<tr>' +
-                        '<td><strong>'+(h.full_name||h.patient_id)+'</strong></td>' +
-                        '<td>'+(h.room||'-')+(h.bed?' / '+h.bed:'')+'</td>' +
-                        '<td>'+(h.admission_date||'-')+'</td>' +
-                        '<td>'+(h.discharge_date||'—')+'</td>' +
-                        '<td>'+(h.doctor||'-')+'</td>' +
-                        '<td>'+fmtHTG(h.deposit)+'</td>' +
-                        '<td style="color:'+(balance<0?'#dc3545':'#28a745')+'"><strong>'+fmtHTG(balance)+'</strong></td>' +
-                        '<td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalisé':'Sorti')+'</span></td>' +
-                    '</tr>';
-                }).join('') + '</tbody></table></div></div>';
-        }
-    } catch(e) {
-        el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
-    }
-}
-
-// ─── HOSPITALISATION ─────────────────────────────────────────
-var _currentHospId = null;
-var _currentHospPatient = null;
-
-function toggleAdmitForm() {
-    var f = document.getElementById('admit-form');
-    if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
-}
-
-async function loadDoctorsForHosp() {
-    var sel = document.getElementById('hosp-doctor');
-    if (!sel) return;
-    var users = await API.getUsers().catch(function() { return []; });
-    var doctors = users.filter(function(u) {
-        return u.active && (u.role === 'doctor' || (u.extra_roles && u.extra_roles.includes('doctor')));
-    });
-    sel.innerHTML = '<option value="">Sélectionner un médecin</option>' +
-        doctors.map(function(d) { return '<option value="' + d.username + '">' + d.name + '</option>'; }).join('');
-}
-
-async function searchPatientForHosp() {
-    var search = document.getElementById('hosp-patient-search').value.trim();
-    if (!search) return;
-    var patients = await API.getPatients({ search: search }).catch(function() { return []; });
-    var div = document.getElementById('hosp-patient-found');
-    if (!patients.length) {
-        div.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>';
-        div.style.display = 'block';
-        return;
-    }
-    var p = patients[0];
-    div.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> <strong>' + p.full_name + '</strong> — ' + p.id + '</div>';
-    div.style.display = 'block';
-    div.dataset.patientId   = p.id;
-    div.dataset.patientName = p.full_name;
-}
-
-async function admitPatient() {
-    var div = document.getElementById('hosp-patient-found');
-    var patientId   = div.dataset.patientId;
-    var patientName = div.dataset.patientName;
-    if (!patientId) { toast('Chercher un patient d\'abord', 'error'); return; }
-    var room    = document.getElementById('hosp-room').value.trim();
-    var bed     = document.getElementById('hosp-bed').value.trim();
-    var reason  = document.getElementById('hosp-reason').value.trim();
-    var doctor  = document.getElementById('hosp-doctor').value;
-    var deposit = parseFloat(document.getElementById('hosp-deposit').value) || 0;
-    if (!reason) { toast('Le motif est obligatoire', 'error'); return; }
-    try {
-        await apiCall(function() {
-            return API.admitPatient({ patientId, room, bed, reason, doctorUsername: doctor, depositAmount: deposit });
-        });
-        toast(patientName + ' admis en hospitalisation !', 'success');
-        toggleAdmitForm();
-        document.getElementById('hosp-patient-search').value = '';
-        document.getElementById('hosp-patient-found').style.display = 'none';
-        ['hosp-room','hosp-bed','hosp-reason','hosp-deposit'].forEach(function(id) {
-            var el = document.getElementById(id); if (el) el.value = '';
-        });
-        loadHospitalizations('active');
-    } catch(e) {}
-}
-
-async function loadHospitalizations(status) {
-    var container = document.getElementById('hospitalizations-list');
-    if (!container) return;
-    container.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
-    try {
-        var params = {};
-        if (status) params.status = status;
-        var hosps = await API.getHospitalizations(params);
-        if (!hosps.length) {
-            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-bed"></i> Aucune hospitalisation ' + (status === 'active' ? 'en cours' : '') + '.</div>';
-            return;
-        }
-        var stateColors = { active: '#28a745', discharged: '#6c757d' };
-        var stateLabels = { active: 'Hospitalisé', discharged: 'Sorti' };
-        container.innerHTML = hosps.map(function(h) {
-            var balance = parseFloat(h.balance || 0);
-            var isDebt  = balance < 0;
-            var days    = Math.floor((new Date() - new Date(h.admission_date)) / (1000*60*60*24));
-            return '<div class="card mb-2" style="border-left:4px solid '+(stateColors[h.status]||'#6c757d')+';padding:14px;">' +
-                '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
-                '<div>' +
-                '<h4 style="margin-bottom:4px;">' + h.full_name + '</h4>' +
-                '<small class="text-muted">' +
-                (h.room ? h.room + (h.bed ? ' / ' + h.bed : '') + ' | ' : '') +
-                'Admis le ' + h.admission_date + ' (' + days + ' j)' +
-                (h.doctor ? ' | Dr. ' + h.doctor : '') +
-                '</small><br><small class="text-muted">' + (h.admission_reason||'-') + '</small>' +
-                '</div>' +
-                '<div style="text-align:right;">' +
-                '<span class="badge" style="background:'+(stateColors[h.status]||'#6c757d')+';color:#fff;padding:4px 10px;">' + (stateLabels[h.status]||h.status) + '</span><br>' +
-                '<strong style="color:'+(isDebt?'#dc3545':'#28a745')+'">' +
-                (isDebt ? 'Dette: '+Math.abs(balance).toLocaleString('fr-FR') : 'Solde: '+balance.toLocaleString('fr-FR')) + ' HTG</strong>' +
-                '</div></div>' +
-                '<div class="d-flex gap-10 mt-2">' +
-                '<button class="btn btn-primary btn-sm" data-hid="' + h.id + '" data-hname="' + h.full_name + '" onclick="openHospDetail(this.dataset.hid,this.dataset.hname)"><i class="fas fa-folder-open"></i> Dossier</button>' +
-                (h.status === 'active' ? '<button class="btn btn-danger btn-sm" data-hid="' + h.id + '" onclick="quickDischarge(this.dataset.hid)"><i class="fas fa-sign-out-alt"></i> Sortie rapide</button>' : '') +
-                '</div></div>';
-        }).join('');
-    } catch(e) { container.innerHTML = '<div class="alert alert-danger">Erreur: ' + e.message + '</div>'; }
-}
-
-async function openHospDetail(hospId, patientName) {
-    _currentHospId = hospId;
-    document.getElementById('hosp-detail-section').style.display = 'block';
-    document.getElementById('admit-patient-card').style.display = 'none';
-    document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
-    document.getElementById('hosp-detail-title').innerHTML = '<i class="fas fa-user-injured"></i> ' + patientName;
-    var meds = state.medications && state.medications.length ? state.medications : await API.getMedications().catch(function(){return[];});
-    state.medications = meds;
-    var rxSel = document.getElementById('rx-medication');
-    if (rxSel) {
-        rxSel.innerHTML = '<option value="">Sélectionner du stock...</option>' +
-            meds.map(function(m) {
-                return '<option value="'+m.id+'" data-price="'+m.price+'" data-stock="'+m.quantity+'">'+m.name+' — Stock: '+m.quantity+' — '+m.price+' HTG</option>';
-            }).join('');
-    }
-    await refreshHospDetail();
-    showHospTab('nursing');
-}
-
-async function refreshHospDetail() {
-    var hosp = await API.getHospitalization(_currentHospId).catch(function(){return null;});
-    if (!hosp) return;
-    _currentHospPatient = hosp;
-    var balance = parseFloat(hosp.balance || 0);
-    var deposit = parseFloat(hosp.deposit || 0);
-    var isDebt  = balance < 0;
-    var el = document.getElementById('hosp-financial-summary');
-    if (el) el.innerHTML =
-        '<div class="d-flex gap-15 flex-wrap">' +
-        '<div style="background:#d4edda;padding:12px 18px;border-radius:10px;text-align:center;">' +
-        '<strong style="font-size:1.1rem;color:#155724;">'+deposit.toLocaleString('fr-FR')+' HTG</strong><br><small>Total déposé</small></div>' +
-        '<div style="background:'+(isDebt?'#f8d7da':'#d4edda')+';padding:12px 18px;border-radius:10px;text-align:center;">' +
-        '<strong style="font-size:1.1rem;color:'+(isDebt?'#721c24':'#155724')+'">' +
-        (isDebt?'⚠️ Dette: '+Math.abs(balance).toLocaleString('fr-FR'):'✅ Solde: '+balance.toLocaleString('fr-FR'))+' HTG</strong>' +
-        '<br><small>Solde actuel</small></div>' +
-        '</div>';
-}
-
-function closeHospDetail() {
-    _currentHospId = null;
-    _currentHospPatient = null;
-    document.getElementById('hosp-detail-section').style.display = 'none';
-    document.getElementById('admit-patient-card').style.display = 'block';
-    document.getElementById('hospitalizations-list').closest('.card').style.display = 'block';
-    loadHospitalizations('active');
-}
-
-function showHospTab(tab) {
-    document.querySelectorAll('.hosp-tab-content').forEach(function(el) { el.style.display = 'none'; });
-    document.querySelectorAll('.hosp-tab-btn').forEach(function(btn) {
-        var isActive = btn.dataset.tab === tab;
-        btn.style.color        = isActive ? 'var(--primary)' : 'var(--muted)';
-        btn.style.borderBottom = isActive ? '3px solid var(--primary)' : '3px solid transparent';
-    });
-    var tabEl = document.getElementById('hosp-tab-' + tab);
-    if (tabEl) tabEl.style.display = 'block';
-    if (tab === 'nursing')       loadNursingNotes();
-    else if (tab === 'prescriptions') loadPrescriptions();
-    else if (tab === 'deposits') loadDeposits();
-    else if (tab === 'services') loadHospServices();
-}
-
-async function saveNursingNote() {
-    if (!_currentHospId || !_currentHospPatient) return;
-    var data = {
-        hospitalizationId: _currentHospId,
-        patientId:    _currentHospPatient.patient_id,
-        temperature:  document.getElementById('nur-temp').value   || null,
-        bloodPressure:document.getElementById('nur-bp').value     || null,
-        pulse:        document.getElementById('nur-pulse').value  || null,
-        oxygenSat:    document.getElementById('nur-o2').value     || null,
-        weight:       document.getElementById('nur-weight').value || null,
-        generalState: document.getElementById('nur-state').value  || null,
-        notes:        document.getElementById('nur-notes').value  || null,
-    };
-    try {
-        await apiCall(function() { return API.addHospNursing(data); });
-        toast('Suivi enregistré !', 'success');
-        ['nur-temp','nur-bp','nur-pulse','nur-o2','nur-weight','nur-notes'].forEach(function(id){
-            var el=document.getElementById(id); if(el) el.value='';
-        });
-        document.getElementById('nur-state').value = '';
-        loadNursingNotes();
-    } catch(e) {}
-}
-
-async function loadNursingNotes() {
-    if (!_currentHospId) return;
-    var notes = await API.getHospNursing(_currentHospId).catch(function(){return[];});
-    var container = document.getElementById('nursing-notes-list');
-    if (!container) return;
-    if (!notes.length) { container.innerHTML = '<div class="alert alert-info">Aucun suivi enregistré.</div>'; return; }
-    var stateColors = { Bon:'#28a745', Stable:'#17a2b8', Moyen:'#ffc107', Critique:'#dc3545', Amélioré:'#28a745' };
-    container.innerHTML = notes.map(function(n) {
-        var vitals = [
-            n.temperature    ? 'T°: '+n.temperature+'°C'    : null,
-            n.blood_pressure ? 'TA: '+n.blood_pressure       : null,
-            n.pulse          ? 'Pouls: '+n.pulse+' bpm'      : null,
-            n.oxygen_sat     ? 'O2: '+n.oxygen_sat+'%'       : null,
-            n.weight         ? 'Poids: '+n.weight+' kg'      : null,
-        ].filter(Boolean);
-        return '<div class="card mb-2" style="border-left:4px solid '+(stateColors[n.general_state]||'#17a2b8')+';padding:12px;">' +
-            '<div class="d-flex justify-between align-center">' +
-            '<strong>'+new Date(n.created_at).toLocaleString('fr-FR')+'</strong>' +
-            ' — Par: <em>'+(n.recorded_by||'-')+'</em>' +
-            (n.general_state ? ' <span class="badge" style="background:'+(stateColors[n.general_state]||'#17a2b8')+';color:#fff;">'+n.general_state+'</span>' : '') +
-            '</div>' +
-            (vitals.length ? '<div class="mt-2" style="display:flex;gap:6px;flex-wrap:wrap;">'+vitals.map(function(v){return '<span class="badge badge-info">'+v+'</span>';}).join('')+'</div>' : '') +
-            (n.notes ? '<p class="mt-2" style="font-size:.88rem;">'+n.notes+'</p>' : '') +
-            '</div>';
-    }).join('');
-}
-
-function onRxMedSelect() {
-    var sel = document.getElementById('rx-medication');
-    var opt = sel.options[sel.selectedIndex];
-    if (!opt || !opt.dataset.price) return;
-    document.getElementById('rx-price').value = opt.dataset.price;
-    document.getElementById('rx-med-name').value = '';
-    updateRxCost();
-}
-
-function updateRxCost() {
-    var qty   = parseInt(document.getElementById('rx-qty').value) || 0;
-    var price = parseFloat(document.getElementById('rx-price').value) || 0;
-    var total = qty * price;
-    var prev  = document.getElementById('rx-cost-preview');
-    if (prev) prev.innerHTML = total > 0 ?
-        '<span class="badge badge-primary">Coût: '+total.toLocaleString('fr-FR')+' HTG</span>' : '';
-}
-
-async function savePrescription() {
-    if (!_currentHospId || !_currentHospPatient) return;
-    var medSel  = document.getElementById('rx-medication');
-    var medId   = medSel ? medSel.value : '';
-    var medName = medId
-        ? medSel.options[medSel.selectedIndex].text.split(' —')[0]
-        : document.getElementById('rx-med-name').value.trim();
-    var dosage  = document.getElementById('rx-dosage').value.trim();
-    var freq    = document.getElementById('rx-frequency').value;
-    var dur     = document.getElementById('rx-duration').value.trim();
-    var route   = document.getElementById('rx-route').value;
-    var qty     = parseInt(document.getElementById('rx-qty').value) || 1;
-    var price   = parseFloat(document.getElementById('rx-price').value) || 0;
-    var note    = document.getElementById('rx-note').value.trim();
-    if (!medName || !dosage) { toast('Médicament et dosage obligatoires', 'error'); return; }
-    try {
-        await apiCall(function() {
-            return API.addHospPrescription({
-                hospitalizationId: _currentHospId,
-                patientId:   _currentHospPatient.patient_id,
-                medicationId: medId || null,
-                medicationName: medName,
-                dosage, frequency: freq, duration: dur,
-                route, note, pricePerUnit: price, quantity: qty,
-            });
-        });
-        toast('Prescription enregistrée — '+(qty*price).toLocaleString('fr-FR')+' HTG déduit', 'success');
-        ['rx-med-name','rx-dosage','rx-duration','rx-note'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-        if (medSel) medSel.value = '';
-        document.getElementById('rx-qty').value = '1';
-        document.getElementById('rx-price').value = '';
-        document.getElementById('rx-cost-preview').innerHTML = '';
-        loadPrescriptions();
-        await refreshHospDetail();
-    } catch(e) {}
-}
-
-async function loadPrescriptions() {
-    if (!_currentHospId) return;
-    var rxs = await API.getHospPrescriptions(_currentHospId).catch(function(){return[];});
-    var container = document.getElementById('prescriptions-list');
-    if (!container) return;
-    if (!rxs.length) { container.innerHTML = '<div class="alert alert-info">Aucune prescription.</div>'; return; }
-    var statusColors = { pending:'#ffc107', administered:'#28a745', skipped:'#dc3545' };
-    var statusLabels = { pending:'En attente', administered:'Administré', skipped:'Sauté' };
-    container.innerHTML = rxs.map(function(rx) {
-        return '<div class="card mb-2" style="border-left:4px solid #6f42c1;padding:12px;">' +
-            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
-            '<div>' +
-            '<h5 style="color:#6f42c1;margin-bottom:4px;">'+rx.medication_name+'</h5>' +
-            '<div style="font-size:.85rem;display:flex;gap:10px;flex-wrap:wrap;">' +
-            '<span>'+rx.dosage+'</span>' +
-            (rx.frequency ? '<span>'+rx.frequency+'</span>' : '') +
-            (rx.duration  ? '<span>'+rx.duration+'</span>'  : '') +
-            '<span>'+(rx.route||'Orale')+'</span>' +
-            '</div>' +
-            (rx.note ? '<p style="font-size:.82rem;background:#fff3cd;padding:4px 8px;border-radius:4px;margin-top:6px;">'+rx.note+'</p>' : '') +
-            '<small class="text-muted">Qté: '+rx.quantity+' × '+parseFloat(rx.price_per_unit||0).toLocaleString('fr-FR')+' HTG = <strong>'+parseFloat(rx.total_price||0).toLocaleString('fr-FR')+' HTG</strong> | Par: '+(rx.prescribed_by||'-')+'</small>' +
-            '</div>' +
-            '<div style="text-align:right;">' +
-            '<span class="badge" style="background:'+(statusColors[rx.status]||'#ffc107')+';color:'+(rx.status==='pending'?'#212529':'#fff')+';padding:4px 10px;">'+(statusLabels[rx.status]||rx.status)+'</span>' +
-            (rx.status === 'pending' ?
-            '<br><div class="d-flex gap-6 mt-2">' +
-            '<button class="btn btn-xs btn-success" data-rxid="'+rx.id+'" onclick="markAdministered(this.dataset.rxid)"><i class="fas fa-check"></i> Administré</button>' +
-            '<button class="btn btn-xs btn-secondary" data-rxid="'+rx.id+'" onclick="markSkipped(this.dataset.rxid)"><i class="fas fa-times"></i> Sauté</button>' +
-            '</div>' : '') +
-            '</div></div></div>';
-    }).join('');
-}
-
-async function markAdministered(rxId) {
-    await apiCall(function() {
-        return API.updateHospPrescription(rxId, { status: 'administered', administeredAt: new Date().toISOString(), administeredBy: state.currentUser?.username });
-    });
-    toast('Médicament administré !', 'success');
-    loadPrescriptions();
-}
-async function markSkipped(rxId) {
-    await apiCall(function() { return API.updateHospPrescription(rxId, { status: 'skipped' }); });
-    toast('Dose sautée enregistrée', 'warning');
-    loadPrescriptions();
-}
-
-async function addDeposit() {
-    if (!_currentHospId || !_currentHospPatient) return;
-    var amount = parseFloat(document.getElementById('dep-amount').value);
-    var note   = document.getElementById('dep-note').value.trim();
-    if (isNaN(amount) || amount <= 0) { toast('Montant invalide', 'error'); return; }
-    try {
-        await apiCall(function() {
-            return API.addHospDeposit({ hospitalizationId: _currentHospId, patientId: _currentHospPatient.patient_id, amount, note });
-        });
-        toast('Dépôt de '+amount.toLocaleString('fr-FR')+' HTG enregistré !', 'success');
-        document.getElementById('dep-amount').value = '';
-        document.getElementById('dep-note').value   = '';
-        loadDeposits();
-        await refreshHospDetail();
-    } catch(e) {}
-}
-
-async function loadDeposits() {
-    if (!_currentHospId) return;
-    var deps = await API.getHospDeposits(_currentHospId).catch(function(){return[];});
-    var container = document.getElementById('deposits-list');
-    if (!container) return;
-    if (!deps.length) { container.innerHTML = '<div class="alert alert-info">Aucun dépôt.</div>'; return; }
-    var total = deps.reduce(function(s,d){return s+parseFloat(d.amount);},0);
-    container.innerHTML =
-        '<div style="background:#d4edda;padding:10px 16px;border-radius:8px;margin-bottom:10px;">Total déposé: <strong>'+total.toLocaleString('fr-FR')+' HTG</strong></div>' +
-        '<div class="table-container"><table><thead><tr><th>Date</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
-        deps.map(function(d) {
-            return '<tr><td>'+new Date(d.created_at).toLocaleString('fr-FR')+'</td>' +
-                '<td><strong style="color:#28a745;">+'+parseFloat(d.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
-                '<td>'+(d.note||'-')+'</td><td>'+(d.created_by||'-')+'</td></tr>';
-        }).join('')+'</tbody></table></div>';
-}
-
-async function addHospService() {
-    if (!_currentHospId || !_currentHospPatient) return;
-    var service = document.getElementById('svc-name').value.trim();
-    var amount  = parseFloat(document.getElementById('svc-amount').value);
-    var note    = document.getElementById('svc-note').value.trim();
-    if (!service || isNaN(amount) || amount <= 0) { toast('Service et montant obligatoires', 'error'); return; }
-    try {
-        await apiCall(function() {
-            return API.addHospService({ hospitalizationId: _currentHospId, patientId: _currentHospPatient.patient_id, service, amount, note });
-        });
-        toast('Service ajouté — '+amount.toLocaleString('fr-FR')+' HTG déduit', 'success');
-        document.getElementById('svc-name').value   = '';
-        document.getElementById('svc-amount').value = '';
-        document.getElementById('svc-note').value   = '';
-        loadHospServices();
-        await refreshHospDetail();
-    } catch(e) {}
-}
-
-async function loadHospServices() {
-    if (!_currentHospId) return;
-    var svcs = await API.getHospServices(_currentHospId).catch(function(){return[];});
-    var container = document.getElementById('hosp-services-list');
-    if (!container) return;
-    if (!svcs.length) { container.innerHTML = '<div class="alert alert-info">Aucun service ajouté.</div>'; return; }
-    var total = svcs.reduce(function(s,v){return s+parseFloat(v.amount);},0);
-    container.innerHTML =
-        '<div style="background:#f8d7da;padding:10px 16px;border-radius:8px;margin-bottom:10px;">Total services: <strong>'+total.toLocaleString('fr-FR')+' HTG</strong></div>' +
-        '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Note</th></tr></thead><tbody>' +
-        svcs.map(function(s) {
-            return '<tr><td>'+new Date(s.created_at).toLocaleDateString('fr-FR')+'</td>' +
-                '<td>'+s.service+'</td>' +
-                '<td><strong style="color:#dc3545;">-'+parseFloat(s.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
-                '<td>'+(s.note||'-')+'</td></tr>';
-        }).join('')+'</tbody></table></div>';
-}
-
-async function dischargePatient() {
-    if (!_currentHospId || !_currentHospPatient) return;
-    var note    = document.getElementById('discharge-note').value.trim();
-    var balance = parseFloat(_currentHospPatient.balance || 0);
-    var debtInfo = balance < 0
-        ? ' | Dette: ' + Math.abs(balance).toLocaleString('fr-FR') + ' HTG'
-        : ' | Solde: ' + balance.toLocaleString('fr-FR') + ' HTG';
-    if (!confirm('Confirmer la sortie de ' + _currentHospPatient.full_name + ' ?' + debtInfo)) return;
-    try {
-        await apiCall(function() {
-            return API.updateHospitalization(_currentHospId, {
-                status: 'discharged',
-                dischargeDate: new Date().toISOString().split('T')[0],
-                dischargeNote: note,
-            });
-        });
-        toast(_currentHospPatient.full_name + ' sorti(e) avec succès !', 'success');
-        closeHospDetail();
-    } catch(e) {}
-}
-
-async function quickDischarge(hospId) {
-    if (!confirm('Confirmer la sortie du patient ?')) return;
-    try {
-        await apiCall(function() {
-            return API.updateHospitalization(hospId, {
-                status: 'discharged',
-                dischargeDate: new Date().toISOString().split('T')[0],
-            });
-        });
-        toast('Patient sorti', 'success');
-        loadHospitalizations('active');
-    } catch(e) {}
 }
 
 async function loadSuppliers() {
@@ -4505,37 +3763,6 @@ function openEditUserModal(userId) {
     }).catch(function() { toast('Erreur chargement utilisateur', 'error'); });
 }
 
-async function saveEditUser(userId) {
-    var name     = document.getElementById('eu-name').value.trim();
-    var username = document.getElementById('eu-username').value.trim();
-    var role     = document.getElementById('eu-role').value;
-    var active   = document.getElementById('eu-active').value === 'true';
-    var pwd      = document.getElementById('eu-pwd').value;
-    var pwd2     = document.getElementById('eu-pwd2').value;
-
-    if (!name || !username || !role) { toast('Remplir les champs obligatoires', 'error'); return; }
-    if (pwd && pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
-    if (pwd && pwd.length < 4) { toast('Mot de passe trop court', 'error'); return; }
-
-    var extraRoles = [];
-    if (role === 'multi') {
-        document.querySelectorAll('#eu-multi-section input[type=checkbox]:checked').forEach(function(cb) {
-            extraRoles.push(cb.value);
-        });
-        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles', 'error'); return; }
-    }
-
-    var data = { name: name, username: username, role: role, active: active, extraRoles: extraRoles };
-    if (pwd) data.password = pwd;
-
-    try {
-        await apiCall(function() { return API.updateUser(userId, data); });
-        toast('Utilisateur modifié avec succès !', 'success');
-        document.getElementById('edit-user-modal').remove();
-        updateMedicationsSettingsList();
-    } catch(e) {}
-}
-
 async function toggleUser(id, active, name) {
     await apiCall(function() { return API.updateUser(id, { name: name, active: active }); });
     toast('Utilisateur ' + (active ? 'activé' : 'désactivé'));
@@ -4617,7 +3844,7 @@ function toggleEditUserMulti() {
     if (container) container.style.display = role === 'multi' ? 'block' : 'none';
 }
 
-async function saveEditUser(id) {
+async function saveEditUser(userId) {
     var name     = document.getElementById('eu-name').value.trim();
     var username = document.getElementById('eu-username').value.trim();
     var role     = document.getElementById('eu-role').value;
@@ -4627,36 +3854,35 @@ async function saveEditUser(id) {
 
     if (!name || !username || !role) { toast('Remplir les champs obligatoires', 'error'); return; }
     if (pwd && pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
-    if (pwd && pwd.length < 6) { toast('Mot de passe trop court (min 6 caractères)', 'error'); return; }
+    if (pwd && pwd.length < 4) { toast('Mot de passe trop court (min 4 caractères)', 'error'); return; }
 
     var extraRoles = [];
     if (role === 'multi') {
-        document.querySelectorAll('#eu-multi-container input[type=checkbox]:checked').forEach(function(cb) {
+        document.querySelectorAll('#eu-multi-section input[type=checkbox]:checked').forEach(function(cb) {
             extraRoles.push(cb.value);
         });
-        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles pour un compte multi-rôle', 'error'); return; }
+        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles', 'error'); return; }
     }
 
     try {
         // Mettre à jour les infos de base
         await apiCall(function() {
-            return API.updateUser(id, { name: name, active: active, username: username, role: role, extraRoles: extraRoles });
+            return API.updateUser(userId, { name: name, username: username, role: role, active: active, extraRoles: extraRoles });
         });
-
-        // Changer le mot de passe si fourni
+        // Changer le mot de passe séparément si rempli
         if (pwd) {
             await apiCall(function() {
-                return API.updateUserPassword(id, pwd);
+                return API.updateUserPassword(userId, pwd);
             });
         }
-
-        toast('Utilisateur "' + name + '" mis à jour !', 'success');
-        document.getElementById('edit-user-modal').remove();
+        toast('Utilisateur modifié avec succès !', 'success');
+        var modal = document.getElementById('edit-user-modal');
+        if (modal) modal.remove();
         updateMedicationsSettingsList();
     } catch(e) {}
 }
 
-// ─── PERMISSIONS SOUS-ADMIN ──────────────────────────────────
+
 function loadSubAdminPermissionsUI() {
     const perms = state.subAdminPermissions;
     Object.entries(perms).forEach(([key, val]) => {

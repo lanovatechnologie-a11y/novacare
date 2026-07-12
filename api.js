@@ -38,7 +38,8 @@ const API = (() => {
         // ── Utilisateurs ─────────────────────────────────────
         getUsers:     ()          => request('GET',    '/users'),
         addUser:      (data)      => request('POST',   '/users', data),
-        updateUser:   (id, data)  => request('PUT',    `/users/${id}`, data),
+        updateUser:      (id, data)  => request('PUT',    `/users/${id}`, data),
+        updateUserPassword: (id, pwd)  => request('PUT',    `/users/${id}/password`, { password: pwd }),
         deleteUser:   (id)        => request('DELETE', `/users/${id}`),
 
         // ── Patients ─────────────────────────────────────────
@@ -131,11 +132,6 @@ const API = (() => {
         addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
         deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
 
-        // ── Petite caisse ─────────────────────────────────────
-        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
-        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
-        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
-
         // ── Fournisseurs ──────────────────────────────────────
         getSuppliers:    ()          => request('GET',    '/suppliers'),
         addSupplier:     (data)      => request('POST',   '/suppliers', data),
@@ -157,35 +153,18 @@ const API = (() => {
         },
         addSupplierPayment: (data) => request('POST', '/supplier-payments', data),
 
-        // ── Remboursements ────────────────────────────────────
-        getRefunds:   (params = {}) => {
+        // ── Gestion de caisse (retraits / commissions) ────────
+        getCashWithdrawals: (params = {}) => {
             const qs = new URLSearchParams(params).toString();
-            return request('GET', '/refunds' + (qs ? '?' + qs : ''));
+            return request('GET', '/cash-withdrawals' + (qs ? '?' + qs : ''));
         },
-        addRefund:    (data) => request('POST',   '/refunds', data),
-        deleteRefund: (id)   => request('DELETE', `/refunds/${id}`),
+        addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
+        deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
 
-        // ── Hospitalisation ───────────────────────────────────
-        getHospitalizations:   (params = {}) => {
-            const qs = new URLSearchParams(params).toString();
-            return request('GET', '/hospitalizations' + (qs ? '?' + qs : ''));
-        },
-        getHospitalization:    (id)       => request('GET',  `/hospitalizations/${id}`),
-        admitPatient:          (data)     => request('POST', '/hospitalizations', data),
-        updateHospitalization: (id, data) => request('PUT',  `/hospitalizations/${id}`, data),
-
-        getHospDeposits:  (hospId)   => request('GET',  `/hosp-deposits/${hospId}`),
-        addHospDeposit:   (data)     => request('POST', '/hosp-deposits', data),
-
-        getHospPrescriptions:   (hospId)   => request('GET',  `/hosp-prescriptions/${hospId}`),
-        addHospPrescription:    (data)     => request('POST', '/hosp-prescriptions', data),
-        updateHospPrescription: (id, data) => request('PUT',  `/hosp-prescriptions/${id}`, data),
-
-        getHospNursing: (hospId) => request('GET',  `/hosp-nursing/${hospId}`),
-        addHospNursing: (data)   => request('POST', '/hosp-nursing', data),
-
-        addHospService:  (data)   => request('POST', '/hosp-services', data),
-        getHospServices: (hospId) => request('GET',  `/hosp-services/${hospId}`),
+        // ── Petite caisse ──────────────────────────────────────
+        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
+        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
+        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
 
         // ── Stats admin ───────────────────────────────────────
         getStats: (params = {}) => {
