@@ -436,6 +436,7 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'hospitalization') { loadHospitalizations('active'); loadDoctorsForHosp(); }
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
         });
@@ -444,7 +445,7 @@ function setupNavigation() {
 
 function setupRoleBasedNavigation() {
     const role = state.currentRole;
-    const allSections = ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','reports','hospitalization','suppliers','settings'];
+    const allSections = ['dashboard','secretary','cashier','nurse','doctor','laboratory','pharmacy','messaging','administration','hospitalization','suppliers','settings'];
 
     let allowed;
     if (role === 'admin') {
@@ -2607,9 +2608,9 @@ async function updateAdminStats() {
             }).join('') : '<p class="text-muted">Aucune donnée</p>') +
             '</div>';
 
-        // Section comptes + décaissements + caisse
+        // Section comptes multiples (try séparé pour ne pas bloquer les stats)
         try { await renderAccountsDashboard(stats); } catch(eAcc) { console.warn('Comptes:', eAcc.message); }
-        try { await loadDecaissements(); } catch(eDec) { console.warn('Dec:', eDec.message); }
+        // Section gestion de caisse
         try { await renderCashManagement(stats); } catch(eCash) { console.warn('Caisse:', eCash.message); }
 
         // Mettre à jour les anciens éléments si présents
@@ -2906,334 +2907,427 @@ function toggleSupplierForm() {
 }
 
 
-// ─── RAPPORTS PERSONNALISÉS ───────────────────────────────────
-var _currentRptTab = 'transactions';
+// ─── HOSPITALISATION ─────────────────────────────────────────
+var _currentHospId = null;
+var _currentHospPatient = null;
 
-async function initReports() {
-    var today = new Date().toISOString().split('T')[0];
-    var fromEl = document.getElementById('rpt-from');
-    var toEl   = document.getElementById('rpt-to');
-    if (fromEl && !fromEl.value) fromEl.value = today;
-    if (toEl   && !toEl.value)   toEl.value   = today;
-    var agentSel = document.getElementById('rpt-agent');
-    if (agentSel && agentSel.options.length <= 1) {
-        var users = await API.getUsers().catch(function(){return[];});
-        users.forEach(function(u) {
-            var opt = document.createElement('option');
-            opt.value = u.username;
-            opt.textContent = u.name + ' (' + getRoleLabel(u.role) + ')';
-            agentSel.appendChild(opt);
-        });
-    }
-    showRptTab(_currentRptTab || 'transactions');
+function toggleAdmitForm() {
+    var f = document.getElementById('admit-form');
+    if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
 
-function showRptTab(tab) {
-    _currentRptTab = tab;
-    document.querySelectorAll('.rpt-tab-content').forEach(function(el) { el.style.display = 'none'; });
-    document.querySelectorAll('.rpt-tab-btn').forEach(function(btn) {
-        var a = btn.dataset.rpt === tab;
-        btn.style.color        = a ? 'var(--primary)' : 'var(--muted)';
-        btn.style.borderBottom = a ? '3px solid var(--primary)' : '3px solid transparent';
-        btn.style.background   = a ? 'var(--primary-light)' : 'none';
+async function loadDoctorsForHosp() {
+    var sel = document.getElementById('hosp-doctor');
+    if (!sel) return;
+    var users = await API.getUsers().catch(function() { return []; });
+    var doctors = users.filter(function(u) {
+        return u.active && (u.role === 'doctor' || (u.extra_roles && u.extra_roles.includes('doctor')));
     });
-    var el = document.getElementById('rpt-tab-' + tab);
-    if (el) { el.style.display = 'block'; generateReport(tab); }
+    sel.innerHTML = '<option value="">Sélectionner un médecin</option>' +
+        doctors.map(function(d) { return '<option value="' + d.username + '">' + d.name + '</option>'; }).join('');
 }
 
-function generateReports() { showRptTab(_currentRptTab || 'transactions'); }
-
-async function generateReport(tab) {
-    var today = new Date().toISOString().split('T')[0];
-    var from  = (document.getElementById('rpt-from') || {}).value || today;
-    var to    = (document.getElementById('rpt-to')   || {}).value || today;
-    var agent = (document.getElementById('rpt-agent')|| {}).value || '';
-    var rate  = state.exchangeRate || 130;
-    var el    = document.getElementById('rpt-tab-' + tab);
-    if (!el) return;
-    el.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
-
-    function fmtHTG(v) { return parseFloat(v||0).toLocaleString('fr-FR') + ' HTG'; }
-    function fmtUSD(v) { return '&#8776;$' + (parseFloat(v||0)/rate).toFixed(2); }
-    function scard(icon, label, val, sub, color) {
-        return '<div style="background:#fff;border-radius:10px;padding:14px;border:1px solid var(--border);border-left:4px solid '+(color||'#1a6bca')+';">' +
-            '<div style="font-size:.8rem;color:var(--muted);margin-bottom:6px;"><i class="fas '+icon+'" style="color:'+(color||'#1a6bca')+';"></i> '+label+'</div>' +
-            '<div style="font-size:1.2rem;font-weight:700;color:'+(color||'#1a6bca')+';">'+val+'</div>' +
-            (sub?'<div style="font-size:.75rem;color:var(--muted);">'+sub+'</div>':'')+'</div>';
+async function searchPatientForHosp() {
+    var search = document.getElementById('hosp-patient-search').value.trim();
+    if (!search) return;
+    var patients = await API.getPatients({ search: search }).catch(function() { return []; });
+    var div = document.getElementById('hosp-patient-found');
+    if (!patients.length) {
+        div.innerHTML = '<div class="alert alert-danger">Patient non trouvé</div>';
+        div.style.display = 'block';
+        return;
     }
-    function tbl(heads, rows) {
-        return '<div class="table-container"><table><thead><tr>'+heads.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
-    }
-    var periodLabel = '<p class="text-muted mb-3" style="font-size:.82rem;"><i class="fas fa-calendar"></i> Periode: <strong>'+from+'</strong> au <strong>'+to+'</strong>'+(agent?' | Agent: <strong>'+agent+'</strong>':'')+'</p>';
-
-    try {
-        if (tab === 'transactions') {
-            var txs = await API.getTransactions({ status:'all', fromDate:from, toDate:to });
-            if (agent) txs = txs.filter(function(t){ return t.payment_agent===agent||t.created_by===agent; });
-            var paid=txs.filter(function(t){return t.status==='paid';}),
-                unpaid=txs.filter(function(t){return t.status==='unpaid';}),
-                refunded=txs.filter(function(t){return t.status==='refunded';});
-            var totP=paid.reduce(function(s,t){return s+parseFloat(t.amount);},0);
-            var totU=unpaid.reduce(function(s,t){return s+parseFloat(t.amount);},0);
-            var byType={}, byMethod={};
-            paid.forEach(function(t){
-                var tp=t.type||'autre'; if(!byType[tp]) byType[tp]={c:0,tot:0}; byType[tp].c++; byType[tp].tot+=parseFloat(t.amount);
-                var m=t.payment_method||'Non precis'; if(!byMethod[m]) byMethod[m]={c:0,tot:0}; byMethod[m].c++; byMethod[m].tot+=parseFloat(t.amount);
-            });
-            var tl={consultation:'Consultation',lab:'Laboratoire',medication:'Medicaments',external:'Services ext.'};
-            el.innerHTML = periodLabel +
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
-                scard('fa-check-circle','Encaisse',fmtHTG(totP),fmtUSD(totP)+' | '+paid.length+' tx','#28a745') +
-                scard('fa-clock','Non paye',fmtHTG(totU),unpaid.length+' tx','#dc3545') +
-                scard('fa-undo','Rembourses',refunded.length+' tx','','#ffc107') +
-                scard('fa-list','Total',txs.length+' tx','','#1a6bca') +
-                '</div>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Par type</h4>' +
-                tbl(['Type','Nb','HTG','USD'],Object.entries(byType).map(function(e){return '<tr><td>'+(tl[e[0]]||e[0])+'</td><td>'+e[1].c+'</td><td>'+fmtHTG(e[1].tot)+'</td><td>'+fmtUSD(e[1].tot)+'</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Par methode</h4>' +
-                tbl(['Methode','Nb','HTG','USD'],Object.entries(byMethod).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1].c+'</td><td>'+fmtHTG(e[1].tot)+'</td><td>'+fmtUSD(e[1].tot)+'</td></tr>';}).join(''))+'</div></div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Detail ('+Math.min(txs.length,100)+'/'+txs.length+')</h4>' +
-                tbl(['Date','Patient','Service','Montant','Statut','Methode','Agent'],
-                    txs.slice(0,100).map(function(t){
-                        var sc=t.status==='paid'?'status-paid':t.status==='refunded'?'status-partial':'status-unpaid';
-                        return '<tr><td>'+(t.date||'-')+'</td><td>'+t.patient_name+'</td><td>'+t.service+'</td><td>'+fmtHTG(t.amount)+'</td><td><span class="'+sc+'">'+t.status+'</span></td><td>'+(t.payment_method||'-')+'</td><td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
-                    }).join(''))+'</div>';
-
-        } else if (tab === 'patients') {
-            var pats = await API.getPatients({});
-            pats = pats.filter(function(p){ var d=(p.registration_date||''); return(!from||d>=from)&&(!to||d<=to); });
-            var types={};
-            pats.forEach(function(p){ types[p.type]=(types[p.type]||0)+1; });
-            el.innerHTML = periodLabel +
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
-                scard('fa-users','Total',pats.length+' patients','','#1a6bca') +
-                scard('fa-star','VIP',pats.filter(function(p){return p.vip;}).length+' patients','','#ffc107') +
-                scard('fa-heart','Sponsorises',pats.filter(function(p){return p.sponsored;}).length+' patients','','#6f42c1') +
-                '</div>' +
-                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Par type</h4>' +
-                tbl(['Type','Nombre','%'],Object.entries(types).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1]+'</td><td>'+(e[1]/(pats.length||1)*100).toFixed(1)+'%</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Liste ('+Math.min(pats.length,100)+')</h4>' +
-                tbl(['ID','Nom','Tel','Type','Date','Privilege'],
-                    pats.slice(0,100).map(function(p){return '<tr><td>'+p.id+'</td><td>'+p.full_name+'</td><td>'+(p.phone||'-')+'</td><td>'+p.type+'</td><td>'+(p.registration_date||'-')+'</td><td>'+(p.vip?'VIP':p.sponsored?'Sponsor.':'-')+'</td></tr>';}).join(''))+'</div>';
-
-        } else if (tab === 'medications') {
-            var meds = await API.getMedications();
-            var low=meds.filter(function(m){return parseFloat(m.quantity)>0&&parseFloat(m.quantity)<=parseFloat(m.alert_threshold);});
-            var out=meds.filter(function(m){return parseFloat(m.quantity)===0;});
-            var val=meds.reduce(function(s,m){return s+parseFloat(m.price||0)*parseFloat(m.quantity||0);},0);
-            el.innerHTML =
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
-                scard('fa-pills','Total',meds.length+' refs','','#1a6bca') +
-                scard('fa-exclamation','Faible',low.length+' refs','','#ffc107') +
-                scard('fa-times','Rupture',out.length+' refs','','#dc3545') +
-                scard('fa-dollar-sign','Valeur',fmtHTG(val),fmtUSD(val),'#6f42c1') +
-                '</div>' +
-                (out.length?'<div class="alert alert-danger mb-2">Rupture: '+out.map(function(m){return m.name;}).join(', ')+'</div>':'') +
-                (low.length?'<div class="alert alert-warning mb-2">Faible: '+low.map(function(m){return m.name+'('+m.quantity+')';}).join(', ')+'</div>':'') +
-                '<div class="card"><h4 style="margin-bottom:10px;">Stock complet</h4>' +
-                tbl(['Medicament','Forme','Stock','Seuil','Prix','Valeur','Emplacement','Fournisseur'],
-                    meds.map(function(m){
-                        var cls=parseFloat(m.quantity)===0?'out-of-stock':parseFloat(m.quantity)<=parseFloat(m.alert_threshold)?'low-stock':'';
-                        var loc=(m.espace||'')+(m.espace&&m.etagere?'/':'')+(m.etagere||'');
-                        return '<tr class="'+cls+'"><td>'+m.name+'</td><td>'+(m.form||'-')+'</td><td>'+m.quantity+'</td><td>'+m.alert_threshold+'</td><td>'+fmtHTG(m.price)+'</td><td>'+fmtHTG(parseFloat(m.price||0)*parseFloat(m.quantity||0))+'</td><td>'+(loc||'-')+'</td><td>'+(m.supplier_name||'-')+'</td></tr>';
-                    }).join(''))+'</div>';
-
-        } else if (tab === 'suppliers') {
-            var sups = await API.getSuppliers().catch(function(){return[];});
-            var purs = await API.getSupplierPurchases({}).catch(function(){return[];});
-            var totDebt=sups.reduce(function(s,sup){return s+parseFloat(sup.total_debt||0);},0);
-            var totPur=purs.reduce(function(s,p){return s+parseFloat(p.total_amount||0);},0);
-            el.innerHTML =
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
-                scard('fa-truck','Fournisseurs',sups.length,'','#1a6bca') +
-                scard('fa-shopping-cart','Achats totaux',fmtHTG(totPur),fmtUSD(totPur),'#6f42c1') +
-                scard('fa-exclamation','Dettes totales',fmtHTG(totDebt),fmtUSD(totDebt),'#dc3545') +
-                '</div>' +
-                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Fournisseurs</h4>' +
-                tbl(['Nom','Tel','Email','Dette','Statut'],
-                    sups.map(function(s){var d=parseFloat(s.total_debt||0); return '<tr><td>'+s.name+'</td><td>'+(s.phone||'-')+'</td><td>'+(s.email||'-')+'</td><td style="color:'+(d>0?'#dc3545':'#28a745')+';">'+fmtHTG(d)+'</td><td><span class="'+(d>0?'status-unpaid':'status-paid')+'">'+(d>0?'Dette':'Solde')+'</span></td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Historique achats</h4>' +
-                tbl(['Date','Description','Total','Paye','Restant','Type'],
-                    purs.slice(0,50).map(function(p){return '<tr><td>'+(p.date||'-')+'</td><td>'+p.description+'</td><td>'+fmtHTG(p.total_amount)+'</td><td style="color:#28a745;">'+fmtHTG(p.amount_paid)+'</td><td style="color:'+(parseFloat(p.amount_due)>0?'#dc3545':'#28a745')+';">'+fmtHTG(p.amount_due)+'</td><td>'+p.payment_type+'</td></tr>';}).join(''))+'</div>';
-
-        } else if (tab === 'users') {
-            var us = await API.getUsers();
-            var byRole={};
-            us.forEach(function(u){ byRole[u.role]=(byRole[u.role]||0)+1; });
-            el.innerHTML =
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
-                scard('fa-users','Total',us.length+' comptes','','#1a6bca') +
-                scard('fa-check','Actifs',us.filter(function(u){return u.active;}).length,'','#28a745') +
-                scard('fa-ban','Inactifs',us.filter(function(u){return !u.active;}).length,'','#dc3545') +
-                '</div>' +
-                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Par role</h4>' +
-                tbl(['Role','Nombre'],Object.entries(byRole).map(function(e){return '<tr><td>'+getRoleLabel(e[0])+'</td><td>'+e[1]+'</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Liste utilisateurs</h4>' +
-                tbl(['Nom','Identifiant','Role','Extra roles','Statut'],
-                    us.map(function(u){return '<tr><td>'+u.name+'</td><td>'+u.username+'</td><td>'+getRoleLabel(u.role)+'</td><td>'+(u.extra_roles||'-')+'</td><td><span class="'+(u.active?'status-paid':'status-unpaid')+'">'+(u.active?'Actif':'Inactif')+'</span></td></tr>';}).join(''))+'</div>';
-
-        } else if (tab === 'hospitalization') {
-            var hosps = await API.getHospitalizations({}).catch(function(){return[];});
-            hosps = hosps.filter(function(h){var d=h.admission_date||'';return(!from||d>=from)&&(!to||d<=to);});
-            var totDep=hosps.reduce(function(s,h){return s+parseFloat(h.deposit||0);},0);
-            var totDebt2=hosps.filter(function(h){return parseFloat(h.balance||0)<0;}).reduce(function(s,h){return s+Math.abs(parseFloat(h.balance));},0);
-            el.innerHTML = periodLabel +
-                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
-                scard('fa-bed','Admissions',hosps.length,'','#1a6bca') +
-                scard('fa-hospital-user','Hospitalises',hosps.filter(function(h){return h.status==='active';}).length,'','#28a745') +
-                scard('fa-sign-out-alt','Sorties',hosps.filter(function(h){return h.status==='discharged';}).length,'','#6c757d') +
-                scard('fa-money-bill','Total depots',fmtHTG(totDep),fmtUSD(totDep),'#28a745') +
-                scard('fa-exclamation','Dettes',fmtHTG(totDebt2),fmtUSD(totDebt2),'#dc3545') +
-                '</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Detail</h4>' +
-                tbl(['Patient','Chambre','Admission','Sortie','Depot','Solde','Statut'],
-                    hosps.map(function(h){var b=parseFloat(h.balance||0); return '<tr><td>'+(h.full_name||h.patient_id)+'</td><td>'+(h.room||'-')+'</td><td>'+(h.admission_date||'-')+'</td><td>'+(h.discharge_date||'-')+'</td><td>'+fmtHTG(h.deposit)+'</td><td style="color:'+(b<0?'#dc3545':'#28a745')+';">'+fmtHTG(b)+'</td><td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalise':'Sorti')+'</span></td></tr>';}).join(''))+'</div>';
-        }
-    } catch(e) {
-        el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
-    }
+    var p = patients[0];
+    div.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> <strong>' + p.full_name + '</strong> — ' + p.id + '</div>';
+    div.style.display = 'block';
+    div.dataset.patientId   = p.id;
+    div.dataset.patientName = p.full_name;
 }
 
-// ─── DÉCAISSEMENTS ────────────────────────────────────────────
-async function loadDecaissements() {
-    var section = document.getElementById('decaissement-section');
-    if (!section) {
-        section = document.createElement('div');
-        section.id = 'decaissement-section';
-        section.className = 'card mt-3';
-        var adminEl = document.getElementById('administration');
-        if (adminEl) adminEl.appendChild(section);
-    }
-    var rate  = state.exchangeRate || 130;
-    var today = new Date().toISOString().split('T')[0];
-    var decList = await API.getCashWithdrawals({ fromDate: today }).catch(function(){return[];});
-    var totDec  = decList.reduce(function(s,d){return s+parseFloat(d.amount);},0);
-    var users    = await API.getUsers().catch(function(){return[];});
-    var patients = await API.getPatients({}).catch(function(){return[];});
-    var benefs = [];
-    users.forEach(function(u){ benefs.push({ id:'USR-'+u.username, label:u.name+' ('+getRoleLabel(u.role)+')' }); });
-    patients.forEach(function(p){ benefs.push({ id:'PAT-'+p.id, label:p.full_name+' ['+p.id+']' }); });
-    window._decBenefs = benefs;
-    window._decSelId = null;
-    window._decSelName = null;
-    var acctLabels = { cash:'Especes', moncash:'MonCash', natcash:'NatCash', card:'Carte', virement:'Virement', petite_caisse:'Petite Caisse' };
-    section.innerHTML =
-        '<h3><i class="fas fa-money-bill-wave-alt" style="color:#dc3545;"></i> Decaissements</h3>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;">' +
-        '<div style="background:#f8d7da;padding:14px;border-radius:10px;text-align:center;"><strong style="font-size:1.2rem;color:#721c24;">'+totDec.toLocaleString('fr-FR')+' HTG</strong><br><small>Decaisse aujourd\'hui</small></div>' +
-        '<div style="background:#d1ecf1;padding:14px;border-radius:10px;text-align:center;"><strong style="font-size:1.2rem;color:#0c5460;">$'+(totDec/rate).toFixed(2)+'</strong><br><small>Equivalent USD</small></div>' +
-        '</div>' +
-        '<div class="card" style="background:#fff8f8;border-left-color:#dc3545;margin-bottom:16px;">' +
-        '<h4><i class="fas fa-plus-circle" style="color:#dc3545;"></i> Nouveau decaissement</h4>' +
-        '<div class="add-form-grid" style="margin-top:12px;">' +
-        '<div style="grid-column:1/-1;"><label class="form-label">Beneficiaire *</label>' +
-        '<input type="text" id="dec-search" class="form-control" placeholder="Rechercher patient ou utilisateur..." oninput="filterDecBenefs(this.value)">' +
-        '<div id="dec-benef-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;display:none;background:#fff;position:relative;z-index:500;"></div>' +
-        '<div id="dec-selected" style="display:none;margin-top:6px;" class="alert alert-success"></div></div>' +
-        '<div style="grid-column:1/-1;"><label class="form-label" style="font-size:.8rem;color:var(--muted);">Ou entrer un nom externe (non inscrit)</label>' +
-        '<div class="d-flex gap-10"><input type="text" id="dec-ext-name" class="form-control" placeholder="Nom complet"><input type="text" id="dec-ext-info" class="form-control" placeholder="Tel / info"></div></div>' +
-        '<div><label class="form-label">Montant (HTG) *</label><input type="number" id="dec-amount" class="form-control" placeholder="0.00" min="0"></div>' +
-        '<div><label class="form-label">Compte a debiter *</label>' +
-        '<select id="dec-account" class="form-control">' +
-        '<option value="cash">Especes (Grande caisse)</option>' +
-        '<option value="moncash">MonCash</option>' +
-        '<option value="natcash">NatCash</option>' +
-        '<option value="card">Carte</option>' +
-        '<option value="virement">Virement</option>' +
-        '<option value="petite_caisse">Petite Caisse</option>' +
-        '</select></div>' +
-        '<div style="grid-column:1/-1;"><label class="form-label">Raison / Note *</label>' +
-        '<textarea id="dec-note" class="form-control" rows="2" placeholder="Ex: Paiement fournisseur, remboursement, depense..."></textarea></div>' +
-        '<div style="display:flex;align-items:flex-end;">' +
-        '<button class="btn btn-danger" style="width:100%;" onclick="saveDecaissement()"><i class="fas fa-money-bill-wave-alt"></i> Effectuer</button></div>' +
-        '</div></div>' +
-        '<h4 style="margin-bottom:10px;"><i class="fas fa-history"></i> Historique du jour</h4>' +
-        (decList.length ?
-        '<div class="table-container"><table><thead><tr><th>Heure</th><th>Beneficiaire</th><th>Montant</th><th>Compte</th><th>Note</th><th>Par</th><th></th></tr></thead><tbody>' +
-        decList.map(function(d){
-            return '<tr><td>'+(d.created_at?new Date(d.created_at).toLocaleTimeString('fr-FR'):'-')+'</td>' +
-                '<td><strong>'+(d.agent_name||'-')+'</strong></td>' +
-                '<td><strong style="color:#dc3545;">-'+parseFloat(d.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
-                '<td>'+(acctLabels[d.payment_method]||d.payment_method||'Especes')+'</td>' +
-                '<td>'+(d.note||'-')+'</td><td>'+(d.created_by||'-')+'</td>' +
-                '<td><button class="btn btn-xs btn-danger" data-wid="'+d.id+'" onclick="deleteDecaissement(this.dataset.wid)"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('')+'</tbody></table></div>'
-        : '<div class="alert alert-info">Aucun decaissement aujourd\'hui.</div>');
-}
-
-function filterDecBenefs(val) {
-    var list = document.getElementById('dec-benef-list');
-    if (!val || val.length < 2) { list.style.display = 'none'; return; }
-    var filtered = (window._decBenefs||[]).filter(function(b){
-        return b.label.toLowerCase().includes(val.toLowerCase());
-    }).slice(0, 8);
-    if (!filtered.length) { list.style.display = 'none'; return; }
-    list.innerHTML = filtered.map(function(b){
-        return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.85rem;" ' +
-            '<div class="dec-benef-item" data-bid="' + b.id + '" data-blabel="' + b.label + '" ' +
-            'style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:.85rem;" ' +
-            'onclick="selectDecBenef(this)"><i class="fas fa-user" style="color:var(--primary);margin-right:6px;"></i>' + b.label + '</div>';
-            '<i class="fas fa-user" style="color:var(--primary);margin-right:6px;"></i>'+b.label+'</div>';
-    }).join('');
-    list.style.display = 'block';
-}
-
-function selectDecBenef(el) {
-    window._decSelId   = el.dataset.bid;
-    window._decSelName = el.dataset.blabel;
-    document.getElementById('dec-search').value = el.dataset.blabel;
-    document.getElementById('dec-benef-list').style.display = 'none';
-    document.getElementById('dec-ext-name').value = '';
-    var sel = document.getElementById('dec-selected');
-    sel.innerHTML = '<i class="fas fa-check-circle"></i> <strong>'+el.dataset.blabel+'</strong>';
-    sel.style.display = 'block';
-}
-
-async function saveDecaissement() {
-    var amount  = parseFloat(document.getElementById('dec-amount').value);
-    var account = document.getElementById('dec-account').value;
-    var note    = document.getElementById('dec-note').value.trim();
-    var extName = document.getElementById('dec-ext-name').value.trim();
-    var extInfo = document.getElementById('dec-ext-info').value.trim();
-    var benefName = window._decSelName || extName;
-    if (!benefName) { toast('Selectionner ou entrer un beneficiaire', 'error'); return; }
-    if (!amount || amount <= 0) { toast('Montant invalide', 'error'); return; }
-    if (!note) { toast('La note est obligatoire', 'error'); return; }
-    var acctLabels = { cash:'Especes', moncash:'MonCash', natcash:'NatCash', card:'Carte', virement:'Virement', petite_caisse:'Petite Caisse' };
-    if (!confirm('Confirmer le decaissement de '+amount.toLocaleString('fr-FR')+' HTG vers "'+benefName+'" depuis '+acctLabels[account]+'?')) return;
+async function admitPatient() {
+    var div = document.getElementById('hosp-patient-found');
+    var patientId   = div.dataset.patientId;
+    var patientName = div.dataset.patientName;
+    if (!patientId) { toast('Chercher un patient d\'abord', 'error'); return; }
+    var room    = document.getElementById('hosp-room').value.trim();
+    var bed     = document.getElementById('hosp-bed').value.trim();
+    var reason  = document.getElementById('hosp-reason').value.trim();
+    var doctor  = document.getElementById('hosp-doctor').value;
+    var deposit = parseFloat(document.getElementById('hosp-deposit').value) || 0;
+    if (!reason) { toast('Le motif est obligatoire', 'error'); return; }
     try {
         await apiCall(function() {
-            return API.addCashWithdrawal({
-                agentUsername: window._decSelId || ('EXT-'+Date.now()),
-                agentName:     benefName,
-                amount:        amount,
-                note:          note + (extInfo ? ' | '+extInfo : '') + ' | Compte: '+(acctLabels[account]||account),
-                date:          new Date().toISOString().split('T')[0],
-                paymentMethod: account,
-            });
+            return API.admitPatient({ patientId, room, bed, reason, doctorUsername: doctor, depositAmount: deposit });
         });
-        toast('Decaissement de '+amount.toLocaleString('fr-FR')+' HTG effectue depuis '+acctLabels[account]+' !', 'success');
-        document.getElementById('dec-amount').value = '';
-        document.getElementById('dec-note').value   = '';
-        document.getElementById('dec-search').value = '';
-        document.getElementById('dec-ext-name').value = '';
-        document.getElementById('dec-ext-info').value = '';
-        document.getElementById('dec-selected').style.display = 'none';
-        window._decSelId = null; window._decSelName = null;
-        await notifyAdmin('Decaissement', benefName+' — '+amount.toLocaleString('fr-FR')+' HTG depuis '+(acctLabels[account]||account)+' | '+note);
-        loadDecaissements();
-        updateAdminStats();
+        toast(patientName + ' admis en hospitalisation !', 'success');
+        toggleAdmitForm();
+        document.getElementById('hosp-patient-search').value = '';
+        document.getElementById('hosp-patient-found').style.display = 'none';
+        ['hosp-room','hosp-bed','hosp-reason','hosp-deposit'].forEach(function(id) {
+            var el = document.getElementById(id); if (el) el.value = '';
+        });
+        loadHospitalizations('active');
     } catch(e) {}
 }
 
-async function deleteDecaissement(id) {
-    if (!confirm('Annuler ce decaissement ?')) return;
+async function loadHospitalizations(status) {
+    var container = document.getElementById('hospitalizations-list');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
     try {
-        await apiCall(function() { return API.deleteCashWithdrawal(id); });
-        toast('Decaissement annule', 'warning');
-        loadDecaissements();
-        updateAdminStats();
+        var params = {};
+        if (status) params.status = status;
+        var hosps = await API.getHospitalizations(params);
+        if (!hosps.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-bed"></i> Aucune hospitalisation ' + (status === 'active' ? 'en cours' : '') + '.</div>';
+            return;
+        }
+        var stateColors = { active: '#28a745', discharged: '#6c757d' };
+        var stateLabels = { active: 'Hospitalisé', discharged: 'Sorti' };
+        container.innerHTML = hosps.map(function(h) {
+            var balance = parseFloat(h.balance || 0);
+            var isDebt  = balance < 0;
+            var days    = Math.floor((new Date() - new Date(h.admission_date)) / (1000*60*60*24));
+            return '<div class="card mb-2" style="border-left:4px solid '+(stateColors[h.status]||'#6c757d')+';padding:14px;">' +
+                '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                '<div>' +
+                '<h4 style="margin-bottom:4px;">' + h.full_name + '</h4>' +
+                '<small class="text-muted">' +
+                (h.room ? h.room + (h.bed ? ' / ' + h.bed : '') + ' | ' : '') +
+                'Admis le ' + h.admission_date + ' (' + days + ' j)' +
+                (h.doctor ? ' | Dr. ' + h.doctor : '') +
+                '</small><br><small class="text-muted">' + (h.admission_reason||'-') + '</small>' +
+                '</div>' +
+                '<div style="text-align:right;">' +
+                '<span class="badge" style="background:'+(stateColors[h.status]||'#6c757d')+';color:#fff;padding:4px 10px;">' + (stateLabels[h.status]||h.status) + '</span><br>' +
+                '<strong style="color:'+(isDebt?'#dc3545':'#28a745')+'">' +
+                (isDebt ? 'Dette: '+Math.abs(balance).toLocaleString('fr-FR') : 'Solde: '+balance.toLocaleString('fr-FR')) + ' HTG</strong>' +
+                '</div></div>' +
+                '<div class="d-flex gap-10 mt-2">' +
+                '<button class="btn btn-primary btn-sm" data-hid="' + h.id + '" data-hname="' + h.full_name + '" onclick="openHospDetail(this.dataset.hid,this.dataset.hname)"><i class="fas fa-folder-open"></i> Dossier</button>' +
+                (h.status === 'active' ? '<button class="btn btn-danger btn-sm" data-hid="' + h.id + '" onclick="quickDischarge(this.dataset.hid)"><i class="fas fa-sign-out-alt"></i> Sortie rapide</button>' : '') +
+                '</div></div>';
+        }).join('');
+    } catch(e) { container.innerHTML = '<div class="alert alert-danger">Erreur: ' + e.message + '</div>'; }
+}
+
+async function openHospDetail(hospId, patientName) {
+    _currentHospId = hospId;
+    document.getElementById('hosp-detail-section').style.display = 'block';
+    document.getElementById('admit-patient-card').style.display = 'none';
+    document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
+    document.getElementById('hosp-detail-title').innerHTML = '<i class="fas fa-user-injured"></i> ' + patientName;
+    var meds = state.medications && state.medications.length ? state.medications : await API.getMedications().catch(function(){return[];});
+    state.medications = meds;
+    var rxSel = document.getElementById('rx-medication');
+    if (rxSel) {
+        rxSel.innerHTML = '<option value="">Sélectionner du stock...</option>' +
+            meds.map(function(m) {
+                return '<option value="'+m.id+'" data-price="'+m.price+'" data-stock="'+m.quantity+'">'+m.name+' — Stock: '+m.quantity+' — '+m.price+' HTG</option>';
+            }).join('');
+    }
+    await refreshHospDetail();
+    showHospTab('nursing');
+}
+
+async function refreshHospDetail() {
+    var hosp = await API.getHospitalization(_currentHospId).catch(function(){return null;});
+    if (!hosp) return;
+    _currentHospPatient = hosp;
+    var balance = parseFloat(hosp.balance || 0);
+    var deposit = parseFloat(hosp.deposit || 0);
+    var isDebt  = balance < 0;
+    var el = document.getElementById('hosp-financial-summary');
+    if (el) el.innerHTML =
+        '<div class="d-flex gap-15 flex-wrap">' +
+        '<div style="background:#d4edda;padding:12px 18px;border-radius:10px;text-align:center;">' +
+        '<strong style="font-size:1.1rem;color:#155724;">'+deposit.toLocaleString('fr-FR')+' HTG</strong><br><small>Total déposé</small></div>' +
+        '<div style="background:'+(isDebt?'#f8d7da':'#d4edda')+';padding:12px 18px;border-radius:10px;text-align:center;">' +
+        '<strong style="font-size:1.1rem;color:'+(isDebt?'#721c24':'#155724')+'">' +
+        (isDebt?'⚠️ Dette: '+Math.abs(balance).toLocaleString('fr-FR'):'✅ Solde: '+balance.toLocaleString('fr-FR'))+' HTG</strong>' +
+        '<br><small>Solde actuel</small></div>' +
+        '</div>';
+}
+
+function closeHospDetail() {
+    _currentHospId = null;
+    _currentHospPatient = null;
+    document.getElementById('hosp-detail-section').style.display = 'none';
+    document.getElementById('admit-patient-card').style.display = 'block';
+    document.getElementById('hospitalizations-list').closest('.card').style.display = 'block';
+    loadHospitalizations('active');
+}
+
+function showHospTab(tab) {
+    document.querySelectorAll('.hosp-tab-content').forEach(function(el) { el.style.display = 'none'; });
+    document.querySelectorAll('.hosp-tab-btn').forEach(function(btn) {
+        var isActive = btn.dataset.tab === tab;
+        btn.style.color        = isActive ? 'var(--primary)' : 'var(--muted)';
+        btn.style.borderBottom = isActive ? '3px solid var(--primary)' : '3px solid transparent';
+    });
+    var tabEl = document.getElementById('hosp-tab-' + tab);
+    if (tabEl) tabEl.style.display = 'block';
+    if (tab === 'nursing')       loadNursingNotes();
+    else if (tab === 'prescriptions') loadPrescriptions();
+    else if (tab === 'deposits') loadDeposits();
+    else if (tab === 'services') loadHospServices();
+}
+
+async function saveNursingNote() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var data = {
+        hospitalizationId: _currentHospId,
+        patientId:    _currentHospPatient.patient_id,
+        temperature:  document.getElementById('nur-temp').value   || null,
+        bloodPressure:document.getElementById('nur-bp').value     || null,
+        pulse:        document.getElementById('nur-pulse').value  || null,
+        oxygenSat:    document.getElementById('nur-o2').value     || null,
+        weight:       document.getElementById('nur-weight').value || null,
+        generalState: document.getElementById('nur-state').value  || null,
+        notes:        document.getElementById('nur-notes').value  || null,
+    };
+    try {
+        await apiCall(function() { return API.addHospNursing(data); });
+        toast('Suivi enregistré !', 'success');
+        ['nur-temp','nur-bp','nur-pulse','nur-o2','nur-weight','nur-notes'].forEach(function(id){
+            var el=document.getElementById(id); if(el) el.value='';
+        });
+        document.getElementById('nur-state').value = '';
+        loadNursingNotes();
+    } catch(e) {}
+}
+
+async function loadNursingNotes() {
+    if (!_currentHospId) return;
+    var notes = await API.getHospNursing(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('nursing-notes-list');
+    if (!container) return;
+    if (!notes.length) { container.innerHTML = '<div class="alert alert-info">Aucun suivi enregistré.</div>'; return; }
+    var stateColors = { Bon:'#28a745', Stable:'#17a2b8', Moyen:'#ffc107', Critique:'#dc3545', Amélioré:'#28a745' };
+    container.innerHTML = notes.map(function(n) {
+        var vitals = [
+            n.temperature    ? 'T°: '+n.temperature+'°C'    : null,
+            n.blood_pressure ? 'TA: '+n.blood_pressure       : null,
+            n.pulse          ? 'Pouls: '+n.pulse+' bpm'      : null,
+            n.oxygen_sat     ? 'O2: '+n.oxygen_sat+'%'       : null,
+            n.weight         ? 'Poids: '+n.weight+' kg'      : null,
+        ].filter(Boolean);
+        return '<div class="card mb-2" style="border-left:4px solid '+(stateColors[n.general_state]||'#17a2b8')+';padding:12px;">' +
+            '<div class="d-flex justify-between align-center">' +
+            '<strong>'+new Date(n.created_at).toLocaleString('fr-FR')+'</strong>' +
+            ' — Par: <em>'+(n.recorded_by||'-')+'</em>' +
+            (n.general_state ? ' <span class="badge" style="background:'+(stateColors[n.general_state]||'#17a2b8')+';color:#fff;">'+n.general_state+'</span>' : '') +
+            '</div>' +
+            (vitals.length ? '<div class="mt-2" style="display:flex;gap:6px;flex-wrap:wrap;">'+vitals.map(function(v){return '<span class="badge badge-info">'+v+'</span>';}).join('')+'</div>' : '') +
+            (n.notes ? '<p class="mt-2" style="font-size:.88rem;">'+n.notes+'</p>' : '') +
+            '</div>';
+    }).join('');
+}
+
+function onRxMedSelect() {
+    var sel = document.getElementById('rx-medication');
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.dataset.price) return;
+    document.getElementById('rx-price').value = opt.dataset.price;
+    document.getElementById('rx-med-name').value = '';
+    updateRxCost();
+}
+
+function updateRxCost() {
+    var qty   = parseInt(document.getElementById('rx-qty').value) || 0;
+    var price = parseFloat(document.getElementById('rx-price').value) || 0;
+    var total = qty * price;
+    var prev  = document.getElementById('rx-cost-preview');
+    if (prev) prev.innerHTML = total > 0 ?
+        '<span class="badge badge-primary">Coût: '+total.toLocaleString('fr-FR')+' HTG</span>' : '';
+}
+
+async function savePrescription() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var medSel  = document.getElementById('rx-medication');
+    var medId   = medSel ? medSel.value : '';
+    var medName = medId
+        ? medSel.options[medSel.selectedIndex].text.split(' —')[0]
+        : document.getElementById('rx-med-name').value.trim();
+    var dosage  = document.getElementById('rx-dosage').value.trim();
+    var freq    = document.getElementById('rx-frequency').value;
+    var dur     = document.getElementById('rx-duration').value.trim();
+    var route   = document.getElementById('rx-route').value;
+    var qty     = parseInt(document.getElementById('rx-qty').value) || 1;
+    var price   = parseFloat(document.getElementById('rx-price').value) || 0;
+    var note    = document.getElementById('rx-note').value.trim();
+    if (!medName || !dosage) { toast('Médicament et dosage obligatoires', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addHospPrescription({
+                hospitalizationId: _currentHospId,
+                patientId:   _currentHospPatient.patient_id,
+                medicationId: medId || null,
+                medicationName: medName,
+                dosage, frequency: freq, duration: dur,
+                route, note, pricePerUnit: price, quantity: qty,
+            });
+        });
+        toast('Prescription enregistrée — '+(qty*price).toLocaleString('fr-FR')+' HTG déduit', 'success');
+        ['rx-med-name','rx-dosage','rx-duration','rx-note'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+        if (medSel) medSel.value = '';
+        document.getElementById('rx-qty').value = '1';
+        document.getElementById('rx-price').value = '';
+        document.getElementById('rx-cost-preview').innerHTML = '';
+        loadPrescriptions();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function loadPrescriptions() {
+    if (!_currentHospId) return;
+    var rxs = await API.getHospPrescriptions(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('prescriptions-list');
+    if (!container) return;
+    if (!rxs.length) { container.innerHTML = '<div class="alert alert-info">Aucune prescription.</div>'; return; }
+    var statusColors = { pending:'#ffc107', administered:'#28a745', skipped:'#dc3545' };
+    var statusLabels = { pending:'En attente', administered:'Administré', skipped:'Sauté' };
+    container.innerHTML = rxs.map(function(rx) {
+        return '<div class="card mb-2" style="border-left:4px solid #6f42c1;padding:12px;">' +
+            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+            '<div>' +
+            '<h5 style="color:#6f42c1;margin-bottom:4px;">'+rx.medication_name+'</h5>' +
+            '<div style="font-size:.85rem;display:flex;gap:10px;flex-wrap:wrap;">' +
+            '<span>'+rx.dosage+'</span>' +
+            (rx.frequency ? '<span>'+rx.frequency+'</span>' : '') +
+            (rx.duration  ? '<span>'+rx.duration+'</span>'  : '') +
+            '<span>'+(rx.route||'Orale')+'</span>' +
+            '</div>' +
+            (rx.note ? '<p style="font-size:.82rem;background:#fff3cd;padding:4px 8px;border-radius:4px;margin-top:6px;">'+rx.note+'</p>' : '') +
+            '<small class="text-muted">Qté: '+rx.quantity+' × '+parseFloat(rx.price_per_unit||0).toLocaleString('fr-FR')+' HTG = <strong>'+parseFloat(rx.total_price||0).toLocaleString('fr-FR')+' HTG</strong> | Par: '+(rx.prescribed_by||'-')+'</small>' +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            '<span class="badge" style="background:'+(statusColors[rx.status]||'#ffc107')+';color:'+(rx.status==='pending'?'#212529':'#fff')+';padding:4px 10px;">'+(statusLabels[rx.status]||rx.status)+'</span>' +
+            (rx.status === 'pending' ?
+            '<br><div class="d-flex gap-6 mt-2">' +
+            '<button class="btn btn-xs btn-success" data-rxid="'+rx.id+'" onclick="markAdministered(this.dataset.rxid)"><i class="fas fa-check"></i> Administré</button>' +
+            '<button class="btn btn-xs btn-secondary" data-rxid="'+rx.id+'" onclick="markSkipped(this.dataset.rxid)"><i class="fas fa-times"></i> Sauté</button>' +
+            '</div>' : '') +
+            '</div></div></div>';
+    }).join('');
+}
+
+async function markAdministered(rxId) {
+    await apiCall(function() {
+        return API.updateHospPrescription(rxId, { status: 'administered', administeredAt: new Date().toISOString(), administeredBy: state.currentUser?.username });
+    });
+    toast('Médicament administré !', 'success');
+    loadPrescriptions();
+}
+async function markSkipped(rxId) {
+    await apiCall(function() { return API.updateHospPrescription(rxId, { status: 'skipped' }); });
+    toast('Dose sautée enregistrée', 'warning');
+    loadPrescriptions();
+}
+
+async function addDeposit() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var amount = parseFloat(document.getElementById('dep-amount').value);
+    var note   = document.getElementById('dep-note').value.trim();
+    if (isNaN(amount) || amount <= 0) { toast('Montant invalide', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addHospDeposit({ hospitalizationId: _currentHospId, patientId: _currentHospPatient.patient_id, amount, note });
+        });
+        toast('Dépôt de '+amount.toLocaleString('fr-FR')+' HTG enregistré !', 'success');
+        document.getElementById('dep-amount').value = '';
+        document.getElementById('dep-note').value   = '';
+        loadDeposits();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function loadDeposits() {
+    if (!_currentHospId) return;
+    var deps = await API.getHospDeposits(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('deposits-list');
+    if (!container) return;
+    if (!deps.length) { container.innerHTML = '<div class="alert alert-info">Aucun dépôt.</div>'; return; }
+    var total = deps.reduce(function(s,d){return s+parseFloat(d.amount);},0);
+    container.innerHTML =
+        '<div style="background:#d4edda;padding:10px 16px;border-radius:8px;margin-bottom:10px;">Total déposé: <strong>'+total.toLocaleString('fr-FR')+' HTG</strong></div>' +
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
+        deps.map(function(d) {
+            return '<tr><td>'+new Date(d.created_at).toLocaleString('fr-FR')+'</td>' +
+                '<td><strong style="color:#28a745;">+'+parseFloat(d.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
+                '<td>'+(d.note||'-')+'</td><td>'+(d.created_by||'-')+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+}
+
+async function addHospService() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var service = document.getElementById('svc-name').value.trim();
+    var amount  = parseFloat(document.getElementById('svc-amount').value);
+    var note    = document.getElementById('svc-note').value.trim();
+    if (!service || isNaN(amount) || amount <= 0) { toast('Service et montant obligatoires', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.addHospService({ hospitalizationId: _currentHospId, patientId: _currentHospPatient.patient_id, service, amount, note });
+        });
+        toast('Service ajouté — '+amount.toLocaleString('fr-FR')+' HTG déduit', 'success');
+        document.getElementById('svc-name').value   = '';
+        document.getElementById('svc-amount').value = '';
+        document.getElementById('svc-note').value   = '';
+        loadHospServices();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function loadHospServices() {
+    if (!_currentHospId) return;
+    var svcs = await API.getHospServices(_currentHospId).catch(function(){return[];});
+    var container = document.getElementById('hosp-services-list');
+    if (!container) return;
+    if (!svcs.length) { container.innerHTML = '<div class="alert alert-info">Aucun service ajouté.</div>'; return; }
+    var total = svcs.reduce(function(s,v){return s+parseFloat(v.amount);},0);
+    container.innerHTML =
+        '<div style="background:#f8d7da;padding:10px 16px;border-radius:8px;margin-bottom:10px;">Total services: <strong>'+total.toLocaleString('fr-FR')+' HTG</strong></div>' +
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Note</th></tr></thead><tbody>' +
+        svcs.map(function(s) {
+            return '<tr><td>'+new Date(s.created_at).toLocaleDateString('fr-FR')+'</td>' +
+                '<td>'+s.service+'</td>' +
+                '<td><strong style="color:#dc3545;">-'+parseFloat(s.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
+                '<td>'+(s.note||'-')+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+}
+
+async function dischargePatient() {
+    if (!_currentHospId || !_currentHospPatient) return;
+    var note    = document.getElementById('discharge-note').value.trim();
+    var balance = parseFloat(_currentHospPatient.balance || 0);
+    var debtInfo = balance < 0
+        ? ' | Dette: ' + Math.abs(balance).toLocaleString('fr-FR') + ' HTG'
+        : ' | Solde: ' + balance.toLocaleString('fr-FR') + ' HTG';
+    if (!confirm('Confirmer la sortie de ' + _currentHospPatient.full_name + ' ?' + debtInfo)) return;
+    try {
+        await apiCall(function() {
+            return API.updateHospitalization(_currentHospId, {
+                status: 'discharged',
+                dischargeDate: new Date().toISOString().split('T')[0],
+                dischargeNote: note,
+            });
+        });
+        toast(_currentHospPatient.full_name + ' sorti(e) avec succès !', 'success');
+        closeHospDetail();
+    } catch(e) {}
+}
+
+async function quickDischarge(hospId) {
+    if (!confirm('Confirmer la sortie du patient ?')) return;
+    try {
+        await apiCall(function() {
+            return API.updateHospitalization(hospId, {
+                status: 'discharged',
+                dischargeDate: new Date().toISOString().split('T')[0],
+            });
+        });
+        toast('Patient sorti', 'success');
+        loadHospitalizations('active');
     } catch(e) {}
 }
 
@@ -4095,6 +4189,37 @@ function openEditUserModal(userId) {
     }).catch(function() { toast('Erreur chargement utilisateur', 'error'); });
 }
 
+async function saveEditUser(userId) {
+    var name     = document.getElementById('eu-name').value.trim();
+    var username = document.getElementById('eu-username').value.trim();
+    var role     = document.getElementById('eu-role').value;
+    var active   = document.getElementById('eu-active').value === 'true';
+    var pwd      = document.getElementById('eu-pwd').value;
+    var pwd2     = document.getElementById('eu-pwd2').value;
+
+    if (!name || !username || !role) { toast('Remplir les champs obligatoires', 'error'); return; }
+    if (pwd && pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+    if (pwd && pwd.length < 4) { toast('Mot de passe trop court', 'error'); return; }
+
+    var extraRoles = [];
+    if (role === 'multi') {
+        document.querySelectorAll('#eu-multi-section input[type=checkbox]:checked').forEach(function(cb) {
+            extraRoles.push(cb.value);
+        });
+        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles', 'error'); return; }
+    }
+
+    var data = { name: name, username: username, role: role, active: active, extraRoles: extraRoles };
+    if (pwd) data.password = pwd;
+
+    try {
+        await apiCall(function() { return API.updateUser(userId, data); });
+        toast('Utilisateur modifié avec succès !', 'success');
+        document.getElementById('edit-user-modal').remove();
+        updateMedicationsSettingsList();
+    } catch(e) {}
+}
+
 async function toggleUser(id, active, name) {
     await apiCall(function() { return API.updateUser(id, { name: name, active: active }); });
     toast('Utilisateur ' + (active ? 'activé' : 'désactivé'));
@@ -4176,7 +4301,7 @@ function toggleEditUserMulti() {
     if (container) container.style.display = role === 'multi' ? 'block' : 'none';
 }
 
-async function saveEditUser(userId) {
+async function saveEditUser(id) {
     var name     = document.getElementById('eu-name').value.trim();
     var username = document.getElementById('eu-username').value.trim();
     var role     = document.getElementById('eu-role').value;
@@ -4186,35 +4311,36 @@ async function saveEditUser(userId) {
 
     if (!name || !username || !role) { toast('Remplir les champs obligatoires', 'error'); return; }
     if (pwd && pwd !== pwd2) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
-    if (pwd && pwd.length < 4) { toast('Mot de passe trop court (min 4 caractères)', 'error'); return; }
+    if (pwd && pwd.length < 6) { toast('Mot de passe trop court (min 6 caractères)', 'error'); return; }
 
     var extraRoles = [];
     if (role === 'multi') {
-        document.querySelectorAll('#eu-multi-section input[type=checkbox]:checked').forEach(function(cb) {
+        document.querySelectorAll('#eu-multi-container input[type=checkbox]:checked').forEach(function(cb) {
             extraRoles.push(cb.value);
         });
-        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles', 'error'); return; }
+        if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles pour un compte multi-rôle', 'error'); return; }
     }
 
     try {
         // Mettre à jour les infos de base
         await apiCall(function() {
-            return API.updateUser(userId, { name: name, username: username, role: role, active: active, extraRoles: extraRoles });
+            return API.updateUser(id, { name: name, active: active, username: username, role: role, extraRoles: extraRoles });
         });
-        // Changer le mot de passe séparément si rempli
+
+        // Changer le mot de passe si fourni
         if (pwd) {
             await apiCall(function() {
-                return API.updateUserPassword(userId, pwd);
+                return API.updateUserPassword(id, pwd);
             });
         }
-        toast('Utilisateur modifié avec succès !', 'success');
-        var modal = document.getElementById('edit-user-modal');
-        if (modal) modal.remove();
+
+        toast('Utilisateur "' + name + '" mis à jour !', 'success');
+        document.getElementById('edit-user-modal').remove();
         updateMedicationsSettingsList();
     } catch(e) {}
 }
 
-
+// ─── PERMISSIONS SOUS-ADMIN ──────────────────────────────────
 function loadSubAdminPermissionsUI() {
     const perms = state.subAdminPermissions;
     Object.entries(perms).forEach(([key, val]) => {
