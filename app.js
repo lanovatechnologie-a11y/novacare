@@ -2191,11 +2191,12 @@ async function renderAccountsDashboard(stats) {
     var rate  = state.exchangeRate || 130;
 
     // Charger toutes les transactions payées + petite caisse
-    var [txAll, txToday, petiteCaisse, withdrawals] = await Promise.all([
+    var [txAll, txToday, petiteCaisse, withdrawals, accountBals] = await Promise.all([
         API.getTransactions({ status: 'paid' }).catch(function() { return []; }),
         API.getTransactions({ status: 'paid', date: today }).catch(function() { return []; }),
         API.getPetiteCaisse ? API.getPetiteCaisse().catch(function() { return []; }) : Promise.resolve([]),
         API.getCashWithdrawals ? API.getCashWithdrawals().catch(function() { return []; }) : Promise.resolve([]),
+        API.getAccountBalances ? API.getAccountBalances().catch(function() { return null; }) : Promise.resolve(null),
     ]);
 
     // Calcul par méthode de paiement (all time)
@@ -2259,9 +2260,10 @@ async function renderAccountsDashboard(stats) {
                 '<div style="width:36px;height:36px;border-radius:8px;background:' + methodColors[m] + ';display:flex;align-items:center;justify-content:center;color:#fff;">' +
                 '<i class="fas ' + methodIcons[m] + '"></i></div>' +
                 '<strong style="font-size:.9rem;">' + methodLabels[m] + '</strong></div>' +
-                '<div style="font-size:1.2rem;font-weight:700;color:' + methodColors[m] + ';">' + acc.total.toLocaleString('fr-FR') + '</div>' +
-                '<div style="font-size:.72rem;color:var(--muted);">HTG total (' + acc.count + ' tx)</div>' +
-                '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Aujourd\'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
+                '<div style="font-size:1.2rem;font-weight:700;color:' + (acc.total < 0 ? '#dc3545' : methodColors[m]) + ';">' + acc.total.toLocaleString('fr-FR') + '</div>' +
+                '<div style="font-size:.72rem;color:var(--muted);">' + (acc.isReal ? 'HTG solde net' : 'HTG encaisse') + ' (' + acc.count + ' tx)</div>' +
+                '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Encaisse total: <strong>' + acc.encaisse.toLocaleString('fr-FR') + '</strong></div>' +
+                '<div style="font-size:.8rem;color:var(--muted);">Aujourd\'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
                 '</div>';
         }).join('') +
 
@@ -3208,7 +3210,7 @@ async function saveDecaissement() {
                 agentUsername: window._decSelId || ('EXT-'+Date.now()),
                 agentName:     benefName,
                 amount:        amount,
-                note:          note + (extInfo ? ' | '+extInfo : '') + ' | Compte: '+(acctLabels[account]||account),
+                note:          note + (extInfo ? ' | '+extInfo : ''),
                 date:          new Date().toISOString().split('T')[0],
                 paymentMethod: account,
             });

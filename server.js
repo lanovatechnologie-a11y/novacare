@@ -1267,19 +1267,87 @@ app.delete('/petite-caisse/:id', auth, adminOnly, async (req, res) => {
 
 // Enregistrer un retrait/commission
 app.post('/cash-withdrawals', auth, adminOnly, async (req, res) => {
+    const client = await pool.connect();
     try {
-        const { agentUsername, agentName, amount, note, date } = req.body;
+        await client.query('BEGIN');
+        const { agentUsername, agentName, amount, note, date, paymentMethod } = req.body;
+        const method = paymentMethod || 'cash';
         const id = 'WD' + Date.now();
-        await pool.query(
-            `INSERT INTO cash_withdrawals(id,agent_username,agent_name,amount,note,date,created_by)
-             VALUES($1,$2,$3,$4,$5,$6,$7)`,
-            [id, agentUsername, agentName, amount, note||null, date||new Date().toISOString().split('T')[0], req.user.username]
+
+        // Vérifier que le solde du compte est suffisant
+        const bal = await getAccountBalance(client, method);
+        if (bal < parseFloat(amount)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                error: 'Solde insuffisant sur ce compte. Disponible: ' + bal.toLocaleString('fr') + ' HTG'
+            });
+        }
+
+        await client.query(
+            `INSERT INTO cash_withdrawals(id,agent_username,agent_name,amount,note,date,created_by,payment_method)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [id, agentUsername, agentName, amount, note||null,
+             date||new Date().toISOString().split('T')[0], req.user.username, method]
         );
-        res.status(201).json({ id, success: true });
+
+        // Déduire du compte concerné
+        await client.query(
+            `INSERT INTO account_movements(id,account,amount,direction,reference,note,created_by)
+             VALUES($1,$2,$3,'out',$4,$5,$6)`,
+            ['MOV'+Date.now(), method, amount, id, note||'Décaissement', req.user.username]
+        );
+
+        await client.query('COMMIT');
+        res.status(201).json({ id, success: true, newBalance: bal - parseFloat(amount) });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// Helper: calculer le solde d'un compte
+async function getAccountBalance(client, method) {
+    // Encaissements reçus via cette méthode
+    const inc = await client.query(
+        "SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status='paid' AND LOWER(payment_method)=$1",
+        [method]
+    );
+    // Retraits effectués depuis ce compte
+    const out = await client.query(
+        "SELECT COALESCE(SUM(amount),0) as total FROM cash_withdrawals WHERE LOWER(payment_method)=$1",
+        [method]
+    );
+    // Mouvements manuels (petite caisse, transferts)
+    const mov_in  = await client.query(
+        "SELECT COALESCE(SUM(amount),0) as total FROM account_movements WHERE account=$1 AND direction='in'",
+        [method]
+    ).catch(function() { return { rows: [{ total: 0 }] }; });
+    const mov_out = await client.query(
+        "SELECT COALESCE(SUM(amount),0) as total FROM account_movements WHERE account=$1 AND direction='out'",
+        [method]
+    ).catch(function() { return { rows: [{ total: 0 }] }; });
+
+    return parseFloat(inc.rows[0].total)
+         - parseFloat(out.rows[0].total)
+         + parseFloat(mov_in.rows[0].total)
+         - parseFloat(mov_out.rows[0].total);
+}
+
+// Lister les retraits
+// Soldes de tous les comptes
+app.get('/account-balances', auth, adminOnly, async (req, res) => {
+    try {
+        const methods = ['cash','moncash','natcash','card','virement','petite_caisse'];
+        const client = await pool.connect();
+        const balances = {};
+        for (const m of methods) {
+            balances[m] = await getAccountBalance(client, m);
+        }
+        client.release();
+        res.json(balances);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Lister les retraits
 app.get('/cash-withdrawals', auth, adminOnly, async (req, res) => {
     try {
         const { agentUsername, date, fromDate, toDate } = req.query;
