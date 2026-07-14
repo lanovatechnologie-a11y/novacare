@@ -4119,7 +4119,7 @@ async function saveEditUser(userId) {
 
     var extraRoles = [];
     if (role === 'multi') {
-        document.querySelectorAll('#eu-multi-section input[type=checkbox]:checked').forEach(function(cb) {
+        document.querySelectorAll('#eu-multi-container input[type=checkbox]:checked').forEach(function(cb) {
             extraRoles.push(cb.value);
         });
         if (extraRoles.length < 2) { toast('Sélectionner au moins 2 rôles', 'error'); return; }
