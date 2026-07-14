@@ -4088,7 +4088,7 @@ function openEditUserModal(userId) {
                 '<input type="password" id="eu-pwd2" class="form-control" placeholder="Répéter le mot de passe"></div>' +
             '</div>' +
             '<div class="d-flex gap-10 mt-3">' +
-                '<button class="btn btn-success" onclick="saveEditUser(\'' + userId + '\') "><i class="fas fa-save"></i> Enregistrer</button>' +
+                '<button class="btn btn-success" data-uid="' + userId + '" onclick="saveEditUser(this.dataset.uid)"><i class="fas fa-save"></i> Enregistrer</button>' +
                 '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-user-modal\').remove()">Annuler</button>' +
             '</div></div>';
         document.body.appendChild(modal);
