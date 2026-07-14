@@ -2208,11 +2208,16 @@ async function renderAccountsDashboard(stats) {
     methods.forEach(function(m) {
         var txMethod  = txAll.filter(function(t)   { return (t.payment_method||'').toLowerCase() === m; });
         var todayMeth = txToday.filter(function(t) { return (t.payment_method||'').toLowerCase() === m; });
-        var wdMeth    = withdrawals.filter(function(w) { return true; }); // retraits globaux
+        // Soustraire les retraits effectués depuis CE compte spécifiquement
+        var wdMeth    = withdrawals.filter(function(w) { return (w.payment_method||'cash').toLowerCase() === m; });
+        var encaisse  = txMethod.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0);
+        var retire    = wdMeth.reduce(function(s,w)   { return s+parseFloat(w.amount); }, 0);
         accounts[m] = {
-            total: txMethod.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0),
-            today: todayMeth.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0),
-            count: txMethod.length,
+            encaisse: encaisse,
+            retire:   retire,
+            total:    encaisse - retire,   // solde net = encaissé - retiré
+            today:    todayMeth.reduce(function(s,t) { return s+parseFloat(t.amount); }, 0),
+            count:    txMethod.length,
         };
     });
 
@@ -2259,9 +2264,11 @@ async function renderAccountsDashboard(stats) {
                 '<div style="width:36px;height:36px;border-radius:8px;background:' + methodColors[m] + ';display:flex;align-items:center;justify-content:center;color:#fff;">' +
                 '<i class="fas ' + methodIcons[m] + '"></i></div>' +
                 '<strong style="font-size:.9rem;">' + methodLabels[m] + '</strong></div>' +
-                '<div style="font-size:1.2rem;font-weight:700;color:' + methodColors[m] + ';">' + acc.total.toLocaleString('fr-FR') + '</div>' +
-                '<div style="font-size:.72rem;color:var(--muted);">HTG total (' + acc.count + ' tx)</div>' +
-                '<div style="margin-top:6px;font-size:.8rem;color:var(--muted);">Aujourd\'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
+                '<div style="font-size:1.2rem;font-weight:700;color:' + (acc.total < 0 ? '#dc3545' : methodColors[m]) + ';">' + acc.total.toLocaleString('fr-FR') + ' HTG</div>' +
+                '<div style="font-size:.72rem;color:var(--muted);">Solde net (' + acc.count + ' tx)</div>' +
+                '<div style="font-size:.78rem;color:#28a745;margin-top:4px;">↓ Encaissé: ' + acc.encaisse.toLocaleString('fr-FR') + ' HTG</div>' +
+                (acc.retire > 0 ? '<div style="font-size:.78rem;color:#dc3545;">↑ Retraits: ' + acc.retire.toLocaleString('fr-FR') + ' HTG</div>' : '') +
+                '<div style="font-size:.78rem;color:var(--muted);">Aujourd\'hui: <strong>' + acc.today.toLocaleString('fr-FR') + '</strong></div>' +
                 '</div>';
         }).join('') +
 
@@ -4032,84 +4039,6 @@ async function deleteMedicationSettings(id) {
     toast('Médicament supprimé');
 }
 // ─── MODIFIER UTILISATEUR ────────────────────────────────────
-function openEditUserModal(userId) {
-    // Chercher l\'utilisateur dans le DOM (on recharge depuis l\'API)
-    API.getUsers().then(function(users) {
-        var u = users.find(function(x) { return String(x.id) === String(userId); });
-        if (!u) { toast('Utilisateur introuvable', 'error'); return; }
-
-        var existing = document.getElementById('edit-user-modal');
-        if (existing) existing.remove();
-
-        var extraChecks = ['secretary','cashier','nurse','doctor','lab','pharmacy'].map(function(r) {
-            var checked = u.extra_roles && u.extra_roles.split(',').map(function(s){return s.trim();}).includes(r) ? 'checked' : '';
-            return '<div class="permission-item"><input type="checkbox" id="eu-mr-'+r+'" value="'+r+'" '+checked+'>' +
-                   '<label for="eu-mr-'+r+'">'+getRoleLabel(r)+'</label></div>';
-        }).join('');
-
-        var modal = document.createElement('div');
-        modal.id = 'edit-user-modal';
-        modal.className = 'transaction-details-modal';
-        modal.innerHTML =
-            '<div class="transaction-details-content" style="max-width:520px;">' +
-            '<h4><i class="fas fa-user-edit" style="color:var(--warning);"></i> Modifier l\'utilisateur</h4>' +
-            '<div class="add-form-grid" style="margin-top:16px;">' +
-                '<div><label class="form-label">Nom complet *</label>' +
-                '<input type="text" id="eu-name" class="form-control" value="' + u.name + '"></div>' +
-                '<div><label class="form-label">Identifiant *</label>' +
-                '<input type="text" id="eu-username" class="form-control" value="' + u.username + '"></div>' +
-                '<div><label class="form-label">Rôle *</label>' +
-                '<select id="eu-role" class="form-control" onchange="document.getElementById(\'eu-multi-section\').style.display=this.value===\'multi\'?\'block\':\'none\'">' +
-                    '<option value="sub_admin"' + (u.role==='sub_admin'?' selected':'') + '>Sous-Administrateur</option>' +
-                    '<option value="secretary"' + (u.role==='secretary'?' selected':'') + '>Secrétariat</option>' +
-                    '<option value="cashier"'   + (u.role==='cashier'  ?' selected':'') + '>Caisse</option>' +
-                    '<option value="nurse"'     + (u.role==='nurse'    ?' selected':'') + '>Infirmier</option>' +
-                    '<option value="doctor"'    + (u.role==='doctor'   ?' selected':'') + '>Médecin</option>' +
-                    '<option value="lab"'       + (u.role==='lab'      ?' selected':'') + '>Laboratoire</option>' +
-                    '<option value="pharmacy"'  + (u.role==='pharmacy' ?' selected':'') + '>Pharmacie</option>' +
-                    '<option value="multi"'     + (u.role==='multi'    ?' selected':'') + '>Multi-Rôle</option>' +
-                '</select></div>' +
-                '<div><label class="form-label">Statut</label>' +
-                '<select id="eu-active" class="form-control">' +
-                    '<option value="true"'  + (u.active ?' selected':'') + '>Actif</option>' +
-                    '<option value="false"' + (!u.active?' selected':'') + '>Inactif</option>' +
-                '</select></div>' +
-            '</div>' +
-            '<div id="eu-multi-section" style="display:' + (u.role==='multi'?'block':'none') + ';margin-top:12px;">' +
-                '<label class="form-label"><i class="fas fa-layer-group" style="color:#6f42c1;"></i> Rôles combinés</label>' +
-                '<div class="permissions-grid" style="margin-top:8px;">' + extraChecks + '</div>' +
-            '</div>' +
-            '<hr style="margin:16px 0;border-color:var(--border);">' +
-            '<h5 style="margin-bottom:10px;color:var(--text);"><i class="fas fa-key" style="color:#ffc107;"></i> Changer le mot de passe <small style="color:var(--muted);font-weight:400;">(laisser vide = pas de changement)</small></h5>' +
-            '<div class="add-form-grid">' +
-                '<div><label class="form-label">Nouveau mot de passe</label>' +
-                '<input type="password" id="eu-pwd" class="form-control" placeholder="Laisser vide si inchang&#233;"></div>' +
-                '<div><label class="form-label">Confirmer</label>' +
-                '<input type="password" id="eu-pwd2" class="form-control" placeholder="Répéter le mot de passe"></div>' +
-            '</div>' +
-            '<div class="d-flex gap-10 mt-3">' +
-                '<button class="btn btn-success" data-uid="' + userId + '" onclick="saveEditUser(this.dataset.uid)"><i class="fas fa-save"></i> Enregistrer</button>' +
-                '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-user-modal\').remove()">Annuler</button>' +
-            '</div></div>';
-        document.body.appendChild(modal);
-    }).catch(function() { toast('Erreur chargement utilisateur', 'error'); });
-}
-
-async function toggleUser(id, active, name) {
-    await apiCall(function() { return API.updateUser(id, { name: name, active: active }); });
-    toast('Utilisateur ' + (active ? 'activé' : 'désactivé'));
-    updateMedicationsSettingsList();
-}
-
-async function deleteUser(id, name) {
-    if (!confirm('Supprimer définitivement l\'utilisateur "' + name + '" ?\nCette action est irréversible.')) return;
-    try {
-        await apiCall(function() { return API.deleteUser(id); });
-        toast('Utilisateur "' + name + '" supprimé', 'warning');
-        updateMedicationsSettingsList();
-    } catch(e) {}
-}
-
 function openEditUserModal(id) {
     // Récupérer les infos actuelles depuis le DOM
     API.getUsers().then(function(users) {
@@ -4163,7 +4092,7 @@ function openEditUserModal(id) {
                 '<input type="password" id="eu-pwd2" class="form-control" placeholder="Répéter le nouveau mot de passe"></div>' +
             '</div></div>' +
             '<div class="d-flex gap-10 mt-3">' +
-                '<button class="btn btn-success" onclick="saveEditUser(\'' + id + '\' )"><i class="fas fa-save"></i> Enregistrer</button>' +
+                '<button class="btn btn-success" data-uid="' + id + '" onclick="saveEditUser(this.dataset.uid)"><i class="fas fa-save"></i> Enregistrer</button>' +
                 '<button class="btn btn-secondary" onclick="document.getElementById(\'edit-user-modal\').remove()">Annuler</button>' +
             '</div></div>';
         document.body.appendChild(modal);
