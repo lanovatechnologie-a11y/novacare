@@ -31,7 +31,29 @@ const state = {
     },
     // Notifications locales
     localNotifications: [],
+    // Pagination des longues listes catalogue (10 par page, "Afficher plus")
+    listPages: {},
 };
+
+const LIST_PAGE_SIZE = 10;
+function pageSlice(key, arr) {
+    if (!state.listPages[key]) state.listPages[key] = LIST_PAGE_SIZE;
+    return arr.slice(0, state.listPages[key]);
+}
+function loadMoreList(key, total, rerenderFn) {
+    state.listPages[key] = Math.min((state.listPages[key] || LIST_PAGE_SIZE) + LIST_PAGE_SIZE, total);
+    rerenderFn();
+}
+function loadMoreButtonHtml(key, total, shown, rerenderFnName, colspan) {
+    if (shown >= total) return '';
+    const remaining = total - shown;
+    const btn = `<button type="button" class="btn btn-secondary btn-sm" onclick="loadMoreList('${key}', ${total}, ${rerenderFnName})">
+        <i class="fas fa-chevron-down"></i> Afficher plus (${remaining} restant${remaining>1?'s':''})
+    </button>`;
+    return colspan
+        ? `<tr><td colspan="${colspan}" style="text-align:center;padding:12px;">${btn}</td></tr>`
+        : `<div style="text-align:center;margin-top:10px;">${btn}</div>`;
+}
 
 // ─── Utilitaires monnaie ─────────────────────────────────────
 function htgToUsd(htg)  { return (htg / state.exchangeRate).toFixed(2); }
@@ -254,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCurrencyHandlers();
     setupNotifBell();
     setupExchangeRateSettings();
+    setupExtraModeSettings();
 
     // Rafraîchir messages et notifs toutes les 30s
     setInterval(() => {
@@ -369,6 +392,7 @@ async function loadBaseData() {
 
         applyHospitalSettings();
         updateConsultationTypesSelect();
+        updateAssignedDoctorSelect();
         updateVitalsInputs();
         updateLabAnalysesSelect();
         updateExternalServicesSelect();
@@ -409,6 +433,28 @@ function applyHospitalSettings() {
     const eri = document.getElementById('exchange-rate-input');
     if (eri) eri.value = state.exchangeRate;
     updateExchangeRateDisplay();
+
+    // Mode Extra
+    const extraActive = s.extraMode === 'true' || s.extraMode === true;
+    const extraPct     = parseFloat(s.extraModePercentage) || 0;
+    const emt = document.getElementById('extra-mode-toggle');
+    const emp = document.getElementById('extra-mode-percentage');
+    if (emt) emt.checked = extraActive;
+    if (emp) emp.value   = extraPct;
+    updateExtraModeStatus(extraActive, extraPct);
+}
+
+function updateExtraModeStatus(active, pct) {
+    const txt = document.getElementById('extra-mode-status-text');
+    if (txt) {
+        txt.textContent = active
+            ? `Mode Extra activé : majoration de ${pct}% sur médicaments, analyses, services externes et consultations.`
+            : 'Mode Extra désactivé.';
+    }
+    document.querySelectorAll('[id*="extra-mode-badge"]').forEach(el => {
+        el.textContent = active ? `Mode Extra (+${pct}%)` : '';
+        el.classList.toggle('hidden', !active);
+    });
 }
 
 function updateExchangeRateDisplay() {
@@ -431,7 +477,7 @@ function setupNavigation() {
             document.getElementById(target).classList.add('active');
 
             if      (target === 'dashboard')      updateRoleDashboard();
-            else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); loadAppointmentsList(); }
+            else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); updateAssignedDoctorSelect(); loadAppointmentsList(); }
             else if (target === 'administration') updateAdminStats();
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
@@ -554,6 +600,23 @@ function setupExchangeRateSettings() {
             await apiCall(() => API.saveSettings({ ...state.hospitalSettings, exchangeRate: rate }));
             Object.assign(state.hospitalSettings, { exchangeRate: rate });
             toast(`Taux de change mis à jour: ${rate} HTG = 1 USD`);
+        } catch(e) {}
+    });
+}
+
+// ─── MODE EXTRA ────────────────────────────────────────────────
+function setupExtraModeSettings() {
+    document.getElementById('save-extra-mode-btn')?.addEventListener('click', async () => {
+        const active = document.getElementById('extra-mode-toggle').checked;
+        const pct    = parseFloat(document.getElementById('extra-mode-percentage').value) || 0;
+        if (active && pct <= 0) { toast('Indiquer un pourcentage supérieur à 0', 'error'); return; }
+        try {
+            await apiCall(() => API.saveSettings({ ...state.hospitalSettings, extraMode: active, extraModePercentage: pct }));
+            Object.assign(state.hospitalSettings, { extraMode: active ? 'true' : 'false', extraModePercentage: String(pct) });
+            updateExtraModeStatus(active, pct);
+            toast(active ? `Mode Extra activé (+${pct}%)` : 'Mode Extra désactivé');
+            // Recharger les catalogues pour refléter les nouveaux prix
+            await loadBaseData();
         } catch(e) {}
     });
 }
@@ -1027,6 +1090,19 @@ function updateConsultationTypesSelect() {
     });
 }
 
+async function updateAssignedDoctorSelect() {
+    const sel = document.getElementById('patient-assigned-doctor');
+    if (!sel) return;
+    const currentVal = sel.value;
+    try {
+        const users = await API.getUsers().catch(() => []);
+        const doctors = users.filter(u => (u.role === 'doctor' || (u.role === 'multi' && (u.extra_roles || '').split(',').map(s => s.trim()).includes('doctor'))) && u.active);
+        sel.innerHTML = '<option value="">Sélectionner un médecin...</option>' +
+            doctors.map(d => `<option value="${d.username}">${d.name}</option>`).join('');
+        if (currentVal) sel.value = currentVal;
+    } catch(e) {}
+}
+
 function updateExternalServicesOptions() {
     const container = document.getElementById('external-services-options');
     if (!container) return;
@@ -1061,9 +1137,12 @@ function syncExternalUI() {
     const extOnly = document.getElementById('external-only')?.checked;
     const isExt   = type === 'externe' || extOnly;
     document.getElementById('consultation-type-container')?.classList.toggle('hidden', isExt);
+    document.getElementById('assigned-doctor-container')?.classList.toggle('hidden', isExt);
     document.getElementById('external-services-selection')?.classList.toggle('hidden', !isExt);
     const ctSel = document.getElementById('consultation-type-secretary');
     if (ctSel) ctSel.required = !isExt;
+    const drSel = document.getElementById('patient-assigned-doctor');
+    if (drSel) drSel.required = !isExt;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1114,10 +1193,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const type               = document.querySelector('input[name="patient-type"]:checked').value;
         const externalOnly       = document.getElementById('external-only').checked;
         const consultationTypeId = parseInt(document.getElementById('consultation-type-secretary').value);
+        const assignedDoctorUsername = document.getElementById('patient-assigned-doctor').value;
 
         if (type !== 'externe' && !externalOnly && !consultationTypeId) {
             toast('Sélectionner un type de consultation', 'error'); return;
         }
+        if (type !== 'externe' && !externalOnly && !assignedDoctorUsername) {
+            toast('Sélectionner un médecin', 'error'); return;
+        }
+        const assignedDoctor = assignedDoctorUsername
+            ? (document.getElementById('patient-assigned-doctor').selectedOptions[0]?.textContent || '')
+            : '';
 
         const externalServices = [];
         document.querySelectorAll('.external-service-option:checked').forEach(cb => {
@@ -1136,6 +1222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 externalOnly, consultationTypeId: externalOnly ? null : consultationTypeId,
                 modifiedConsultation: state.currentModifiedConsultation,
                 externalServices,
+                assignedDoctorUsername: externalOnly ? null : assignedDoctorUsername,
+                assignedDoctorName: externalOnly ? null : assignedDoctor,
             }));
 
             toast(`Patient enregistré ! ID: ${result.id}`);
@@ -1143,6 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('patient-normal').checked = true;
             document.getElementById('external-only').checked  = false;
             syncExternalUI();
+            document.getElementById('patient-assigned-doctor').value = '';
             document.getElementById('modify-consultation-type-btn')?.classList.add('hidden');
             document.getElementById('consultation-modification-secretary')?.classList.add('hidden');
             state.currentModifiedConsultation = null;
@@ -3697,9 +3786,11 @@ function quickSetPassword(patientId, patientName) {
 // ─── PARAMÈTRES ──────────────────────────────────────────────
 async function updateSettingsDisplay() {
     // Types de consultation
+    var ctTotal = state.consultationTypes.length;
+    var ctPage  = pageSlice('consultationTypes', state.consultationTypes);
     document.getElementById('consultation-types-list').innerHTML =
         '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Description</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
-        state.consultationTypes.map(function(ct) {
+        ctPage.map(function(ct) {
             return '<tr>' +
                 '<td><strong>' + ct.name + '</strong></td>' +
                 '<td>' + ct.price + ' HTG</td>' +
@@ -3711,6 +3802,11 @@ async function updateSettingsDisplay() {
                 '</div></td>' +
             '</tr>';
         }).join('') +
+        '<tr>' +
+            '<td colspan="5" style="text-align:center;padding:6px;border:none;">' +
+                loadMoreButtonHtml('consultationTypes', ctTotal, ctPage.length, 'updateSettingsDisplay') +
+            '</td>' +
+        '</tr>' +
         '</tbody></table></div>';
 
     // Types signes vitaux
@@ -3729,9 +3825,11 @@ async function updateSettingsDisplay() {
         '</tbody></table></div>';
 
     // Types analyses labo
+    var latTotal = state.labAnalysisTypes.length;
+    var latPage  = pageSlice('labAnalysisTypes', state.labAnalysisTypes);
     document.getElementById('lab-analyses-types-list').innerHTML =
         '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix</th><th>Type</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
-        state.labAnalysisTypes.map(function(a) {
+        latPage.map(function(a) {
             return '<tr>' +
                 '<td>' + a.name + '</td>' +
                 '<td>' + a.price + ' HTG</td>' +
@@ -3743,6 +3841,11 @@ async function updateSettingsDisplay() {
                 '</div></td>' +
             '</tr>';
         }).join('') +
+        '<tr>' +
+            '<td colspan="5" style="text-align:center;padding:6px;border:none;">' +
+                loadMoreButtonHtml('labAnalysisTypes', latTotal, latPage.length, 'updateSettingsDisplay') +
+            '</td>' +
+        '</tr>' +
         '</tbody></table></div>';
 
     // Services externes
@@ -3914,7 +4017,9 @@ async function saveEditMedication(id) {
 async function updateMedicationsSettingsList() {
     var meds = await API.getMedications().catch(function() { return []; });
     state.medications = meds;
-    document.getElementById('medications-settings-list').innerHTML = meds.map(function(m) {
+    var medsTotal = meds.length;
+    var medsPage  = pageSlice('medications', meds);
+    document.getElementById('medications-settings-list').innerHTML = medsPage.map(function(m) {
         return '<tr class="' + (m.quantity === 0 ? 'out-of-stock' : m.quantity <= m.alert_threshold ? 'low-stock' : '') + '">' +
             '<td><strong>' + m.name + '</strong>' + (m.generic_name && m.generic_name !== m.name ? '<br><small class="text-muted">' + m.generic_name + '</small>' : '') + '</td>' +
             '<td>' + (m.form||'-') + '</td>' +
@@ -3928,7 +4033,7 @@ async function updateMedicationsSettingsList() {
                 '<button class="btn btn-sm btn-danger" onclick="deleteMedicationSettings(\'' + m.id + '\') " title="Supprimer"><i class="fas fa-trash"></i></button>' +
             '</div></td>' +
         '</tr>';
-    }).join('');
+    }).join('') + loadMoreButtonHtml('medications', medsTotal, medsPage.length, 'updateMedicationsSettingsList', 8);
 
     if (state.currentRole === 'admin' || (state.currentRole === 'sub_admin' && state.subAdminPermissions.users)) {
         var users = await API.getUsers().catch(function() { return []; });

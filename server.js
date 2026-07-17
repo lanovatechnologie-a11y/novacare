@@ -29,6 +29,34 @@ function buildDbUrl() {
 const pool = new Pool({ connectionString: buildDbUrl(), ssl: { rejectUnauthorized: false } });
 pool.connect().then(c => { console.log('PostgreSQL OK'); c.release(); }).catch(e => console.error('PostgreSQL ERR:', e.message));
 
+// ─── Migrations légères (ajout de colonnes si absentes) ───────
+(async () => {
+    try {
+        await pool.query(`ALTER TABLE patients ADD COLUMN IF NOT EXISTS assigned_doctor VARCHAR(120)`);
+        await pool.query(`ALTER TABLE patients ADD COLUMN IF NOT EXISTS assigned_doctor_name VARCHAR(200)`);
+        console.log('Migration colonnes médecin assigné OK');
+    } catch (e) { console.error('Migration ERR:', e.message); }
+})();
+
+// ─── Mode Extra (majoration % sur les services) ────────────────
+async function getExtraModeInfo() {
+    const r = await pool.query(
+        `SELECT setting_key, setting_val FROM hospital_settings WHERE setting_key IN ('extraMode','extraModePercentage')`
+    );
+    let active = false, percentage = 0;
+    r.rows.forEach(row => {
+        if (row.setting_key === 'extraMode') active = row.setting_val === 'true';
+        if (row.setting_key === 'extraModePercentage') percentage = parseFloat(row.setting_val) || 0;
+    });
+    return { active, percentage, multiplier: active ? (1 + percentage / 100) : 1 };
+}
+function applyExtraMode(price, role, extraInfo) {
+    if (!extraInfo.active) return price;
+    if (role === 'admin' || role === 'sub_admin') return price; // l'admin voit toujours le prix de base
+    const p = Number(price) || 0;
+    return Math.round(p * extraInfo.multiplier * 100) / 100;
+}
+
 // ─── Middlewares ─────────────────────────────────────────────
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
@@ -137,7 +165,7 @@ app.get('/settings', auth, async (req, res) => {
 
 app.put('/settings', auth, adminOnly, async (req, res) => {
     try {
-        const { name, address, phone, logo, exchangeRate, subAdminPermissions } = req.body;
+        const { name, address, phone, logo, exchangeRate, subAdminPermissions, extraMode, extraModePercentage } = req.body;
         const fields = {};
         if (name)         fields.name         = name;
         if (address)      fields.address      = address;
@@ -145,6 +173,8 @@ app.put('/settings', auth, adminOnly, async (req, res) => {
         if (logo)         fields.logo         = logo;
         if (exchangeRate) fields.exchangeRate  = String(exchangeRate);
         if (subAdminPermissions) fields.subAdminPermissions = JSON.stringify(subAdminPermissions);
+        if (extraMode !== undefined) fields.extraMode = extraMode ? 'true' : 'false';
+        if (extraModePercentage !== undefined) fields.extraModePercentage = String(parseFloat(extraModePercentage) || 0);
         for (const [k, v] of Object.entries(fields)) {
             await pool.query(
                 'INSERT INTO hospital_settings(setting_key,setting_val) VALUES($1,$2) ON CONFLICT(setting_key) DO UPDATE SET setting_val=$2',
@@ -258,15 +288,18 @@ app.post('/patients', auth, async (req, res) => {
     try {
         await client.query('BEGIN');
         const { fullName, birthDate, address, phone, responsible, type,
-                externalOnly, consultationTypeId, modifiedConsultation, externalServices } = req.body;
+                externalOnly, consultationTypeId, modifiedConsultation, externalServices,
+                assignedDoctorUsername, assignedDoctorName } = req.body;
 
         const ctr = await nextId(client, 'patient');
         const pid = 'PAT' + String(ctr).padStart(4, '0');
 
         await client.query(
-            'INSERT INTO patients(id,full_name,birth_date,address,phone,responsible,type,registered_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
-            [pid, fullName, birthDate || null, address, phone, responsible, type, req.user.username]
+            'INSERT INTO patients(id,full_name,birth_date,address,phone,responsible,type,registered_by,assigned_doctor,assigned_doctor_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+            [pid, fullName, birthDate || null, address, phone, responsible, type, req.user.username, assignedDoctorUsername || null, assignedDoctorName || null]
         );
+
+        const extra = await getExtraModeInfo();
 
         if (!externalOnly && consultationTypeId) {
             let svcName, svcPrice;
@@ -277,7 +310,7 @@ app.post('/patients', auth, async (req, res) => {
                 const ct = await client.query('SELECT * FROM consultation_types WHERE id=$1', [consultationTypeId]);
                 if (ct.rows.length) {
                     svcName  = 'Consultation: ' + ct.rows[0].name;
-                    svcPrice = ct.rows[0].price;
+                    svcPrice = applyExtraMode(ct.rows[0].price, req.user.role, extra);
                 }
             }
             if (svcName) {
@@ -302,7 +335,7 @@ app.post('/patients', auth, async (req, res) => {
         }
 
         await client.query('COMMIT');
-        res.status(201).json({ id: pid, fullName });
+        res.status(201).json({ id: pid, fullName, assignedDoctorName: assignedDoctorName || null });
     } catch(e) {
         await client.query('ROLLBACK');
         console.error(e);
@@ -495,7 +528,8 @@ app.get('/medications', auth, async (req, res) => {
     const r = await pool.query(
         'SELECT m.*, s.name AS supplier_name FROM medications m LEFT JOIN suppliers s ON s.id=m.supplier_id ORDER BY m.name'
     );
-    res.json(r.rows);
+    const extra = await getExtraModeInfo();
+    res.json(r.rows.map(row => ({ ...row, price: applyExtraMode(row.price, req.user.role, extra) })));
 });
 app.post('/medications', auth, async (req, res) => {
     try {
@@ -532,7 +566,11 @@ app.delete('/medications/:id', auth, adminOnly, async (req, res) => {
 // ════════════════════════════════════════════════════════════
 //  TYPES (consultation, vitaux, labo, externe)
 // ════════════════════════════════════════════════════════════
-app.get('/consultation-types', auth, async (req, res) => { res.json((await pool.query('SELECT * FROM consultation_types ORDER BY id')).rows); });
+app.get('/consultation-types', auth, async (req, res) => {
+    const r = await pool.query('SELECT * FROM consultation_types ORDER BY id');
+    const extra = await getExtraModeInfo();
+    res.json(r.rows.map(row => ({ ...row, price: applyExtraMode(row.price, req.user.role, extra) })));
+});
 app.post('/consultation-types', auth, adminOrSub, async (req, res) => {
     const { name, price, description } = req.body;
     const r = await pool.query('INSERT INTO consultation_types(name,price,description) VALUES($1,$2,$3) RETURNING *', [name, price, description]);
@@ -564,7 +602,11 @@ app.delete('/vital-types/:id', auth, adminOrSub, async (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/lab-analysis-types', auth, async (req, res) => { res.json((await pool.query('SELECT * FROM lab_analysis_types ORDER BY id')).rows); });
+app.get('/lab-analysis-types', auth, async (req, res) => {
+    const r = await pool.query('SELECT * FROM lab_analysis_types ORDER BY id');
+    const extra = await getExtraModeInfo();
+    res.json(r.rows.map(row => ({ ...row, price: applyExtraMode(row.price, req.user.role, extra) })));
+});
 app.post('/lab-analysis-types', auth, adminOrSub, async (req, res) => {
     const { name, price, resultType } = req.body;
     const r = await pool.query('INSERT INTO lab_analysis_types(name,price,result_type) VALUES($1,$2,$3) RETURNING *', [name, price, resultType]);
@@ -580,7 +622,11 @@ app.delete('/lab-analysis-types/:id', auth, adminOrSub, async (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/external-service-types', auth, async (req, res) => { res.json((await pool.query('SELECT * FROM external_service_types ORDER BY id')).rows); });
+app.get('/external-service-types', auth, async (req, res) => {
+    const r = await pool.query('SELECT * FROM external_service_types ORDER BY id');
+    const extra = await getExtraModeInfo();
+    res.json(r.rows.map(row => ({ ...row, price: applyExtraMode(row.price, req.user.role, extra) })));
+});
 app.post('/external-service-types', auth, adminOrSub, async (req, res) => {
     const { name, price } = req.body;
     const r = await pool.query('INSERT INTO external_service_types(name,price) VALUES($1,$2) RETURNING *', [name, price]);

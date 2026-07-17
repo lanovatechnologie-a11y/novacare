@@ -177,6 +177,12 @@
                                 <i class="fas fa-edit"></i> Modifier ce type
                             </button>
                         </div>
+                        <div style="flex:1" id="assigned-doctor-container">
+                            <label class="form-label">Médecin *</label>
+                            <select id="patient-assigned-doctor" class="form-control" required>
+                                <option value="">Sélectionner un médecin...</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div id="external-services-selection" class="hidden">
@@ -1123,6 +1129,32 @@
                     <div style="grid-column:1/-1;" id="exchange-preview" class="exchange-banner" style="margin-top:8px;margin-bottom:0;">
                         <i class="fas fa-info-circle"></i>
                         <span>Taux actuel : <strong>130 HTG = 1 USD</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode Extra -->
+            <div class="card">
+                <h3><i class="fas fa-percentage"></i> Mode Extra</h3>
+                <p class="text-muted" style="margin-bottom:14px;">
+                    Lorsque le Mode Extra est activé, un pourcentage est automatiquement ajouté au prix des médicaments,
+                    des analyses, des services externes et des consultations, pour tous les utilisateurs (sauf l'administration).
+                </p>
+                <div class="add-form-grid" style="margin-top:0;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" id="extra-mode-toggle" style="width:20px;height:20px;">
+                        <label class="form-label" style="margin:0;" for="extra-mode-toggle">Activer le Mode Extra</label>
+                    </div>
+                    <div>
+                        <label class="form-label">Pourcentage de majoration (%)</label>
+                        <input type="number" id="extra-mode-percentage" class="form-control" value="0" min="0" step="0.01">
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button id="save-extra-mode-btn" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer</button>
+                    </div>
+                    <div style="grid-column:1/-1;" id="extra-mode-preview" class="exchange-banner" style="margin-top:8px;margin-bottom:0;">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="extra-mode-status-text">Mode Extra désactivé.</span>
                     </div>
                 </div>
             </div>
