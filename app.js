@@ -482,6 +482,7 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'nurse')          loadNurseHospList();
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'hospitalization') { closeHospDetail(); loadHospitalizations('active'); }
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
@@ -4598,8 +4599,25 @@ async function loadHospitalizations(status) {
     } catch(e) {}
 }
 
+function getFilteredHospList() {
+    const term = (document.getElementById('hosp-list-search')?.value || '').trim().toLowerCase();
+    const list = state.hospListFull || [];
+    if (!term) return list;
+    return list.filter(h =>
+        (h.full_name || '').toLowerCase().includes(term) ||
+        (h.patient_id || '').toLowerCase().includes(term) ||
+        (h.room || '').toLowerCase().includes(term) ||
+        (h.bed || '').toLowerCase().includes(term)
+    );
+}
+
+function filterHospitalizationsList() {
+    state.listPages['hospitalizations'] = LIST_PAGE_SIZE;
+    renderHospitalizationsList();
+}
+
 function renderHospitalizationsList() {
-    const list  = state.hospListFull || [];
+    const list  = getFilteredHospList();
     const total = list.length;
     const page  = pageSlice('hospitalizations', list);
     const container = document.getElementById('hospitalizations-list');
@@ -4954,7 +4972,55 @@ async function dischargePatient() {
     } catch(e) {}
 }
 
-// ── Raccourci médecin : hospitaliser le patient en consultation ─
+// ── Vue infirmier : patients hospitalisés ────────────────────
+async function loadNurseHospList() {
+    try {
+        state.nurseHospFull = await apiCall(() => API.getHospitalizations({ status: 'active' }));
+        state.listPages['nurseHosp'] = LIST_PAGE_SIZE;
+        renderNurseHospList();
+    } catch(e) {}
+}
+
+function getFilteredNurseHospList() {
+    const term = (document.getElementById('nurse-hosp-search')?.value || '').trim().toLowerCase();
+    const list = state.nurseHospFull || [];
+    if (!term) return list;
+    return list.filter(h =>
+        (h.full_name || '').toLowerCase().includes(term) ||
+        (h.patient_id || '').toLowerCase().includes(term) ||
+        (h.room || '').toLowerCase().includes(term) ||
+        (h.bed || '').toLowerCase().includes(term)
+    );
+}
+
+function filterNurseHospList() {
+    state.listPages['nurseHosp'] = LIST_PAGE_SIZE;
+    renderNurseHospList();
+}
+
+function renderNurseHospList() {
+    const list  = getFilteredNurseHospList();
+    const total = list.length;
+    const page  = pageSlice('nurseHosp', list);
+    const container = document.getElementById('nurse-hosp-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucun patient hospitalisé actif.</p>'; return; }
+    container.innerHTML = page.map(h => `
+        <div class="card" style="margin-bottom:8px;padding:12px;">
+            <div class="d-flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <strong>${h.full_name}</strong> <small class="text-muted">#${h.patient_id}</small>
+                    <br><small class="text-muted">${h.room || 'Chambre non assignée'}${h.bed ? ' / ' + h.bed : ''} — Dr. ${h.doctor || '-'}</small>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="openHospDetailFromNurse('${h.id}')"><i class="fas fa-folder-open"></i> Voir le dossier</button>
+            </div>
+        </div>`).join('') + loadMoreButtonHtml('nurseHosp', total, page.length, 'renderNurseHospList');
+}
+
+function openHospDetailFromNurse(hospId) {
+    showSection('hospitalization');
+    openHospDetail(hospId);
+}
 async function quickHospitalize() {
     const p = state.currentDoctorPatient;
     if (!p) { toast('Sélectionner un patient', 'error'); return; }

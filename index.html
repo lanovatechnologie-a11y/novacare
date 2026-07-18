@@ -460,7 +460,19 @@
         <!-- ─── INFIRMIER ───────────────────────────────── -->
         <section id="nurse" class="content">
             <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier — Signes Vitaux</h2>
+
+            <!-- Patients hospitalisés -->
             <div class="card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
+                </div>
+                <div class="d-flex gap-15 mt-2">
+                    <input type="text" id="nurse-hosp-search" class="form-control" placeholder="Rechercher par nom, ID ou chambre..." oninput="filterNurseHospList()">
+                </div>
+                <div id="nurse-hosp-list" class="mt-2"></div>
+            </div>
+
+            <div class="card mt-3">
                 <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
                 <div class="d-flex gap-15">
                     <input type="text" id="nurse-patient-search" class="form-control" placeholder="ID patient ou nom">
@@ -814,7 +826,8 @@
             <div class="card mt-3">
                 <div class="settings-section-header">
                     <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
-                    <div class="d-flex gap-10">
+                    <div class="d-flex gap-10" style="flex-wrap:wrap;">
+                        <input type="text" id="hosp-list-search" class="form-control" style="max-width:220px;" placeholder="Rechercher nom, ID, chambre..." oninput="filterHospitalizationsList()">
                         <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')">Actifs</button>
                         <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
                         <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
