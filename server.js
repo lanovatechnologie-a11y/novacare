@@ -34,6 +34,9 @@ pool.connect().then(c => { console.log('PostgreSQL OK'); c.release(); }).catch(e
     try {
         await pool.query(`ALTER TABLE patients ADD COLUMN IF NOT EXISTS assigned_doctor VARCHAR(120)`);
         await pool.query(`ALTER TABLE patients ADD COLUMN IF NOT EXISTS assigned_doctor_name VARCHAR(200)`);
+        await pool.query(`ALTER TABLE hosp_prescriptions ADD COLUMN IF NOT EXISTS delivered BOOLEAN DEFAULT false`);
+        await pool.query(`ALTER TABLE hosp_prescriptions ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
+        await pool.query(`ALTER TABLE hosp_prescriptions ADD COLUMN IF NOT EXISTS delivered_by VARCHAR(120)`);
         console.log('Migration colonnes médecin assigné OK');
     } catch (e) { console.error('Migration ERR:', e.message); }
 })();
@@ -1127,11 +1130,20 @@ app.post('/hosp-prescriptions', auth, async (req, res) => {
 });
 
 app.put('/hosp-prescriptions/:id', auth, async (req, res) => {
-    const { status, administeredAt, administeredBy, nurseNote } = req.body;
-    await pool.query(
-        'UPDATE hosp_prescriptions SET status=$1, administered_at=$2, administered_by=$3, nurse_note=$4 WHERE id=$5',
-        [status, administeredAt||null, administeredBy||null, nurseNote||null, req.params.id]
-    );
+    const { status, administeredAt, administeredBy, nurseNote,
+            delivered, deliveredAt, deliveredBy } = req.body;
+    const fields = [];
+    const params = [];
+    if (status !== undefined)         { params.push(status);         fields.push('status=$'         + params.length); }
+    if (administeredAt !== undefined) { params.push(administeredAt); fields.push('administered_at=$' + params.length); }
+    if (administeredBy !== undefined) { params.push(administeredBy);fields.push('administered_by=$'  + params.length); }
+    if (nurseNote !== undefined)      { params.push(nurseNote);      fields.push('nurse_note=$'       + params.length); }
+    if (delivered !== undefined)      { params.push(delivered);      fields.push('delivered=$'        + params.length); }
+    if (deliveredAt !== undefined)    { params.push(deliveredAt);    fields.push('delivered_at=$'     + params.length); }
+    if (deliveredBy !== undefined)    { params.push(deliveredBy);    fields.push('delivered_by=$'     + params.length); }
+    if (!fields.length) return res.json({ success: true });
+    params.push(req.params.id);
+    await pool.query(`UPDATE hosp_prescriptions SET ${fields.join(', ')} WHERE id=$${params.length}`, params);
     res.json({ success: true });
 });
 

@@ -479,7 +479,7 @@ function setupNavigation() {
             if      (target === 'dashboard')      updateRoleDashboard();
             else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); updateAssignedDoctorSelect(); loadAppointmentsList(); }
             else if (target === 'administration') updateAdminStats();
-            else if (target === 'pharmacy')       { updateMedicationStockDisplay(); loadPharmacyHospPrescriptions('pending'); }
+            else if (target === 'pharmacy')       { updateMedicationStockDisplay(); state.pharmHospFilter = 'pending'; loadPharmacyHospPrescriptions(); }
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
             else if (target === 'nurse')          loadNurseHospList();
@@ -5177,17 +5177,24 @@ function openHospDetailFromNurse(hospId) {
 }
 
 // ── Vue pharmacie : prescriptions des patients hospitalisés ──
-async function loadPharmacyHospPrescriptions(status) {
+async function loadPharmacyHospPrescriptions() {
     try {
-        state.pharmHospRxFull = await apiCall(() => API.getAllHospPrescriptions(status ? { status } : {}));
+        state.pharmHospRxFull = await apiCall(() => API.getAllHospPrescriptions());
         state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
         renderPharmacyHospPrescriptions();
     } catch(e) {}
 }
 
+function setPharmHospFilter(filter) {
+    state.pharmHospFilter = filter;
+    state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
+    renderPharmacyHospPrescriptions();
+}
+
 function getFilteredPharmHospRx() {
     const term = (document.getElementById('pharm-hosp-search')?.value || '').trim().toLowerCase();
-    const list = state.pharmHospRxFull || [];
+    let list = state.pharmHospRxFull || [];
+    if (state.pharmHospFilter === 'pending') list = list.filter(rx => !rx.delivered);
     if (!term) return list;
     return list.filter(rx =>
         (rx.full_name || '').toLowerCase().includes(term) ||
@@ -5210,20 +5217,40 @@ function renderPharmacyHospPrescriptions() {
     if (!total) { container.innerHTML = '<p class="text-muted">Aucune prescription pour le moment.</p>'; return; }
     const page = pageSlice('pharmHospRx', list);
     container.innerHTML = page.map(rx => `
-        <div class="card mb-2" style="border-left-color:${rx.status === 'administered' ? '#28a745' : '#ff9800'};">
+        <div class="card mb-2" style="border-left-color:${rx.delivered ? '#28a745' : '#ff9800'};">
             <div class="d-flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
                 <div style="flex:1;min-width:220px;">
                     <strong>${rx.medication_name}</strong> — ${rx.dosage}
                     <br><small class="text-muted">${rx.full_name} (#${rx.patient_id}) — ${rx.room || 'Chambre non assignée'}${rx.bed ? ' / ' + rx.bed : ''} — Dr. ${rx.doctor || '-'}</small>
                     <br><small class="text-muted">${rx.frequency || ''} ${rx.duration ? '· ' + rx.duration : ''} ${rx.route ? '· ' + rx.route : ''} · Qté: ${rx.quantity}</small>
                     ${rx.note ? `<p class="mt-2" style="background:#fff8e1;padding:6px 10px;border-radius:6px;"><i class="fas fa-sticky-note"></i> ${rx.note}</p>` : ''}
+                    ${rx.delivered ? `<p class="mt-2 text-muted"><i class="fas fa-check-circle" style="color:#28a745;"></i> Délivré par ${rx.delivered_by||''} le ${rx.delivered_at ? new Date(rx.delivered_at).toLocaleString('fr-FR') : ''}</p>` : ''}
                 </div>
                 <div style="text-align:right;">
-                    <span class="${rx.status === 'administered' ? 'status-paid' : 'status-unpaid'}">${rx.status === 'administered' ? 'Administré' : 'En attente'}</span>
+                    <span class="${rx.delivered ? 'status-paid' : 'status-unpaid'}">${rx.delivered ? 'Délivré (pharmacie)' : 'À délivrer'}</span>
+                    <br><span class="${rx.status === 'administered' ? 'status-paid' : 'status-unpaid'}" style="font-size:.78rem;">${rx.status === 'administered' ? 'Administré (infirmier)' : 'Non administré'}</span>
                     <br><small class="text-muted">${formatHTG(rx.total_price)}</small>
+                    ${!rx.delivered ? `<br><button class="btn btn-sm btn-success mt-2" onclick="markPrescriptionDelivered('${rx.id}')"><i class="fas fa-check"></i> Marquer délivré</button>` : ''}
                 </div>
             </div>
         </div>`).join('') + loadMoreButtonHtml('pharmHospRx', total, page.length, 'renderPharmacyHospPrescriptions');
+}
+
+async function markPrescriptionDelivered(rxId) {
+    try {
+        const deliveredBy = (state.currentUser && (state.currentUser.name || state.currentUser.username)) || '';
+        const deliveredAt = new Date().toISOString();
+        await apiCall(() => API.updateHospPrescription(rxId, { delivered: true, deliveredAt, deliveredBy }));
+        toast('Médicament marqué comme délivré');
+        const list = state.pharmHospRxFull || [];
+        const idx  = list.findIndex(r => r.id === rxId);
+        if (idx > -1) {
+            list[idx].delivered    = true;
+            list[idx].delivered_at = deliveredAt;
+            list[idx].delivered_by = deliveredBy;
+        }
+        renderPharmacyHospPrescriptions();
+    } catch(e) {}
 }
 async function quickHospitalize() {
     const p = state.currentDoctorPatient;
