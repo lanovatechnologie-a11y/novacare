@@ -171,5 +171,27 @@ const API = (() => {
             const qs = new URLSearchParams(params).toString();
             return request('GET', '/stats' + (qs ? '?' + qs : ''));
         },
+
+        // ── Hospitalisation ────────────────────────────────────
+        getHospitalizations: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/hospitalizations' + (qs ? '?' + qs : ''));
+        },
+        getHospitalization:    (id)   => request('GET',  `/hospitalizations/${id}`),
+        admitPatient:          (data) => request('POST', '/hospitalizations', data),
+        updateHospitalization: (id, data) => request('PUT', `/hospitalizations/${id}`, data),
+
+        getHospDeposits: (hospId) => request('GET',  `/hosp-deposits/${hospId}`),
+        addHospDeposit:  (data)   => request('POST', '/hosp-deposits', data),
+
+        getHospPrescriptions:  (hospId)     => request('GET',  `/hosp-prescriptions/${hospId}`),
+        addHospPrescription:   (data)       => request('POST', '/hosp-prescriptions', data),
+        updateHospPrescription:(id, data)   => request('PUT',  `/hosp-prescriptions/${id}`, data),
+
+        getHospNursing: (hospId) => request('GET',  `/hosp-nursing/${hospId}`),
+        addHospNursing: (data)   => request('POST', '/hosp-nursing', data),
+
+        getHospServices: (hospId) => request('GET',  `/hosp-services/${hospId}`),
+        addHospService:  (data)   => request('POST', '/hosp-services', data),
     };
 })();

@@ -483,6 +483,7 @@ function setupNavigation() {
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
             else if (target === 'suppliers')      loadSuppliers();
+            else if (target === 'hospitalization') { closeHospDetail(); loadHospitalizations('active'); }
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
         });
     });
@@ -2776,7 +2777,10 @@ async function deleteAdminTx(txId) {
 }
 
 function updateRecentTransactionsTable(txs) {
-    document.getElementById('recent-transactions-list').innerHTML = txs.map(t => {
+    state.recentTransactionsFull = txs;
+    var total = txs.length;
+    var page  = pageSlice('recentTransactions', txs);
+    document.getElementById('recent-transactions-list').innerHTML = page.map(t => {
         const amtHTG = parseFloat(t.amount);
         return `<tr>
             <td>${t.date} ${t.time||''}</td>
@@ -2789,7 +2793,11 @@ function updateRecentTransactionsTable(txs) {
             <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td>
         <td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction('${t.id}')"><i class="fas fa-edit"></i></button></td>
         </tr>`;
-    }).join('');
+    }).join('') + loadMoreButtonHtml('recentTransactions', total, page.length, 'rerenderRecentTransactions', 9);
+}
+
+function rerenderRecentTransactions() {
+    updateRecentTransactionsTable(state.recentTransactionsFull || []);
 }
 
 function setupAdminSearch() {
@@ -4497,3 +4505,473 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPatientTypeChange();
     setupAdminSearch();
 });
+
+// ════════════════════════════════════════════════════════════
+//  HOSPITALISATION — module frontend
+// ════════════════════════════════════════════════════════════
+
+async function populateHospDoctorSelect() {
+    const sel = document.getElementById('hosp-doctor');
+    if (!sel) return;
+    try {
+        const users = await API.getUsers().catch(() => []);
+        const doctors = users.filter(u => u.role === 'doctor' && u.active);
+        sel.innerHTML = '<option value="">Sélectionner...</option>' +
+            doctors.map(d => `<option value="${d.username}">${d.name}</option>`).join('');
+    } catch(e) {}
+}
+
+function toggleAdmitForm() {
+    const form = document.getElementById('admit-form');
+    if (!form) return;
+    const show = form.style.display === 'none' || !form.style.display;
+    form.style.display = show ? 'block' : 'none';
+    if (show) {
+        populateHospDoctorSelect();
+        document.getElementById('hosp-patient-search').value = '';
+        document.getElementById('hosp-patient-found').style.display = 'none';
+        document.getElementById('hosp-patient-found').innerHTML = '';
+        document.getElementById('hosp-room').value = '';
+        document.getElementById('hosp-bed').value = '';
+        document.getElementById('hosp-reason').value = '';
+        document.getElementById('hosp-deposit').value = '';
+        state.hospSelectedPatient = null;
+    }
+}
+
+async function searchPatientForHosp() {
+    const search = document.getElementById('hosp-patient-search').value.trim();
+    if (!search) { toast('Entrer un ID ou un nom', 'error'); return; }
+    try {
+        const patients = await apiCall(() => API.getPatients({ search }));
+        state.hospSearchResults = patients.slice(0, 8);
+        const box = document.getElementById('hosp-patient-found');
+        box.style.display = 'block';
+        if (!state.hospSearchResults.length) {
+            box.innerHTML = '<p class="text-muted">Aucun patient trouvé.</p>';
+            state.hospSelectedPatient = null;
+            return;
+        }
+        box.innerHTML = state.hospSearchResults.map((p, i) => `
+            <div class="d-flex gap-10" style="align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">
+                <div style="flex:1;"><strong>${p.full_name}</strong> <small class="text-muted">#${p.id}</small></div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="selectHospPatient(${i})">Choisir</button>
+            </div>`).join('');
+    } catch(e) {}
+}
+
+function selectHospPatient(idx) {
+    const p = (state.hospSearchResults || [])[idx];
+    if (!p) return;
+    state.hospSelectedPatient = p;
+    document.getElementById('hosp-patient-found').innerHTML =
+        `<div style="padding:8px 12px;border-radius:8px;background:#e6ffed;border:1px solid #28a745;">
+            <i class="fas fa-check-circle" style="color:#28a745;"></i> Patient sélectionné : <strong>${p.full_name}</strong> (#${p.id})
+        </div>`;
+}
+
+async function admitPatient() {
+    const p = state.hospSelectedPatient;
+    if (!p) { toast('Sélectionner un patient', 'error'); return; }
+    const reason = document.getElementById('hosp-reason').value.trim();
+    if (!reason) { toast("Indiquer le motif d'admission", 'error'); return; }
+    const room   = document.getElementById('hosp-room').value.trim();
+    const bed    = document.getElementById('hosp-bed').value.trim();
+    const doctorUsername  = document.getElementById('hosp-doctor').value;
+    const depositAmount   = parseFloat(document.getElementById('hosp-deposit').value) || 0;
+    try {
+        await apiCall(() => API.admitPatient({ patientId: p.id, room, bed, reason, doctorUsername, depositAmount }));
+        toast('Patient hospitalisé avec succès');
+        toggleAdmitForm();
+        loadHospitalizations('active');
+        notifyDepartment('nurse', 'Nouveau patient hospitalisé',
+            `${p.full_name} (ID: ${p.id}) a été admis${room ? ' — Chambre ' + room : ''}.`, '#6f42c1');
+    } catch(e) {}
+}
+
+async function loadHospitalizations(status) {
+    try {
+        const list = await apiCall(() => API.getHospitalizations(status ? { status } : {}));
+        state.hospListFull = list;
+        state.listPages['hospitalizations'] = LIST_PAGE_SIZE;
+        renderHospitalizationsList();
+    } catch(e) {}
+}
+
+function renderHospitalizationsList() {
+    const list  = state.hospListFull || [];
+    const total = list.length;
+    const page  = pageSlice('hospitalizations', list);
+    const container = document.getElementById('hospitalizations-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucune hospitalisation.</p>'; return; }
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Patient</th><th>Chambre/Lit</th><th>Médecin</th><th>Admission</th><th>Statut</th><th>Solde</th><th>Action</th></tr></thead><tbody>' +
+        page.map(h => `
+            <tr>
+                <td><strong>${h.full_name}</strong><br><small class="text-muted">#${h.patient_id}</small></td>
+                <td>${h.room || '-'}${h.bed ? ' / ' + h.bed : ''}</td>
+                <td>${h.doctor || '-'}</td>
+                <td>${h.admission_date ? new Date(h.admission_date).toLocaleDateString('fr-FR') : '-'}</td>
+                <td><span class="${h.status === 'active' ? 'status-paid' : 'status-unpaid'}">${h.status === 'active' ? 'Actif' : 'Sorti'}</span></td>
+                <td>${formatHTG(h.balance)}</td>
+                <td><button class="btn btn-sm btn-primary" onclick="openHospDetail('${h.id}')"><i class="fas fa-folder-open"></i> Dossier</button></td>
+            </tr>`).join('') +
+        '</tbody></table></div>' +
+        loadMoreButtonHtml('hospitalizations', total, page.length, 'renderHospitalizationsList');
+}
+
+async function openHospDetail(hospId) {
+    try {
+        const h = await apiCall(() => API.getHospitalization(hospId));
+        state.currentHosp = h;
+        document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
+        document.getElementById('admit-patient-card').style.display = 'none';
+        document.getElementById('hosp-detail-section').style.display = 'block';
+        document.getElementById('hosp-detail-title').innerHTML =
+            `<i class="fas fa-user-injured"></i> Dossier: ${h.full_name} (#${h.patient_id})`;
+        renderHospFinancialSummary(h);
+        showHospTab('nursing');
+        populateRxMedicationSelect();
+        await Promise.all([refreshNursingNotes(), refreshPrescriptions(), refreshDeposits(), refreshHospServices()]);
+    } catch(e) {}
+}
+
+function closeHospDetail() {
+    const detail = document.getElementById('hosp-detail-section');
+    if (detail) detail.style.display = 'none';
+    document.getElementById('hospitalizations-list')?.closest('.card') &&
+        (document.getElementById('hospitalizations-list').closest('.card').style.display = 'block');
+    const admitCard = document.getElementById('admit-patient-card');
+    if (admitCard) admitCard.style.display = 'block';
+    state.currentHosp = null;
+}
+
+function renderHospFinancialSummary(h) {
+    const el = document.getElementById('hosp-financial-summary');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="d-flex gap-20" style="flex-wrap:wrap;">
+            <div><strong>Chambre:</strong> ${h.room || '-'}${h.bed ? ' / ' + h.bed : ''}</div>
+            <div><strong>Médecin:</strong> ${h.doctor || '-'}</div>
+            <div><strong>Admission:</strong> ${h.admission_date ? new Date(h.admission_date).toLocaleDateString('fr-FR') : '-'}</div>
+            <div><strong>Statut:</strong> <span class="${h.status === 'active' ? 'status-paid' : 'status-unpaid'}">${h.status === 'active' ? 'Actif' : 'Sorti'}</span></div>
+            <div><strong>Dépôts totaux:</strong> ${formatHTG(h.deposit)}</div>
+            <div><strong>Solde restant:</strong> ${formatHTG(h.balance)}</div>
+        </div>
+        ${h.admission_reason ? `<p class="mt-2"><strong>Motif:</strong> ${h.admission_reason}</p>` : ''}
+    `;
+}
+
+function showHospTab(tab) {
+    document.querySelectorAll('.hosp-tab-content').forEach(el => el.style.display = 'none');
+    const target = document.getElementById('hosp-tab-' + tab);
+    if (target) target.style.display = 'block';
+    document.querySelectorAll('.hosp-tab-btn').forEach(btn => {
+        const active = btn.dataset.tab === tab;
+        btn.style.color        = active ? 'var(--primary)' : 'var(--muted)';
+        btn.style.borderBottom = active ? '3px solid var(--primary)' : '3px solid transparent';
+    });
+}
+
+// ── Suivi infirmier ─────────────────────────────────────────
+async function saveNursingNote() {
+    const h = state.currentHosp;
+    if (!h) return;
+    const data = {
+        hospitalizationId: h.id,
+        patientId:         h.patient_id,
+        temperature:  document.getElementById('nur-temp').value || null,
+        bloodPressure:document.getElementById('nur-bp').value || null,
+        pulse:        document.getElementById('nur-pulse').value || null,
+        oxygenSat:    document.getElementById('nur-o2').value || null,
+        weight:       document.getElementById('nur-weight').value || null,
+        generalState: document.getElementById('nur-state').value || null,
+        notes:        document.getElementById('nur-notes').value.trim() || null,
+    };
+    if (!data.notes && !data.temperature && !data.pulse && !data.generalState) {
+        toast('Renseigner au moins une donnée', 'error'); return;
+    }
+    try {
+        await apiCall(() => API.addHospNursing(data));
+        toast('Suivi enregistré');
+        ['nur-temp','nur-bp','nur-pulse','nur-o2','nur-weight','nur-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('nur-state').value = '';
+        refreshNursingNotes();
+    } catch(e) {}
+}
+
+async function refreshNursingNotes() {
+    const h = state.currentHosp;
+    if (!h) return;
+    try {
+        state.hospNursingFull = await apiCall(() => API.getHospNursing(h.id));
+        state.listPages['hospNursing'] = LIST_PAGE_SIZE;
+        renderNursingNotes();
+    } catch(e) {}
+}
+
+function renderNursingNotes() {
+    const notes = state.hospNursingFull || [];
+    const total = notes.length;
+    const page  = pageSlice('hospNursing', notes);
+    const container = document.getElementById('nursing-notes-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucun suivi enregistré.</p>'; return; }
+    container.innerHTML = page.map(n => `
+        <div class="card" style="margin-bottom:10px;">
+            <div class="d-flex gap-20" style="flex-wrap:wrap;font-size:.9rem;">
+                ${n.temperature   ? `<div><i class="fas fa-thermometer-half"></i> ${n.temperature}°C</div>` : ''}
+                ${n.blood_pressure? `<div><i class="fas fa-heartbeat"></i> ${n.blood_pressure}</div>` : ''}
+                ${n.pulse         ? `<div><i class="fas fa-heart"></i> ${n.pulse} bpm</div>` : ''}
+                ${n.oxygen_sat    ? `<div><i class="fas fa-lungs"></i> ${n.oxygen_sat}%</div>` : ''}
+                ${n.weight        ? `<div><i class="fas fa-weight"></i> ${n.weight} kg</div>` : ''}
+                ${n.general_state ? `<div><span class="badge badge-primary">${n.general_state}</span></div>` : ''}
+            </div>
+            ${n.notes ? `<p class="mt-2">${n.notes}</p>` : ''}
+            <small class="text-muted">${n.created_at ? new Date(n.created_at).toLocaleString('fr-FR') : ''} — ${n.recorded_by||''}</small>
+        </div>`).join('') + loadMoreButtonHtml('hospNursing', total, page.length, 'renderNursingNotes');
+}
+
+// ── Prescriptions ────────────────────────────────────────────
+function populateRxMedicationSelect() {
+    const sel = document.getElementById('rx-medication');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Sélectionner...</option>' +
+        (state.medications || []).filter(m => m.quantity > 0).map(m =>
+            `<option value="${m.id}" data-price="${m.price}">${m.name} (Stock: ${m.quantity})</option>`).join('');
+}
+
+function onRxMedSelect() {
+    const sel = document.getElementById('rx-medication');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset && opt.dataset.price) {
+        document.getElementById('rx-price').value = opt.dataset.price;
+        document.getElementById('rx-med-name').value = '';
+    }
+    updateRxCostPreview();
+}
+
+function updateRxCostPreview() {
+    const price = parseFloat(document.getElementById('rx-price').value) || 0;
+    const qty   = parseInt(document.getElementById('rx-qty').value) || 1;
+    const total = price * qty;
+    const el = document.getElementById('rx-cost-preview');
+    if (el) el.innerHTML = total > 0 ? `<strong>Coût total:</strong> ${formatAmount(total)}` : '';
+}
+
+async function savePrescription() {
+    const h = state.currentHosp;
+    if (!h) return;
+    const medSel = document.getElementById('rx-medication');
+    const medId  = medSel.value || null;
+    const medName = medId
+        ? medSel.options[medSel.selectedIndex].textContent.replace(/\s*\(Stock:.*\)$/, '')
+        : document.getElementById('rx-med-name').value.trim();
+    const dosage = document.getElementById('rx-dosage').value.trim();
+    if (!medName) { toast('Sélectionner un médicament ou saisir un nom', 'error'); return; }
+    if (!dosage)  { toast('Indiquer le dosage', 'error'); return; }
+    const data = {
+        hospitalizationId: h.id,
+        patientId:         h.patient_id,
+        medicationId:      medId,
+        medicationName:    medName,
+        dosage,
+        frequency: document.getElementById('rx-frequency').value,
+        duration:  document.getElementById('rx-duration').value.trim() || null,
+        route:     document.getElementById('rx-route').value,
+        note:      document.getElementById('rx-note').value.trim() || null,
+        pricePerUnit: parseFloat(document.getElementById('rx-price').value) || 0,
+        quantity:     parseInt(document.getElementById('rx-qty').value) || 1,
+    };
+    try {
+        await apiCall(() => API.addHospPrescription(data));
+        toast('Prescription enregistrée');
+        notifyDepartment('nurse', 'Nouvelle prescription',
+            `${state.currentUser?.name || 'Le médecin'} a prescrit ${medName} pour ${h.full_name} (#${h.patient_id}).`, '#6f42c1');
+        ['rx-med-name','rx-dosage','rx-duration','rx-note'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('rx-medication').value = '';
+        document.getElementById('rx-qty').value = 1;
+        document.getElementById('rx-price').value = '';
+        updateRxCostPreview();
+        refreshPrescriptions();
+        const updated = await apiCall(() => API.getHospitalization(h.id));
+        state.currentHosp = updated;
+        renderHospFinancialSummary(updated);
+        state.medications = await API.getMedications().catch(() => state.medications);
+        populateRxMedicationSelect();
+    } catch(e) {}
+}
+
+async function refreshPrescriptions() {
+    const h = state.currentHosp;
+    if (!h) return;
+    try {
+        state.hospRxFull = await apiCall(() => API.getHospPrescriptions(h.id));
+        state.listPages['hospPrescriptions'] = LIST_PAGE_SIZE;
+        renderPrescriptions();
+    } catch(e) {}
+}
+
+function renderPrescriptions() {
+    const list  = state.hospRxFull || [];
+    const total = list.length;
+    const page  = pageSlice('hospPrescriptions', list);
+    const container = document.getElementById('prescriptions-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucune prescription.</p>'; return; }
+    container.innerHTML = page.map(rx => `
+        <div class="card" style="margin-bottom:10px;border-left-color:${rx.status === 'administered' ? '#28a745' : '#ff9800'};">
+            <div class="d-flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div style="flex:1;min-width:220px;">
+                    <strong>${rx.medication_name}</strong> — ${rx.dosage}
+                    <br><small class="text-muted">${rx.frequency || ''} ${rx.duration ? '· ' + rx.duration : ''} ${rx.route ? '· ' + rx.route : ''}</small>
+                    ${rx.note ? `<p class="mt-2" style="background:#fff8e1;padding:6px 10px;border-radius:6px;"><i class="fas fa-sticky-note"></i> ${rx.note}</p>` : ''}
+                    ${rx.status === 'administered' ? `<p class="mt-2 text-muted"><i class="fas fa-check-circle" style="color:#28a745;"></i> Exécuté par ${rx.administered_by||''} le ${rx.administered_at ? new Date(rx.administered_at).toLocaleString('fr-FR') : ''}${rx.nurse_note ? ' — ' + rx.nurse_note : ''}</p>` : ''}
+                </div>
+                <div style="text-align:right;">
+                    <span class="${rx.status === 'administered' ? 'status-paid' : 'status-unpaid'}">${rx.status === 'administered' ? 'Administré' : 'En attente'}</span>
+                    <br><small class="text-muted">${formatHTG(rx.total_price)}</small>
+                    ${rx.status !== 'administered' ? `<br><button class="btn btn-sm btn-success mt-2" onclick="markPrescriptionAdministered('${rx.id}')"><i class="fas fa-check"></i> Marquer exécuté</button>` : ''}
+                </div>
+            </div>
+        </div>`).join('') + loadMoreButtonHtml('hospPrescriptions', total, page.length, 'renderPrescriptions');
+}
+
+async function markPrescriptionAdministered(rxId) {
+    const note = prompt("Note de l'infirmière (optionnel) :", '') || '';
+    try {
+        await apiCall(() => API.updateHospPrescription(rxId, {
+            status: 'administered',
+            administeredAt: new Date().toISOString(),
+            administeredBy: (state.currentUser && (state.currentUser.name || state.currentUser.username)) || '',
+            nurseNote: note,
+        }));
+        toast('Prescription marquée comme exécutée');
+        refreshPrescriptions();
+    } catch(e) {}
+}
+
+// ── Dépôts ────────────────────────────────────────────────────
+async function addDeposit() {
+    const h = state.currentHosp;
+    if (!h) return;
+    const amount = parseFloat(document.getElementById('dep-amount').value);
+    if (!amount || amount <= 0) { toast('Indiquer un montant valide', 'error'); return; }
+    const note = document.getElementById('dep-note').value.trim();
+    try {
+        await apiCall(() => API.addHospDeposit({ hospitalizationId: h.id, patientId: h.patient_id, amount, note }));
+        toast('Dépôt ajouté');
+        document.getElementById('dep-amount').value = '';
+        document.getElementById('dep-note').value = '';
+        refreshDeposits();
+        const updated = await apiCall(() => API.getHospitalization(h.id));
+        state.currentHosp = updated;
+        renderHospFinancialSummary(updated);
+    } catch(e) {}
+}
+
+async function refreshDeposits() {
+    const h = state.currentHosp;
+    if (!h) return;
+    try {
+        state.hospDepositsFull = await apiCall(() => API.getHospDeposits(h.id));
+        state.listPages['hospDeposits'] = LIST_PAGE_SIZE;
+        renderDeposits();
+    } catch(e) {}
+}
+
+function renderDeposits() {
+    const list  = state.hospDepositsFull || [];
+    const total = list.length;
+    const page  = pageSlice('hospDeposits', list);
+    const container = document.getElementById('deposits-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucun dépôt.</p>'; return; }
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
+        page.map(d => `<tr><td>${d.created_at ? new Date(d.created_at).toLocaleString('fr-FR') : ''}</td><td>${formatHTG(d.amount)}</td><td>${d.note || '-'}</td><td>${d.created_by||''}</td></tr>`).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('hospDeposits', total, page.length, 'renderDeposits');
+}
+
+// ── Services supplémentaires ────────────────────────────────
+async function addHospService() {
+    const h = state.currentHosp;
+    if (!h) return;
+    const service = document.getElementById('svc-name').value.trim();
+    const amount  = parseFloat(document.getElementById('svc-amount').value);
+    if (!service) { toast('Indiquer le service', 'error'); return; }
+    if (!amount || amount <= 0) { toast('Indiquer un montant valide', 'error'); return; }
+    const note = document.getElementById('svc-note').value.trim();
+    try {
+        await apiCall(() => API.addHospService({ hospitalizationId: h.id, patientId: h.patient_id, service, amount, note }));
+        toast('Service ajouté');
+        document.getElementById('svc-name').value = '';
+        document.getElementById('svc-amount').value = '';
+        document.getElementById('svc-note').value = '';
+        refreshHospServices();
+        const updated = await apiCall(() => API.getHospitalization(h.id));
+        state.currentHosp = updated;
+        renderHospFinancialSummary(updated);
+    } catch(e) {}
+}
+
+async function refreshHospServices() {
+    const h = state.currentHosp;
+    if (!h) return;
+    try {
+        state.hospServicesFull = await apiCall(() => API.getHospServices(h.id));
+        state.listPages['hospServices'] = LIST_PAGE_SIZE;
+        renderHospServicesList();
+    } catch(e) {}
+}
+
+function renderHospServicesList() {
+    const list  = state.hospServicesFull || [];
+    const total = list.length;
+    const page  = pageSlice('hospServices', list);
+    const container = document.getElementById('hosp-services-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucun service ajouté.</p>'; return; }
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
+        page.map(s => `<tr><td>${s.created_at ? new Date(s.created_at).toLocaleString('fr-FR') : ''}</td><td>${s.service}</td><td>${formatHTG(s.amount)}</td><td>${s.note || '-'}</td><td>${s.created_by||''}</td></tr>`).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('hospServices', total, page.length, 'renderHospServicesList');
+}
+
+// ── Sortie du patient ────────────────────────────────────────
+async function dischargePatient() {
+    const h = state.currentHosp;
+    if (!h) return;
+    if (!confirm('Confirmer la sortie de ce patient ?')) return;
+    const note = document.getElementById('discharge-note').value.trim();
+    try {
+        await apiCall(() => API.updateHospitalization(h.id, {
+            status: 'discharged',
+            dischargeDate: new Date().toISOString().slice(0, 10),
+            dischargeNote: note || null,
+        }));
+        toast('Patient sorti avec succès');
+        closeHospDetail();
+        loadHospitalizations('active');
+    } catch(e) {}
+}
+
+// ── Raccourci médecin : hospitaliser le patient en consultation ─
+async function quickHospitalize() {
+    const p = state.currentDoctorPatient;
+    if (!p) { toast('Sélectionner un patient', 'error'); return; }
+    showSection('hospitalization');
+    const form = document.getElementById('admit-form');
+    if (form) form.style.display = 'block';
+    await populateHospDoctorSelect();
+    const sel = document.getElementById('hosp-doctor');
+    if (sel && state.currentRole === 'doctor' && state.currentUser) sel.value = state.currentUser.username;
+    state.hospSelectedPatient = { id: p.id, full_name: p.full_name };
+    const searchInput = document.getElementById('hosp-patient-search');
+    if (searchInput) searchInput.value = p.full_name;
+    const box = document.getElementById('hosp-patient-found');
+    if (box) {
+        box.style.display = 'block';
+        box.innerHTML = `<div style="padding:8px 12px;border-radius:8px;background:#e6ffed;border:1px solid #28a745;">
+            <i class="fas fa-check-circle" style="color:#28a745;"></i> Patient sélectionné : <strong>${p.full_name}</strong> (#${p.id})
+        </div>`;
+    }
+}

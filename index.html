@@ -495,7 +495,11 @@
             </div>
             <div id="doctor-patient-details" class="hidden">
                 <div class="card">
-                    <h3>Patient: <span id="doctor-patient-name"></span> <small class="text-muted">(#<span id="doctor-patient-id"></span>)</small></h3>
+                    <h3>Patient: <span id="doctor-patient-name"></span> <small class="text-muted">(#<span id="doctor-patient-id"></span>)</small>
+                        <button class="btn btn-sm" style="background:#6f42c1;color:#fff;margin-left:10px;" id="doctor-hospitalize-btn" onclick="quickHospitalize()">
+                            <i class="fas fa-bed"></i> Hospitaliser ce patient
+                        </button>
+                    </h3>
                     <div class="d-flex gap-20" style="margin-bottom:16px;flex-wrap:wrap;">
                         <div style="flex:1"><p><strong>Âge:</strong> <span id="doctor-patient-age"></span> ans</p><p><strong>Téléphone:</strong> <span id="doctor-patient-phone"></span></p></div>
                         <div style="flex:1"><p><strong>Type:</strong> <span id="doctor-patient-type"></span></p><p><strong>Statut:</strong> <span id="doctor-payment-status" class="patient-status-badge"></span></p></div>
@@ -908,9 +912,9 @@
                                     </select>
                                 </div>
                                 <div><label class="form-label">Quantité à délivrer</label>
-                                    <input type="number" id="rx-qty" class="form-control" placeholder="1" min="1" value="1"></div>
+                                    <input type="number" id="rx-qty" class="form-control" placeholder="1" min="1" value="1" oninput="updateRxCostPreview()"></div>
                                 <div><label class="form-label">Prix/unité (HTG)</label>
-                                    <input type="number" id="rx-price" class="form-control" placeholder="0.00" min="0"></div>
+                                    <input type="number" id="rx-price" class="form-control" placeholder="0.00" min="0" oninput="updateRxCostPreview()"></div>
                                 <div style="grid-column:1/-1"><label class="form-label">Note pour l'infirmière</label>
                                     <textarea id="rx-note" class="form-control" rows="2" placeholder="Instructions spéciales pour l'administration..."></textarea></div>
                                 <div style="display:flex;align-items:flex-end;">
