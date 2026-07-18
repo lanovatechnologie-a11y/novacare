@@ -479,7 +479,7 @@ function setupNavigation() {
             if      (target === 'dashboard')      updateRoleDashboard();
             else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); updateAssignedDoctorSelect(); loadAppointmentsList(); }
             else if (target === 'administration') updateAdminStats();
-            else if (target === 'pharmacy')       updateMedicationStockDisplay();
+            else if (target === 'pharmacy')       { updateMedicationStockDisplay(); loadPharmacyHospPrescriptions('pending'); }
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
             else if (target === 'nurse')          loadNurseHospList();
@@ -4958,6 +4958,8 @@ async function savePrescription() {
         toast('Prescription enregistrée');
         notifyDepartment('nurse', 'Nouvelle prescription',
             `${state.currentUser?.name || 'Le médecin'} a prescrit ${medName} pour ${h.full_name} (#${h.patient_id}).`, '#6f42c1');
+        notifyDepartment('pharmacy', 'Nouvelle prescription (hospitalisation)',
+            `${medName} prescrit pour ${h.full_name} (#${h.patient_id}) — Chambre ${h.room || '-'}.`, '#6f42c1');
         ['rx-med-name','rx-dosage','rx-duration','rx-note'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('rx-medication').value = '';
         document.getElementById('rx-qty').value = 1;
@@ -5172,6 +5174,56 @@ function renderNurseHospList() {
 function openHospDetailFromNurse(hospId) {
     showSection('hospitalization');
     openHospDetail(hospId);
+}
+
+// ── Vue pharmacie : prescriptions des patients hospitalisés ──
+async function loadPharmacyHospPrescriptions(status) {
+    try {
+        state.pharmHospRxFull = await apiCall(() => API.getAllHospPrescriptions(status ? { status } : {}));
+        state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
+        renderPharmacyHospPrescriptions();
+    } catch(e) {}
+}
+
+function getFilteredPharmHospRx() {
+    const term = (document.getElementById('pharm-hosp-search')?.value || '').trim().toLowerCase();
+    const list = state.pharmHospRxFull || [];
+    if (!term) return list;
+    return list.filter(rx =>
+        (rx.full_name || '').toLowerCase().includes(term) ||
+        (rx.patient_id || '').toLowerCase().includes(term) ||
+        (rx.medication_name || '').toLowerCase().includes(term) ||
+        (rx.room || '').toLowerCase().includes(term)
+    );
+}
+
+function filterPharmacyHospPrescriptions() {
+    state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
+    renderPharmacyHospPrescriptions();
+}
+
+function renderPharmacyHospPrescriptions() {
+    const list  = getFilteredPharmHospRx();
+    const total = list.length;
+    const container = document.getElementById('pharm-hosp-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucune prescription pour le moment.</p>'; return; }
+    const page = pageSlice('pharmHospRx', list);
+    container.innerHTML = page.map(rx => `
+        <div class="card mb-2" style="border-left-color:${rx.status === 'administered' ? '#28a745' : '#ff9800'};">
+            <div class="d-flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div style="flex:1;min-width:220px;">
+                    <strong>${rx.medication_name}</strong> — ${rx.dosage}
+                    <br><small class="text-muted">${rx.full_name} (#${rx.patient_id}) — ${rx.room || 'Chambre non assignée'}${rx.bed ? ' / ' + rx.bed : ''} — Dr. ${rx.doctor || '-'}</small>
+                    <br><small class="text-muted">${rx.frequency || ''} ${rx.duration ? '· ' + rx.duration : ''} ${rx.route ? '· ' + rx.route : ''} · Qté: ${rx.quantity}</small>
+                    ${rx.note ? `<p class="mt-2" style="background:#fff8e1;padding:6px 10px;border-radius:6px;"><i class="fas fa-sticky-note"></i> ${rx.note}</p>` : ''}
+                </div>
+                <div style="text-align:right;">
+                    <span class="${rx.status === 'administered' ? 'status-paid' : 'status-unpaid'}">${rx.status === 'administered' ? 'Administré' : 'En attente'}</span>
+                    <br><small class="text-muted">${formatHTG(rx.total_price)}</small>
+                </div>
+            </div>
+        </div>`).join('') + loadMoreButtonHtml('pharmHospRx', total, page.length, 'renderPharmacyHospPrescriptions');
 }
 async function quickHospitalize() {
     const p = state.currentDoctorPatient;

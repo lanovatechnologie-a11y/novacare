@@ -1075,6 +1075,21 @@ app.get('/hosp-prescriptions/:hospId', auth, async (req, res) => {
     res.json(r.rows);
 });
 
+// Vue pharmacie : toutes les prescriptions des patients hospitalisés actifs
+app.get('/hosp-prescriptions', auth, async (req, res) => {
+    const { status } = req.query;
+    const params = [];
+    let query = `SELECT hp.*, h.room, h.bed, h.doctor, p.full_name
+                 FROM hosp_prescriptions hp
+                 JOIN hospitalizations h ON h.id = hp.hospitalization_id
+                 JOIN patients p ON p.id = hp.patient_id
+                 WHERE h.status = 'active'`;
+    if (status) { params.push(status); query += ` AND hp.status = $${params.length}`; }
+    query += ' ORDER BY hp.created_at DESC';
+    const r = await pool.query(query, params);
+    res.json(r.rows);
+});
+
 app.post('/hosp-prescriptions', auth, async (req, res) => {
     const client = await pool.connect();
     try {

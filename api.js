@@ -185,6 +185,10 @@ const API = (() => {
         addHospDeposit:  (data)   => request('POST', '/hosp-deposits', data),
 
         getHospPrescriptions:  (hospId)     => request('GET',  `/hosp-prescriptions/${hospId}`),
+        getAllHospPrescriptions: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/hosp-prescriptions' + (qs ? '?' + qs : ''));
+        },
         addHospPrescription:   (data)       => request('POST', '/hosp-prescriptions', data),
         updateHospPrescription:(id, data)   => request('PUT',  `/hosp-prescriptions/${id}`, data),
 
