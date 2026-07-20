@@ -100,6 +100,30 @@ function formatDate(d) {
     return new Date(d).toLocaleDateString('fr-FR');
 }
 
+// ─── Son de notification (fort, synthétisé) ───────────────────
+let _audioCtx = null;
+function playNotificationSound() {
+    try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (_audioCtx.state === 'suspended') _audioCtx.resume();
+        const now = _audioCtx.currentTime;
+        // Triple bip aigu et fort pour bien attirer l'attention
+        [0, 0.18, 0.36].forEach(offset => {
+            const osc  = _audioCtx.createOscillator();
+            const gain = _audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(1046.5, now + offset); // Do6
+            gain.gain.setValueAtTime(0, now + offset);
+            gain.gain.linearRampToValueAtTime(0.9, now + offset + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+            osc.connect(gain);
+            gain.connect(_audioCtx.destination);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.16);
+        });
+    } catch(e) {}
+}
+
 // ─── Notification locale cross-département ───────────────────
 function addLocalNotification(title, body, icon = 'fas fa-bell', color = '#1a6bca') {
     const n = { id: Date.now(), title, body, icon, color, time: new Date(), read: false };
@@ -107,6 +131,7 @@ function addLocalNotification(title, body, icon = 'fas fa-bell', color = '#1a6bc
     if (state.localNotifications.length > 50) state.localNotifications.pop();
     updateNotifPanel();
     updateNotifBadge();
+    playNotificationSound();
 }
 
 function updateNotifPanel() {
@@ -117,7 +142,9 @@ function updateNotifPanel() {
         list.innerHTML = '<div class="notif-empty"><i class="fas fa-check-circle" style="font-size:1.5rem;color:#28a745;display:block;margin-bottom:6px;"></i>Aucune notification</div>';
         return;
     }
-    list.innerHTML = notifs.slice(0, 20).map(n => `
+    if (!state.listPages['notifPanel']) state.listPages['notifPanel'] = LIST_PAGE_SIZE;
+    const page = pageSlice('notifPanel', notifs);
+    list.innerHTML = page.map(n => `
         <div class="notif-item ${n.read ? '' : 'unread'}" onclick="markNotifRead(${n.id})">
             <div class="notif-icon" style="background:${n.color};"><i class="${n.icon}"></i></div>
             <div class="notif-content">
@@ -126,7 +153,7 @@ function updateNotifPanel() {
                 <div class="notif-time">${n.time.toLocaleTimeString('fr-FR')}</div>
             </div>
             ${n.read ? '' : '<div class="notif-dot"></div>'}
-        </div>`).join('');
+        </div>`).join('') + loadMoreButtonHtml('notifPanel', notifs.length, page.length, 'updateNotifPanel');
 }
 
 function updateNotifBadge() {
@@ -187,7 +214,7 @@ document.addEventListener('click', function(e) {
 });
 
 // ─── CAISSE: Modal + Reset après paiement ────────────────────
-function showPrintModal(totalHTG, givenHTG, payCurrency, method) {
+function showPrintModal(totalHTG, givenHTG, payCurrency, method, receiptNumber) {
     const change = givenHTG - totalHTG;
     const nom = state.currentCashierPatient ? state.currentCashierPatient.full_name : '';
     var old = document.getElementById('print-modal');
@@ -200,7 +227,8 @@ function showPrintModal(totalHTG, givenHTG, payCurrency, method) {
         '<div style="width:70px;height:70px;background:#d4edda;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">' +
         '<i class="fas fa-check-circle" style="font-size:2.2rem;color:#28a745;"></i></div>' +
         '<h3 style="color:#28a745;margin-bottom:6px;">Paiement confirmé !</h3>' +
-        '<p style="color:#6c757d;margin-bottom:18px;">' + nom + '</p>' +
+        '<p style="color:#6c757d;margin-bottom:6px;">' + nom + '</p>' +
+        (receiptNumber ? '<p style="margin-bottom:18px;"><span class="badge badge-primary" style="font-size:.95rem;padding:6px 12px;"><i class="fas fa-receipt"></i> ' + receiptNumber + '</span></p>' : '<div style="margin-bottom:18px;"></div>') +
         '<div style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;text-align:left;">' +
         '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Total HTG</span><strong>' + totalHTG.toFixed(2) + ' HTG</strong></div>' +
         '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Total USD</span><strong>$' + htgToUsd(totalHTG) + '</strong></div>' +
@@ -296,6 +324,7 @@ function setupLogin() {
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        try { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(eAudio) {}
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
         const role     = document.querySelector('.login-role-btn.active').dataset.role;
@@ -1108,14 +1137,39 @@ async function updateAssignedDoctorSelect() {
 function updateExternalServicesOptions() {
     const container = document.getElementById('external-services-options');
     if (!container) return;
-    let html = '<div class="service-external-list">';
-    state.externalServiceTypes.filter(s => s.active).forEach(s => {
-        html += `<div class="service-item"><label>
+    state.extSvcOptionsFull = state.externalServiceTypes.filter(s => s.active);
+    state.listPages['extSvcOptions'] = LIST_PAGE_SIZE;
+    container.innerHTML = '<div class="service-external-list"></div>';
+    appendExternalServicesOptions();
+}
+
+function appendExternalServicesOptions() {
+    const items = state.extSvcOptionsFull || [];
+    const total = items.length;
+    const container = document.getElementById('external-services-options');
+    if (!container) return;
+    const listWrap = container.querySelector('.service-external-list');
+    if (!listWrap) return;
+    const oldBtnWrap = container.querySelector('.load-more-wrap');
+    if (oldBtnWrap) oldBtnWrap.remove();
+    const shownCount = listWrap.querySelectorAll('.service-item.external-service-opt').length;
+    const pageLimit  = state.listPages['extSvcOptions'] || LIST_PAGE_SIZE;
+    items.slice(shownCount, pageLimit).forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'service-item external-service-opt';
+        div.innerHTML = `<label>
             <input type="checkbox" class="external-service-option" value="${s.id}" data-price="${s.price}">
-            ${s.name} — ${s.price} Gdes</label></div>`;
+            ${s.name} — ${s.price} Gdes</label>`;
+        listWrap.appendChild(div);
     });
-    html += '</div>';
-    container.innerHTML = html;
+    if (pageLimit < total) {
+        const wrap = document.createElement('div');
+        wrap.className = 'load-more-wrap';
+        wrap.style.textAlign = 'center';
+        wrap.style.marginTop = '10px';
+        wrap.innerHTML = loadMoreButtonHtml('extSvcOptions', total, pageLimit, 'appendExternalServicesOptions');
+        container.appendChild(wrap);
+    }
 }
 
 function updateExternalServicesSelect() {
@@ -1444,6 +1498,8 @@ async function loadCashierReports(period) {
             const m = t.payment_method || 'espèces';
             byMethod[m] = (byMethod[m] || 0) + parseFloat(t.amount);
         });
+        state.cashierReportTxsFull = txs;
+        state.listPages['cashierReportTxs'] = LIST_PAGE_SIZE;
         const container = document.getElementById('cashier-report-result');
         container.innerHTML = `
             <div class="exchange-banner mb-3">
@@ -1464,10 +1520,20 @@ async function loadCashierReports(period) {
                     <div class="stat-info"><h3>${v.toLocaleString('fr-FR', {minimumFractionDigits:2})} HTG</h3><p>${m}</p></div>
                 </div>`).join('')}
             </div>
-            <div class="table-container mt-3">
-                <table>
+            <div class="table-container mt-3" id="cashier-report-table-wrap"></div>`;
+        renderCashierReportTable();
+    } catch(e) {}
+}
+
+function renderCashierReportTable() {
+    const txs = state.cashierReportTxsFull || [];
+    const total = txs.length;
+    const wrap = document.getElementById('cashier-report-table-wrap');
+    if (!wrap) return;
+    const page = pageSlice('cashierReportTxs', txs);
+    wrap.innerHTML = `<table>
                     <thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant HTG</th><th>USD</th><th>Méthode</th></tr></thead>
-                    <tbody>${txs.map(t => `
+                    <tbody>${page.map(t => `
                         <tr>
                             <td>${t.date} ${t.payment_time||''}</td>
                             <td>${t.patient_name}</td>
@@ -1477,9 +1543,7 @@ async function loadCashierReports(period) {
                             <td>${t.payment_method||'-'}</td>
                         </tr>`).join('')}
                     </tbody>
-                </table>
-            </div>`;
-    } catch(e) {}
+                </table>` + loadMoreButtonHtml('cashierReportTxs', total, page.length, 'renderCashierReportTable');
 }
 
 // ─── CAISSE ───────────────────────────────────────────────────
@@ -1524,8 +1588,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const method = document.querySelector('.payment-method.active')?.dataset.method;
         const ids = state.selectedServices.map(s => s.id);
         try {
-            await apiCall(() => API.payTransactions(ids, method));
-            generateInvoice(totalHTG, givenHTG, payCurrency, method);
+            const payResult = await apiCall(() => API.payTransactions(ids, method));
+            const receiptNumber = payResult && payResult.receiptNumber;
+            generateInvoice(totalHTG, givenHTG, payCurrency, method, receiptNumber);
 
             // ── Notifications cross-département ciblées ──
             const txTypes = state.selectedServices.map(s => s.type);
@@ -1549,10 +1614,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${patientName} — ${totalHTG.toFixed(2)} HTG ($${htgToUsd(totalHTG)}) via ${method||'espèces'}. Agent: ${state.currentUser.name}`);
 
             // Afficher modal impression
-            showPrintModal(totalHTG, givenHTG, payCurrency, method);
+            showPrintModal(totalHTG, givenHTG, payCurrency, method, receiptNumber);
         } catch(e) {}
     });
 });
+
+// ── Recherche et modification de reçu ─────────────────────────
+async function searchReceipt() {
+    const num = document.getElementById('receipt-search-input').value.trim().toUpperCase();
+    if (!num) { toast('Entrer un numéro de reçu', 'error'); return; }
+    try {
+        const txs = await apiCall(() => API.getReceipt(num));
+        state.currentReceiptTxs = txs;
+        const container = document.getElementById('receipt-search-result');
+        if (!txs.length) {
+            container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Aucun reçu trouvé pour "' + num + '".</div>';
+            return;
+        }
+        renderReceiptResult(num);
+    } catch(e) {}
+}
+
+function renderReceiptResult(num) {
+    const txs = state.currentReceiptTxs || [];
+    const container = document.getElementById('receipt-search-result');
+    if (!container || !txs.length) return;
+    const total = txs.reduce((s,t) => s + parseFloat(t.amount), 0);
+    const first = txs[0];
+    const canEdit = state.currentRole === 'admin' || state.currentRole === 'sub_admin' || state.currentRole === 'cashier';
+    container.innerHTML = `
+        <div class="card" style="background:#f8f9fa;">
+            <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:10px;">
+                <div>
+                    <h4><i class="fas fa-receipt"></i> ${num}</h4>
+                    <p class="text-muted">${first.patient_name} (#${first.patient_id}) — ${first.date||'-'} ${first.payment_time||''} — ${first.payment_method||'-'}</p>
+                </div>
+                <div style="text-align:right;">
+                    <strong style="font-size:1.1rem;">${formatHTG(total)}</strong>
+                </div>
+            </div>
+            <div class="table-container mt-2">
+                <table><thead><tr><th>Service</th><th>Montant</th><th>Statut</th>${canEdit?'<th>Action</th>':''}</tr></thead><tbody>
+                ${txs.map(t => `<tr>
+                    <td>${t.service}</td>
+                    <td>${parseFloat(t.amount).toFixed(2)} HTG</td>
+                    <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td>
+                    ${canEdit?`<td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction('${t.id}')"><i class="fas fa-edit"></i></button></td>`:''}
+                </tr>`).join('')}
+                </tbody></table>
+            </div>
+            ${!canEdit ? '<p class="text-muted mt-2" style="font-size:.8rem;"><i class="fas fa-info-circle"></i> Seul un administrateur peut modifier un reçu.</p>' : ''}
+        </div>`;
+}
 
 async function loadServicesForPayment(patient) {
     const txs = await API.getTransactions({ patientId: patient.id, status: 'unpaid' });
@@ -1596,7 +1709,7 @@ async function loadServicesForPayment(patient) {
     });
 }
 
-function generateInvoice(totalHTG, givenHTG, payCurrency, method) {
+function generateInvoice(totalHTG, givenHTG, payCurrency, method, receiptNumber) {
     const p = state.currentCashierPatient;
     const s = state.hospitalSettings;
     const change = givenHTG - totalHTG;
@@ -1614,7 +1727,7 @@ function generateInvoice(totalHTG, givenHTG, payCurrency, method) {
     document.getElementById('invoice-amount-given').textContent  = `${givenHTG.toFixed(2)} HTG (donné en ${payCurrency})`;
     document.getElementById('invoice-change').textContent        = `${change.toFixed(2)} HTG ≈ $${htgToUsd(change)}`;
     document.getElementById('invoice-payment-method').textContent = method;
-    document.getElementById('invoice-number').textContent         = 'INV-' + Date.now();
+    document.getElementById('invoice-number').textContent         = receiptNumber || 'INV-' + Date.now();
     document.getElementById('invoice-services-list').innerHTML    = state.selectedServices.map(s =>
         `<div class="receipt-item"><span>${s.service}</span><span>${s.finalAmount.toFixed(2)} HTG</span></div>`
     ).join('');
@@ -1733,12 +1846,38 @@ function updateDoctorConsultationTypes() {
 function updateLabAnalysesSelect() {
     const container = document.getElementById('lab-analyses-selection');
     if (!container) return;
-    container.innerHTML = state.labAnalysisTypes.filter(a => a.active).map(a => `
-        <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;">
-            <input type="checkbox" value="${a.id}" data-price="${a.price}" style="accent-color:var(--primary);">
+    state.labAnalysesSelectFull = state.labAnalysisTypes.filter(a => a.active);
+    state.listPages['labAnalysesSelect'] = LIST_PAGE_SIZE;
+    container.innerHTML = '';
+    appendLabAnalysesSelect();
+}
+
+function appendLabAnalysesSelect() {
+    const items = state.labAnalysesSelectFull || [];
+    const total = items.length;
+    const container = document.getElementById('lab-analyses-selection');
+    if (!container) return;
+    const oldBtnWrap = container.querySelector('.load-more-wrap');
+    if (oldBtnWrap) oldBtnWrap.remove();
+    const shownCount = container.querySelectorAll('label.lab-analysis-option').length;
+    const pageLimit  = state.listPages['labAnalysesSelect'] || LIST_PAGE_SIZE;
+    items.slice(shownCount, pageLimit).forEach(a => {
+        const label = document.createElement('label');
+        label.className = 'lab-analysis-option';
+        label.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;';
+        label.innerHTML = `<input type="checkbox" value="${a.id}" data-price="${a.price}" style="accent-color:var(--primary);">
             ${a.name} <span class="badge badge-primary">${a.price} Gdes</span>
-            <span class="result-type-badge ${a.result_type==='image'?'result-type-image':'result-type-text'}">${a.result_type==='image'?'Image':'Texte'}</span>
-        </label>`).join('');
+            <span class="result-type-badge ${a.result_type==='image'?'result-type-image':'result-type-text'}">${a.result_type==='image'?'Image':'Texte'}</span>`;
+        container.appendChild(label);
+    });
+    if (pageLimit < total) {
+        const wrap = document.createElement('div');
+        wrap.className = 'load-more-wrap';
+        wrap.style.textAlign = 'center';
+        wrap.style.marginTop = '10px';
+        wrap.innerHTML = loadMoreButtonHtml('labAnalysesSelect', total, pageLimit, 'appendLabAnalysesSelect');
+        container.appendChild(wrap);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2270,6 +2409,10 @@ let currentConversationPartner = null;
 async function checkUnreadMessages() {
     try {
         const data = await API.getUnreadCount();
+        if (data.count > (state.lastUnreadCount || 0)) {
+            playNotificationSound();
+        }
+        state.lastUnreadCount = data.count;
         const badge = document.getElementById('message-badge');
         if (!badge) return;
         if (data.count > 0) { badge.textContent = data.count; badge.classList.remove('hidden'); }
@@ -2578,6 +2721,8 @@ async function renderCashManagement(stats) {
 
     // Encaissements par agent aujourd\'hui
     var byAgent = stats.byAgent || [];
+    state.cashWithdrawalsFull = withdrawals;
+    state.listPages['cashWithdrawals'] = LIST_PAGE_SIZE;
 
     section.innerHTML =
         '<h3><i class="fas fa-cash-register" style="color:#28a745;"></i> Gestion de Caisse — ' + today + '</h3>' +
@@ -2630,23 +2775,7 @@ async function renderCashManagement(stats) {
 
         // Liste des retraits du jour
         '<h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Retraits du jour</h4>' +
-        (withdrawals.length ?
-        '<div class="table-container"><table><thead><tr><th>Agent</th><th>Montant</th><th>USD</th><th>Note</th><th>Heure</th><th>Par</th><th>Action</th></tr></thead><tbody>' +
-        withdrawals.map(function(w) {
-            var amt = parseFloat(w.amount);
-            var rate = 130;
-            return '<tr>' +
-                '<td><strong>' + w.agent_name + '</strong><br><small>' + w.agent_username + '</small></td>' +
-                '<td><strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
-                '<td>$' + (amt/rate).toFixed(2) + '</td>' +
-                '<td>' + (w.note || '-') + '</td>' +
-                '<td>' + (w.created_at ? new Date(w.created_at).toLocaleTimeString('fr-FR') : '-') + '</td>' +
-                '<td>' + (w.created_by || '-') + '</td>' +
-                '<td><button class="btn btn-xs btn-danger" onclick="supprimerRetrait(\'' + w.id + '\') ">' +
-                '<i class="fas fa-trash"></i></button></td>' +
-            '</tr>';
-        }).join('') + '</tbody></table></div>'
-        : '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun retrait enregistré aujourd\'hui.</div>') +
+        '<div id="cash-withdrawals-container"></div>' +
 
         // Rapport par agent
         (byAgent.length ?
@@ -2664,6 +2793,7 @@ async function renderCashManagement(stats) {
                 '<td><strong style="color:' + (net>=0?'#28a745':'#dc3545') + ';">' + net.toLocaleString('fr-FR') + ' HTG</strong></td>' +
             '</tr>';
         }).join('') + '</tbody></table></div>' : '');
+    renderCashWithdrawalsList();
 
     // Afficher infos agent au changement
     document.getElementById('wd-agent')?.addEventListener('change', function() {
@@ -2681,6 +2811,32 @@ async function renderCashManagement(stats) {
             '</div>';
         document.getElementById('wd-amount').max = dispo;
     });
+}
+
+function renderCashWithdrawalsList() {
+    var withdrawals = state.cashWithdrawalsFull || [];
+    var total = withdrawals.length;
+    var container = document.getElementById('cash-withdrawals-container');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun retrait enregistré aujourd\'hui.</div>'; return; }
+    var page = pageSlice('cashWithdrawals', withdrawals);
+    var rate = 130;
+    container.innerHTML =
+        '<div class="table-container"><table><thead><tr><th>Agent</th><th>Montant</th><th>USD</th><th>Note</th><th>Heure</th><th>Par</th><th>Action</th></tr></thead><tbody>' +
+        page.map(function(w) {
+            var amt = parseFloat(w.amount);
+            return '<tr>' +
+                '<td><strong>' + w.agent_name + '</strong><br><small>' + w.agent_username + '</small></td>' +
+                '<td><strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
+                '<td>$' + (amt/rate).toFixed(2) + '</td>' +
+                '<td>' + (w.note || '-') + '</td>' +
+                '<td>' + (w.created_at ? new Date(w.created_at).toLocaleTimeString('fr-FR') : '-') + '</td>' +
+                '<td>' + (w.created_by || '-') + '</td>' +
+                '<td><button class="btn btn-xs btn-danger" onclick="supprimerRetrait(\'' + w.id + '\') ">' +
+                '<i class="fas fa-trash"></i></button></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table></div>' +
+        loadMoreButtonHtml('cashWithdrawals', total, page.length, 'renderCashWithdrawalsList');
 }
 
 async function enregistrerRetrait() {
@@ -2864,7 +3020,7 @@ async function adminEditTransaction(txId) {
             </div>
             <div class="d-flex gap-10 mt-3">
                 <button class="btn btn-success" onclick="saveAdminTxEdit('${t.id}')"><i class="fas fa-save"></i> Enregistrer</button>
-                <button class="btn btn-danger" onclick="deleteAdminTx('${t.id}')"><i class="fas fa-trash"></i> Supprimer</button>
+                ${(state.currentRole === 'admin' || state.currentRole === 'sub_admin') ? `<button class="btn btn-danger" onclick="deleteAdminTx('${t.id}')"><i class="fas fa-trash"></i> Supprimer</button>` : ''}
                 <button class="btn btn-secondary" onclick="document.getElementById(\'admin-edit-tx-modal\').remove()">Annuler</button>
             </div>
         </div>`;
@@ -2880,7 +3036,8 @@ async function saveAdminTxEdit(txId) {
         await apiCall(() => API.updateTransaction(txId, { service, amount, status, paymentMethod: method }));
         toast('Transaction modifiée!');
         document.getElementById('admin-edit-tx-modal').remove();
-        updateAdminStats();
+        if (state.currentRole === 'admin' || state.currentRole === 'sub_admin') updateAdminStats();
+        if (document.getElementById('receipt-search-input')?.value) searchReceipt();
     } catch(e) {}
 }
 
@@ -2942,21 +3099,10 @@ async function searchAdminPatient() {
         ]);
         const totalPaye   = txs.filter(t => t.status === 'paid').reduce((s, t) => s + parseFloat(t.amount), 0);
         const totalImpaye = txs.filter(t => t.status === 'unpaid').reduce((s, t) => s + parseFloat(t.amount), 0);
-
-        let txRows = txs.map(t => {
-            const amt = parseFloat(t.amount);
-            return '<tr>' +
-                '<td>' + (t.date||'-') + '</td>' +
-                '<td>' + t.service + '</td>' +
-                '<td>' + amt.toFixed(2) + ' HTG <small class="text-muted">$' + htgToUsd(amt) + '</small></td>' +
-                '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
-                '<td>' + (t.payment_method||'-') + '</td>' +
-                '<td>' +
-                  '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button> ' +
-                  '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect(\'' + t.id + '\')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
-                '</td>' +
-            '</tr>';
-        }).join('');
+        state.adminPatientTxsFull = txs;
+        state.adminPatientConsultsFull = consultations;
+        state.listPages['adminPatientTxs'] = LIST_PAGE_SIZE;
+        state.listPages['adminPatientConsults'] = LIST_PAGE_SIZE;
 
         let vitalRows = '';
         if (vitals.length > 0) {
@@ -2965,13 +3111,6 @@ async function searchAdminPatient() {
                 return '<span class="badge badge-primary" style="margin:2px;">' + entry[0] + ': ' + entry[1].value + ' ' + entry[1].unit + '</span>';
             }).join('');
         }
-
-        let consultRows = consultations.map(c =>
-            '<div class="card mb-2" style="padding:10px;">' +
-            '<strong>' + (c.date||'-') + '</strong> — Dr. ' + (c.doctor||'-') + '<br>' +
-            '<span style="font-size:.85rem;white-space:pre-wrap;">' + (c.diagnosis||'-') + '</span>' +
-            '</div>'
-        ).join('');
 
         container.innerHTML =
             '<div class="card">' +
@@ -3008,8 +3147,7 @@ async function searchAdminPatient() {
 
             // Transactions
             '<div class="mt-3"><h4><i class="fas fa-receipt"></i> Transactions (' + txs.length + ')</h4>' +
-            '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Actions</th></tr></thead>' +
-            '<tbody>' + (txRows || '<tr><td colspan="6">Aucune transaction</td></tr>') + '</tbody></table></div></div>' +
+            '<div id="admin-patient-txs-container"></div></div>' +
 
             // Signes vitaux
             '<div class="mt-3"><h4><i class="fas fa-heartbeat"></i> Derniers signes vitaux</h4>' +
@@ -3017,11 +3155,54 @@ async function searchAdminPatient() {
 
             // Consultations
             '<div class="mt-3"><h4><i class="fas fa-stethoscope"></i> Consultations</h4>' +
-            (consultRows || '<p class="text-muted">Aucune consultation.</p>') + '</div>' +
+            '<div id="admin-patient-consults-container"></div></div>' +
 
             '</div>';
         container.classList.remove('hidden');
+        renderAdminPatientTxs();
+        renderAdminPatientConsults();
     } catch(e) { console.error(e); toast('Erreur lors de la recherche', 'error'); }
+}
+
+function renderAdminPatientTxs() {
+    const txs = state.adminPatientTxsFull || [];
+    const total = txs.length;
+    const container = document.getElementById('admin-patient-txs-container');
+    if (!container) return;
+    const page = pageSlice('adminPatientTxs', txs);
+    const txRows = page.map(t => {
+        const amt = parseFloat(t.amount);
+        return '<tr>' +
+            '<td>' + (t.date||'-') + '</td>' +
+            '<td>' + t.service + '</td>' +
+            '<td>' + amt.toFixed(2) + ' HTG <small class="text-muted">$' + htgToUsd(amt) + '</small></td>' +
+            '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
+            '<td>' + (t.payment_method||'-') + '</td>' +
+            '<td>' +
+              '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button> ' +
+              '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect(\'' + t.id + '\')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
+            '</td>' +
+        '</tr>';
+    }).join('');
+    container.innerHTML =
+        '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Actions</th></tr></thead>' +
+        '<tbody>' + (txRows || '<tr><td colspan="6">Aucune transaction</td></tr>') + '</tbody></table></div>' +
+        loadMoreButtonHtml('adminPatientTxs', total, page.length, 'renderAdminPatientTxs');
+}
+
+function renderAdminPatientConsults() {
+    const consultations = state.adminPatientConsultsFull || [];
+    const total = consultations.length;
+    const container = document.getElementById('admin-patient-consults-container');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucune consultation.</p>'; return; }
+    const page = pageSlice('adminPatientConsults', consultations);
+    container.innerHTML = page.map(c =>
+        '<div class="card mb-2" style="padding:10px;">' +
+        '<strong>' + (c.date||'-') + '</strong> — Dr. ' + (c.doctor||'-') + '<br>' +
+        '<span style="font-size:.85rem;white-space:pre-wrap;">' + (c.diagnosis||'-') + '</span>' +
+        '</div>'
+    ).join('') + loadMoreButtonHtml('adminPatientConsults', total, page.length, 'renderAdminPatientConsults');
 }
 
 // Créer / modifier compte patient (accès espace patient)
@@ -3196,6 +3377,8 @@ async function generateReport(tab) {
                 var m=t.payment_method||'Non precis'; if(!byMethod[m]) byMethod[m]={c:0,tot:0}; byMethod[m].c++; byMethod[m].tot+=parseFloat(t.amount);
             });
             var tl={consultation:'Consultation',lab:'Laboratoire',medication:'Medicaments',external:'Services ext.'};
+            state.rptTxsFull = txs;
+            state.listPages['rptTxs'] = LIST_PAGE_SIZE;
             el.innerHTML = periodLabel +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-check-circle','Encaisse',fmtHTG(totP),fmtUSD(totP)+' | '+paid.length+' tx','#28a745') +
@@ -3208,18 +3391,17 @@ async function generateReport(tab) {
                 tbl(['Type','Nb','HTG','USD'],Object.entries(byType).map(function(e){return '<tr><td>'+(tl[e[0]]||e[0])+'</td><td>'+e[1].c+'</td><td>'+fmtHTG(e[1].tot)+'</td><td>'+fmtUSD(e[1].tot)+'</td></tr>';}).join(''))+'</div>' +
                 '<div class="card"><h4 style="margin-bottom:10px;">Par methode</h4>' +
                 tbl(['Methode','Nb','HTG','USD'],Object.entries(byMethod).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1].c+'</td><td>'+fmtHTG(e[1].tot)+'</td><td>'+fmtUSD(e[1].tot)+'</td></tr>';}).join(''))+'</div></div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Detail ('+Math.min(txs.length,100)+'/'+txs.length+')</h4>' +
-                tbl(['Date','Patient','Service','Montant','Statut','Methode','Agent'],
-                    txs.slice(0,100).map(function(t){
-                        var sc=t.status==='paid'?'status-paid':t.status==='refunded'?'status-partial':'status-unpaid';
-                        return '<tr><td>'+(t.date||'-')+'</td><td>'+t.patient_name+'</td><td>'+t.service+'</td><td>'+fmtHTG(t.amount)+'</td><td><span class="'+sc+'">'+t.status+'</span></td><td>'+(t.payment_method||'-')+'</td><td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
-                    }).join(''))+'</div>';
+                '<div class="card"><h4 style="margin-bottom:10px;">Detail (' + txs.length + ')</h4>' +
+                '<div id="rpt-txs-detail"></div></div>';
+            renderRptTxsDetail(fmtHTG);
 
         } else if (tab === 'patients') {
             var pats = await API.getPatients({});
             pats = pats.filter(function(p){ var d=(p.registration_date||''); return(!from||d>=from)&&(!to||d<=to); });
             var types={};
             pats.forEach(function(p){ types[p.type]=(types[p.type]||0)+1; });
+            state.rptPatientsFull = pats;
+            state.listPages['rptPatients'] = LIST_PAGE_SIZE;
             el.innerHTML = periodLabel +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-users','Total',pats.length+' patients','','#1a6bca') +
@@ -3228,15 +3410,17 @@ async function generateReport(tab) {
                 '</div>' +
                 '<div class="card mb-3"><h4 style="margin-bottom:10px;">Par type</h4>' +
                 tbl(['Type','Nombre','%'],Object.entries(types).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1]+'</td><td>'+(e[1]/(pats.length||1)*100).toFixed(1)+'%</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Liste ('+Math.min(pats.length,100)+')</h4>' +
-                tbl(['ID','Nom','Tel','Type','Date','Privilege'],
-                    pats.slice(0,100).map(function(p){return '<tr><td>'+p.id+'</td><td>'+p.full_name+'</td><td>'+(p.phone||'-')+'</td><td>'+p.type+'</td><td>'+(p.registration_date||'-')+'</td><td>'+(p.vip?'VIP':p.sponsored?'Sponsor.':'-')+'</td></tr>';}).join(''))+'</div>';
+                '<div class="card"><h4 style="margin-bottom:10px;">Liste (' + pats.length + ')</h4>' +
+                '<div id="rpt-patients-detail"></div></div>';
+            renderRptPatientsDetail();
 
         } else if (tab === 'medications') {
             var meds = await API.getMedications();
             var low=meds.filter(function(m){return parseFloat(m.quantity)>0&&parseFloat(m.quantity)<=parseFloat(m.alert_threshold);});
             var out=meds.filter(function(m){return parseFloat(m.quantity)===0;});
             var val=meds.reduce(function(s,m){return s+parseFloat(m.price||0)*parseFloat(m.quantity||0);},0);
+            state.rptMedsFull = meds;
+            state.listPages['rptMeds'] = LIST_PAGE_SIZE;
             el.innerHTML =
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-pills','Total',meds.length+' refs','','#1a6bca') +
@@ -3246,36 +3430,38 @@ async function generateReport(tab) {
                 '</div>' +
                 (out.length?'<div class="alert alert-danger mb-2">Rupture: '+out.map(function(m){return m.name;}).join(', ')+'</div>':'') +
                 (low.length?'<div class="alert alert-warning mb-2">Faible: '+low.map(function(m){return m.name+'('+m.quantity+')';}).join(', ')+'</div>':'') +
-                '<div class="card"><h4 style="margin-bottom:10px;">Stock complet</h4>' +
-                tbl(['Medicament','Forme','Stock','Seuil','Prix','Valeur','Emplacement','Fournisseur'],
-                    meds.map(function(m){
-                        var cls=parseFloat(m.quantity)===0?'out-of-stock':parseFloat(m.quantity)<=parseFloat(m.alert_threshold)?'low-stock':'';
-                        var loc=(m.espace||'')+(m.espace&&m.etagere?'/':'')+(m.etagere||'');
-                        return '<tr class="'+cls+'"><td>'+m.name+'</td><td>'+(m.form||'-')+'</td><td>'+m.quantity+'</td><td>'+m.alert_threshold+'</td><td>'+fmtHTG(m.price)+'</td><td>'+fmtHTG(parseFloat(m.price||0)*parseFloat(m.quantity||0))+'</td><td>'+(loc||'-')+'</td><td>'+(m.supplier_name||'-')+'</td></tr>';
-                    }).join(''))+'</div>';
+                '<div class="card"><h4 style="margin-bottom:10px;">Stock complet (' + meds.length + ')</h4>' +
+                '<div id="rpt-meds-detail"></div></div>';
+            renderRptMedsDetail();
 
         } else if (tab === 'suppliers') {
             var sups = await API.getSuppliers().catch(function(){return[];});
             var purs = await API.getSupplierPurchases({}).catch(function(){return[];});
             var totDebt=sups.reduce(function(s,sup){return s+parseFloat(sup.total_debt||0);},0);
             var totPur=purs.reduce(function(s,p){return s+parseFloat(p.total_amount||0);},0);
+            state.rptSupsFull = sups;
+            state.rptPursFull = purs;
+            state.listPages['rptSups'] = LIST_PAGE_SIZE;
+            state.listPages['rptPurs'] = LIST_PAGE_SIZE;
             el.innerHTML =
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-truck','Fournisseurs',sups.length,'','#1a6bca') +
                 scard('fa-shopping-cart','Achats totaux',fmtHTG(totPur),fmtUSD(totPur),'#6f42c1') +
                 scard('fa-exclamation','Dettes totales',fmtHTG(totDebt),fmtUSD(totDebt),'#dc3545') +
                 '</div>' +
-                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Fournisseurs</h4>' +
-                tbl(['Nom','Tel','Email','Dette','Statut'],
-                    sups.map(function(s){var d=parseFloat(s.total_debt||0); return '<tr><td>'+s.name+'</td><td>'+(s.phone||'-')+'</td><td>'+(s.email||'-')+'</td><td style="color:'+(d>0?'#dc3545':'#28a745')+';">'+fmtHTG(d)+'</td><td><span class="'+(d>0?'status-unpaid':'status-paid')+'">'+(d>0?'Dette':'Solde')+'</span></td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Historique achats</h4>' +
-                tbl(['Date','Description','Total','Paye','Restant','Type'],
-                    purs.slice(0,50).map(function(p){return '<tr><td>'+(p.date||'-')+'</td><td>'+p.description+'</td><td>'+fmtHTG(p.total_amount)+'</td><td style="color:#28a745;">'+fmtHTG(p.amount_paid)+'</td><td style="color:'+(parseFloat(p.amount_due)>0?'#dc3545':'#28a745')+';">'+fmtHTG(p.amount_due)+'</td><td>'+p.payment_type+'</td></tr>';}).join(''))+'</div>';
+                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Fournisseurs (' + sups.length + ')</h4>' +
+                '<div id="rpt-sups-detail"></div></div>' +
+                '<div class="card"><h4 style="margin-bottom:10px;">Historique achats (' + purs.length + ')</h4>' +
+                '<div id="rpt-purs-detail"></div></div>';
+            renderRptSupsDetail();
+            renderRptPursDetail();
 
         } else if (tab === 'users') {
             var us = await API.getUsers();
             var byRole={};
             us.forEach(function(u){ byRole[u.role]=(byRole[u.role]||0)+1; });
+            state.rptUsersFull = us;
+            state.listPages['rptUsers'] = LIST_PAGE_SIZE;
             el.innerHTML =
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-users','Total',us.length+' comptes','','#1a6bca') +
@@ -3284,15 +3470,17 @@ async function generateReport(tab) {
                 '</div>' +
                 '<div class="card mb-3"><h4 style="margin-bottom:10px;">Par role</h4>' +
                 tbl(['Role','Nombre'],Object.entries(byRole).map(function(e){return '<tr><td>'+getRoleLabel(e[0])+'</td><td>'+e[1]+'</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Liste utilisateurs</h4>' +
-                tbl(['Nom','Identifiant','Role','Extra roles','Statut'],
-                    us.map(function(u){return '<tr><td>'+u.name+'</td><td>'+u.username+'</td><td>'+getRoleLabel(u.role)+'</td><td>'+(u.extra_roles||'-')+'</td><td><span class="'+(u.active?'status-paid':'status-unpaid')+'">'+(u.active?'Actif':'Inactif')+'</span></td></tr>';}).join(''))+'</div>';
+                '<div class="card"><h4 style="margin-bottom:10px;">Liste utilisateurs (' + us.length + ')</h4>' +
+                '<div id="rpt-users-detail"></div></div>';
+            renderRptUsersDetail();
 
         } else if (tab === 'hospitalization') {
             var hosps = await API.getHospitalizations({}).catch(function(){return[];});
             hosps = hosps.filter(function(h){var d=h.admission_date||'';return(!from||d>=from)&&(!to||d<=to);});
             var totDep=hosps.reduce(function(s,h){return s+parseFloat(h.deposit||0);},0);
             var totDebt2=hosps.filter(function(h){return parseFloat(h.balance||0)<0;}).reduce(function(s,h){return s+Math.abs(parseFloat(h.balance));},0);
+            state.rptHospsFull = hosps;
+            state.listPages['rptHosps'] = LIST_PAGE_SIZE;
             el.innerHTML = periodLabel +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-bed','Admissions',hosps.length,'','#1a6bca') +
@@ -3301,9 +3489,9 @@ async function generateReport(tab) {
                 scard('fa-money-bill','Total depots',fmtHTG(totDep),fmtUSD(totDep),'#28a745') +
                 scard('fa-exclamation','Dettes',fmtHTG(totDebt2),fmtUSD(totDebt2),'#dc3545') +
                 '</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Detail</h4>' +
-                tbl(['Patient','Chambre','Admission','Sortie','Depot','Solde','Statut'],
-                    hosps.map(function(h){var b=parseFloat(h.balance||0); return '<tr><td>'+(h.full_name||h.patient_id)+'</td><td>'+(h.room||'-')+'</td><td>'+(h.admission_date||'-')+'</td><td>'+(h.discharge_date||'-')+'</td><td>'+fmtHTG(h.deposit)+'</td><td style="color:'+(b<0?'#dc3545':'#28a745')+';">'+fmtHTG(b)+'</td><td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalise':'Sorti')+'</span></td></tr>';}).join(''))+'</div>';
+                '<div class="card"><h4 style="margin-bottom:10px;">Detail (' + hosps.length + ')</h4>' +
+                '<div id="rpt-hosps-detail"></div></div>';
+            renderRptHospsDetail();
         }
     } catch(e) {
         el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
@@ -3311,6 +3499,92 @@ async function generateReport(tab) {
 }
 
 // ─── DÉCAISSEMENTS ────────────────────────────────────────────
+function fmtHTGDefault(v) { return parseFloat(v||0).toLocaleString('fr-FR') + ' HTG'; }
+function fmtUSDDefault(v, rate) { rate = rate || (state.exchangeRate || 130); return '≈$' + (parseFloat(v||0)/rate).toFixed(2); }
+
+function renderRptTxsDetail(fmtHTG) {
+    fmtHTG = fmtHTG || fmtHTGDefault;
+    var txs = state.rptTxsFull || [];
+    var total = txs.length;
+    var container = document.getElementById('rpt-txs-detail');
+    if (!container) return;
+    var page = pageSlice('rptTxs', txs);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant</th><th>Statut</th><th>Methode</th><th>Agent</th></tr></thead><tbody>' +
+        page.map(function(t){
+            var sc=t.status==='paid'?'status-paid':t.status==='refunded'?'status-partial':'status-unpaid';
+            return '<tr><td>'+(t.date||'-')+'</td><td>'+t.patient_name+'</td><td>'+t.service+'</td><td>'+fmtHTG(t.amount)+'</td><td><span class="'+sc+'">'+t.status+'</span></td><td>'+(t.payment_method||'-')+'</td><td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        loadMoreButtonHtml('rptTxs', total, page.length, 'renderRptTxsDetail');
+}
+
+function renderRptPatientsDetail() {
+    var pats = state.rptPatientsFull || [];
+    var total = pats.length;
+    var container = document.getElementById('rpt-patients-detail');
+    if (!container) return;
+    var page = pageSlice('rptPatients', pats);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>ID</th><th>Nom</th><th>Tel</th><th>Type</th><th>Date</th><th>Privilege</th></tr></thead><tbody>' +
+        page.map(function(p){return '<tr><td>'+p.id+'</td><td>'+p.full_name+'</td><td>'+(p.phone||'-')+'</td><td>'+p.type+'</td><td>'+(p.registration_date||'-')+'</td><td>'+(p.vip?'VIP':p.sponsored?'Sponsor.':'-')+'</td></tr>';}).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('rptPatients', total, page.length, 'renderRptPatientsDetail');
+}
+
+function renderRptMedsDetail() {
+    var meds = state.rptMedsFull || [];
+    var total = meds.length;
+    var container = document.getElementById('rpt-meds-detail');
+    if (!container) return;
+    var page = pageSlice('rptMeds', meds);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Medicament</th><th>Forme</th><th>Stock</th><th>Seuil</th><th>Prix</th><th>Valeur</th><th>Emplacement</th><th>Fournisseur</th></tr></thead><tbody>' +
+        page.map(function(m){
+            var cls=parseFloat(m.quantity)===0?'out-of-stock':parseFloat(m.quantity)<=parseFloat(m.alert_threshold)?'low-stock':'';
+            var loc=(m.espace||'')+(m.espace&&m.etagere?'/':'')+(m.etagere||'');
+            return '<tr class="'+cls+'"><td>'+m.name+'</td><td>'+(m.form||'-')+'</td><td>'+m.quantity+'</td><td>'+m.alert_threshold+'</td><td>'+fmtHTGDefault(m.price)+'</td><td>'+fmtHTGDefault(parseFloat(m.price||0)*parseFloat(m.quantity||0))+'</td><td>'+(loc||'-')+'</td><td>'+(m.supplier_name||'-')+'</td></tr>';
+        }).join('') + '</tbody></table></div>' + loadMoreButtonHtml('rptMeds', total, page.length, 'renderRptMedsDetail');
+}
+
+function renderRptSupsDetail() {
+    var sups = state.rptSupsFull || [];
+    var total = sups.length;
+    var container = document.getElementById('rpt-sups-detail');
+    if (!container) return;
+    var page = pageSlice('rptSups', sups);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Nom</th><th>Tel</th><th>Email</th><th>Dette</th><th>Statut</th></tr></thead><tbody>' +
+        page.map(function(s){var d=parseFloat(s.total_debt||0); return '<tr><td>'+s.name+'</td><td>'+(s.phone||'-')+'</td><td>'+(s.email||'-')+'</td><td style="color:'+(d>0?'#dc3545':'#28a745')+';">'+fmtHTGDefault(d)+'</td><td><span class="'+(d>0?'status-unpaid':'status-paid')+'">'+(d>0?'Dette':'Solde')+'</span></td></tr>';}).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('rptSups', total, page.length, 'renderRptSupsDetail');
+}
+
+function renderRptPursDetail() {
+    var purs = state.rptPursFull || [];
+    var total = purs.length;
+    var container = document.getElementById('rpt-purs-detail');
+    if (!container) return;
+    var page = pageSlice('rptPurs', purs);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Description</th><th>Total</th><th>Paye</th><th>Restant</th><th>Type</th></tr></thead><tbody>' +
+        page.map(function(p){return '<tr><td>'+(p.date||'-')+'</td><td>'+p.description+'</td><td>'+fmtHTGDefault(p.total_amount)+'</td><td style="color:#28a745;">'+fmtHTGDefault(p.amount_paid)+'</td><td style="color:'+(parseFloat(p.amount_due)>0?'#dc3545':'#28a745')+';">'+fmtHTGDefault(p.amount_due)+'</td><td>'+p.payment_type+'</td></tr>';}).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('rptPurs', total, page.length, 'renderRptPursDetail');
+}
+
+function renderRptUsersDetail() {
+    var us = state.rptUsersFull || [];
+    var total = us.length;
+    var container = document.getElementById('rpt-users-detail');
+    if (!container) return;
+    var page = pageSlice('rptUsers', us);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Nom</th><th>Identifiant</th><th>Role</th><th>Extra roles</th><th>Statut</th></tr></thead><tbody>' +
+        page.map(function(u){return '<tr><td>'+u.name+'</td><td>'+u.username+'</td><td>'+getRoleLabel(u.role)+'</td><td>'+(u.extra_roles||'-')+'</td><td><span class="'+(u.active?'status-paid':'status-unpaid')+'">'+(u.active?'Actif':'Inactif')+'</span></td></tr>';}).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('rptUsers', total, page.length, 'renderRptUsersDetail');
+}
+
+function renderRptHospsDetail() {
+    var hosps = state.rptHospsFull || [];
+    var total = hosps.length;
+    var container = document.getElementById('rpt-hosps-detail');
+    if (!container) return;
+    var page = pageSlice('rptHosps', hosps);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Patient</th><th>Chambre</th><th>Admission</th><th>Sortie</th><th>Depot</th><th>Solde</th><th>Statut</th></tr></thead><tbody>' +
+        page.map(function(h){var b=parseFloat(h.balance||0); return '<tr><td>'+(h.full_name||h.patient_id)+'</td><td>'+(h.room||'-')+'</td><td>'+(h.admission_date||'-')+'</td><td>'+(h.discharge_date||'-')+'</td><td>'+fmtHTGDefault(h.deposit)+'</td><td style="color:'+(b<0?'#dc3545':'#28a745')+';">'+fmtHTGDefault(b)+'</td><td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalise':'Sorti')+'</span></td></tr>';}).join('') +
+        '</tbody></table></div>' + loadMoreButtonHtml('rptHosps', total, page.length, 'renderRptHospsDetail');
+}
 async function loadDecaissements() {
     var section = document.getElementById('decaissement-section');
     if (!section) {
@@ -3323,6 +3597,8 @@ async function loadDecaissements() {
     var rate  = state.exchangeRate || 130;
     var today = new Date().toISOString().split('T')[0];
     var decList = await API.getCashWithdrawals({ fromDate: today }).catch(function(){return[];});
+    state.decaissementsFull = decList;
+    state.listPages['decaissements'] = LIST_PAGE_SIZE;
     var totDec  = decList.reduce(function(s,d){return s+parseFloat(d.amount);},0);
     var users    = await API.getUsers().catch(function(){return[];});
     var patients = await API.getPatients({}).catch(function(){return[];});
@@ -3364,17 +3640,33 @@ async function loadDecaissements() {
         '<button class="btn btn-danger" style="width:100%;" onclick="saveDecaissement()"><i class="fas fa-money-bill-wave-alt"></i> Effectuer</button></div>' +
         '</div></div>' +
         '<h4 style="margin-bottom:10px;"><i class="fas fa-history"></i> Historique du jour</h4>' +
-        (decList.length ?
+        '<div id="dec-history-container"></div>';
+    renderDecaissementsHistory(acctLabels);
+}
+
+function renderDecaissementsHistory(acctLabels) {
+    var decList = state.decaissementsFull || [];
+    var total = decList.length;
+    var container = document.getElementById('dec-history-container');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<div class="alert alert-info">Aucun decaissement aujourd\'hui.</div>'; return; }
+    var page = pageSlice('decaissements', decList);
+    container.innerHTML =
         '<div class="table-container"><table><thead><tr><th>Heure</th><th>Beneficiaire</th><th>Montant</th><th>Compte</th><th>Note</th><th>Par</th><th></th></tr></thead><tbody>' +
-        decList.map(function(d){
+        page.map(function(d){
             return '<tr><td>'+(d.created_at?new Date(d.created_at).toLocaleTimeString('fr-FR'):'-')+'</td>' +
                 '<td><strong>'+(d.agent_name||'-')+'</strong></td>' +
                 '<td><strong style="color:#dc3545;">-'+parseFloat(d.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
                 '<td>'+(acctLabels[d.payment_method]||d.payment_method||'Especes')+'</td>' +
                 '<td>'+(d.note||'-')+'</td><td>'+(d.created_by||'-')+'</td>' +
                 '<td><button class="btn btn-xs btn-danger" data-wid="'+d.id+'" onclick="deleteDecaissement(this.dataset.wid)"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('')+'</tbody></table></div>'
-        : '<div class="alert alert-info">Aucun decaissement aujourd\'hui.</div>');
+        }).join('')+'</tbody></table></div>' +
+        loadMoreButtonHtml('decaissements', total, page.length, 'renderDecaissementsHistoryNoArgs');
+}
+
+function renderDecaissementsHistoryNoArgs() {
+    var acctLabels = { cash:'Especes', moncash:'MonCash', natcash:'NatCash', card:'Carte', virement:'Virement', petite_caisse:'Petite Caisse' };
+    renderDecaissementsHistory(acctLabels);
 }
 
 function filterDecBenefs(val) {

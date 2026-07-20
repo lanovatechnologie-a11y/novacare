@@ -57,6 +57,7 @@ const API = (() => {
             return request('GET', '/transactions' + (qs ? '?' + qs : ''));
         },
         payTransactions:   (ids, method) => request('POST', '/transactions/pay', { transactionIds: ids, paymentMethod: method }),
+        getReceipt:        (receiptNumber) => request('GET', `/transactions/receipt/${encodeURIComponent(receiptNumber)}`),
         addTransaction:    (data)        => request('POST', '/transactions/add', data),
         saveLabResult:     (id, result)  => request('PUT',  `/transactions/${id}/lab-result`, { result }),
         updateTransactionConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),

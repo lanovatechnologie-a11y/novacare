@@ -37,6 +37,12 @@ pool.connect().then(c => { console.log('PostgreSQL OK'); c.release(); }).catch(e
         await pool.query(`ALTER TABLE hosp_prescriptions ADD COLUMN IF NOT EXISTS delivered BOOLEAN DEFAULT false`);
         await pool.query(`ALTER TABLE hosp_prescriptions ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
         await pool.query(`ALTER TABLE hosp_prescriptions ADD COLUMN IF NOT EXISTS delivered_by VARCHAR(120)`);
+        await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS receipt_number VARCHAR(50)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_transactions_receipt ON transactions(receipt_number)`);
+        const receiptCounter = await pool.query("SELECT 1 FROM counters WHERE name='receipt'");
+        if (!receiptCounter.rows.length) {
+            await pool.query("INSERT INTO counters(name, value) VALUES('receipt', 0)");
+        }
         console.log('Migration colonnes médecin assigné OK');
     } catch (e) { console.error('Migration ERR:', e.message); }
 })();
@@ -77,6 +83,11 @@ function adminOnly(req, res, next) {
 }
 function adminOrSub(req, res, next) {
     if (req.user.role !== 'admin' && req.user.role !== 'sub_admin')
+        return res.status(403).json({ error: 'Accès refusé' });
+    next();
+}
+function adminSubOrCashier(req, res, next) {
+    if (req.user.role !== 'admin' && req.user.role !== 'sub_admin' && req.user.role !== 'cashier')
         return res.status(403).json({ error: 'Accès refusé' });
     next();
 }
@@ -382,15 +393,36 @@ app.get('/transactions', auth, async (req, res) => {
 });
 
 app.post('/transactions/pay', auth, async (req, res) => {
+    const client = await pool.connect();
     try {
         const { transactionIds, paymentMethod } = req.body;
         if (!transactionIds || !transactionIds.length)
             return res.status(400).json({ error: 'Aucune transaction' });
-        await pool.query(
-            "UPDATE transactions SET status='paid',payment_method=$1,payment_date=CURRENT_DATE,payment_time=CURRENT_TIME,payment_agent=$2 WHERE id=ANY($3::text[])",
-            [paymentMethod, req.user.username, transactionIds]
+        await client.query('BEGIN');
+        const ctr = await nextId(client, 'receipt');
+        const receiptNumber = 'REC-' + String(ctr).padStart(5, '0');
+        await client.query(
+            "UPDATE transactions SET status='paid',payment_method=$1,payment_date=CURRENT_DATE,payment_time=CURRENT_TIME,payment_agent=$2,receipt_number=$3 WHERE id=ANY($4::text[])",
+            [paymentMethod, req.user.username, receiptNumber, transactionIds]
         );
-        res.json({ success: true });
+        await client.query('COMMIT');
+        res.json({ success: true, receiptNumber });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally {
+        client.release();
+    }
+});
+
+// Rechercher un reçu par son numéro
+app.get('/transactions/receipt/:receiptNumber', auth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            'SELECT * FROM transactions WHERE receipt_number=$1 ORDER BY id',
+            [req.params.receiptNumber.trim().toUpperCase()]
+        );
+        res.json(r.rows);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -419,7 +451,7 @@ app.post('/transactions/add', auth, async (req, res) => {
     } finally { client.release(); }
 });
 
-app.put('/transactions/:id', auth, adminOrSub, async (req, res) => {
+app.put('/transactions/:id', auth, adminSubOrCashier, async (req, res) => {
     try {
         const { service, amount, status, paymentMethod } = req.body;
         const p = [], sets = [];

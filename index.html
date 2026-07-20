@@ -343,6 +343,16 @@
                 </div>
             </div>
 
+            <!-- Recherche de reçu -->
+            <div class="card">
+                <h3><i class="fas fa-receipt"></i> Rechercher un reçu</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="receipt-search-input" class="form-control" placeholder="Ex: REC-00042" onkeyup="if(event.key==='Enter')searchReceipt()">
+                    <button class="btn" onclick="searchReceipt()"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+                <div id="receipt-search-result" class="mt-3"></div>
+            </div>
+
             <div id="cashier-patient-details" class="hidden">
                 <div class="card">
                     <h3><i class="fas fa-user"></i> <span id="cashier-patient-name"></span> <small class="text-muted">(#<span id="cashier-patient-id"></span>)</small></h3>
