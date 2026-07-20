@@ -58,6 +58,11 @@ const API = (() => {
         },
         payTransactions:   (ids, method) => request('POST', '/transactions/pay', { transactionIds: ids, paymentMethod: method }),
         getReceipt:        (receiptNumber) => request('GET', `/transactions/receipt/${encodeURIComponent(receiptNumber)}`),
+        getReceiptsByPatient: (patientId) => request('GET', `/transactions/receipts-by-patient/${encodeURIComponent(patientId)}`),
+        getAllReceipts: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/transactions/receipts' + (qs ? '?' + qs : ''));
+        },
         addTransaction:    (data)        => request('POST', '/transactions/add', data),
         saveLabResult:     (id, result)  => request('PUT',  `/transactions/${id}/lab-result`, { result }),
         updateTransactionConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),

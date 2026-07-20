@@ -512,6 +512,7 @@ function setupNavigation() {
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
             else if (target === 'nurse')          loadNurseHospList();
+            else if (target === 'cashier')        loadAllReceipts('today');
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'hospitalization') { closeHospDetail(); loadHospitalizations('active'); }
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
@@ -1615,24 +1616,124 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Afficher modal impression
             showPrintModal(totalHTG, givenHTG, payCurrency, method, receiptNumber);
+            if (document.getElementById('all-receipts-list')) loadAllReceipts(state.allReceiptsFilter);
         } catch(e) {}
     });
 });
 
+// ── Registre de tous les reçus générés ─────────────────────────
+async function loadAllReceipts(filter) {
+    try {
+        var params = {};
+        if (filter === 'today') {
+            var today = new Date().toISOString().split('T')[0];
+            params = { fromDate: today, toDate: today };
+        }
+        state.allReceiptsFilter = filter;
+        state.allReceiptsFull = await apiCall(() => API.getAllReceipts(params));
+        state.listPages['allReceipts'] = LIST_PAGE_SIZE;
+        renderAllReceiptsList();
+    } catch(e) {}
+}
+
+function renderAllReceiptsList() {
+    const receipts = state.allReceiptsFull || [];
+    const total = receipts.length;
+    const container = document.getElementById('all-receipts-list');
+    if (!container) return;
+    if (!total) { container.innerHTML = '<p class="text-muted">Aucun reçu trouvé.</p>'; return; }
+    const page = pageSlice('allReceipts', receipts);
+    container.innerHTML = '<div class="table-container"><table><thead><tr><th>N° Reçu</th><th>Patient</th><th>Date</th><th>Montant</th><th>Méthode</th><th>Agent</th><th></th></tr></thead><tbody>' +
+        page.map(r => `<tr>
+            <td><strong>${r.receipt_number}</strong></td>
+            <td>${r.patient_name} <small class="text-muted">#${r.patient_id}</small></td>
+            <td>${r.date||'-'} ${r.payment_time||''}</td>
+            <td>${parseFloat(r.total).toFixed(2)} HTG</td>
+            <td>${r.payment_method||'-'}</td>
+            <td>${r.payment_agent||'-'}</td>
+            <td><button class="btn btn-sm btn-primary" onclick="viewReceiptFromRegistry('${r.receipt_number}')"><i class="fas fa-eye"></i> Voir</button></td>
+        </tr>`).join('') + '</tbody></table></div>' +
+        loadMoreButtonHtml('allReceipts', total, page.length, 'renderAllReceiptsList');
+}
+
+async function viewReceiptFromRegistry(receiptNumber) {
+    document.getElementById('receipt-search-input').value = receiptNumber;
+    try {
+        const txs = await apiCall(() => API.getReceipt(receiptNumber));
+        state.currentReceiptTxs = txs;
+        state.receiptCameFromPatientId = null;
+        renderReceiptResult(receiptNumber);
+        document.getElementById('receipt-search-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch(e) {}
+}
+
 // ── Recherche et modification de reçu ─────────────────────────
 async function searchReceipt() {
-    const num = document.getElementById('receipt-search-input').value.trim().toUpperCase();
-    if (!num) { toast('Entrer un numéro de reçu', 'error'); return; }
+    const raw = document.getElementById('receipt-search-input').value.trim().toUpperCase();
+    if (!raw) { toast('Entrer un numéro de reçu ou un ID patient', 'error'); return; }
+    const container = document.getElementById('receipt-search-result');
     try {
-        const txs = await apiCall(() => API.getReceipt(num));
-        state.currentReceiptTxs = txs;
-        const container = document.getElementById('receipt-search-result');
-        if (!txs.length) {
-            container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Aucun reçu trouvé pour "' + num + '".</div>';
-            return;
+        if (raw.startsWith('REC')) {
+            const txs = await apiCall(() => API.getReceipt(raw));
+            state.currentReceiptTxs = txs;
+            if (!txs.length) {
+                container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Aucun reçu trouvé pour "' + raw + '".</div>';
+                return;
+            }
+            state.receiptCameFromPatientId = null;
+            renderReceiptResult(raw);
+        } else {
+            const receipts = await apiCall(() => API.getReceiptsByPatient(raw));
+            if (!receipts.length) {
+                container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Aucun reçu trouvé pour le patient "' + raw + '".</div>';
+                return;
+            }
+            state.patientReceiptsFull = receipts;
+            state.currentPatientReceiptsId = raw;
+            state.listPages['patientReceipts'] = LIST_PAGE_SIZE;
+            renderPatientReceiptsList();
         }
-        renderReceiptResult(num);
     } catch(e) {}
+}
+
+function renderPatientReceiptsList() {
+    const receipts = state.patientReceiptsFull || [];
+    const total = receipts.length;
+    const container = document.getElementById('receipt-search-result');
+    if (!container) return;
+    const page = pageSlice('patientReceipts', receipts);
+    const first = receipts[0];
+    container.innerHTML = `
+        <div class="card" style="background:#f8f9fa;">
+            <h4><i class="fas fa-user"></i> Reçus de ${first ? first.patient_name : ''} <small class="text-muted">(#${state.currentPatientReceiptsId})</small></h4>
+            <p class="text-muted" style="font-size:.85rem;">${total} reçu(s) trouvé(s)</p>
+            <div class="table-container mt-2">
+                <table><thead><tr><th>N° Reçu</th><th>Date</th><th>Montant</th><th>Méthode</th><th>Lignes</th><th></th></tr></thead><tbody>
+                ${page.map(r => `<tr>
+                    <td><strong>${r.receipt_number}</strong></td>
+                    <td>${r.date||'-'} ${r.payment_time||''}</td>
+                    <td>${parseFloat(r.total).toFixed(2)} HTG</td>
+                    <td>${r.payment_method||'-'}</td>
+                    <td>${r.items}</td>
+                    <td><button class="btn btn-sm btn-primary" onclick="viewReceiptFromPatientList('${r.receipt_number}')"><i class="fas fa-eye"></i> Voir</button></td>
+                </tr>`).join('')}
+                </tbody></table>
+            </div>
+        </div>` + loadMoreButtonHtml('patientReceipts', total, page.length, 'renderPatientReceiptsList');
+}
+
+async function viewReceiptFromPatientList(receiptNumber) {
+    try {
+        const txs = await apiCall(() => API.getReceipt(receiptNumber));
+        state.currentReceiptTxs = txs;
+        state.receiptCameFromPatientId = state.currentPatientReceiptsId;
+        renderReceiptResult(receiptNumber);
+    } catch(e) {}
+}
+
+function backToPatientReceipts() {
+    document.getElementById('receipt-search-input').value = state.currentPatientReceiptsId || '';
+    renderPatientReceiptsList();
 }
 
 function renderReceiptResult(num) {
@@ -1644,6 +1745,7 @@ function renderReceiptResult(num) {
     const canEdit = state.currentRole === 'admin' || state.currentRole === 'sub_admin' || state.currentRole === 'cashier';
     container.innerHTML = `
         <div class="card" style="background:#f8f9fa;">
+            ${state.receiptCameFromPatientId ? `<button class="btn btn-sm btn-secondary mb-2" onclick="backToPatientReceipts()"><i class="fas fa-arrow-left"></i> Retour aux reçus du patient</button>` : ''}
             <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:10px;">
                 <div>
                     <h4><i class="fas fa-receipt"></i> ${num}</h4>

@@ -426,6 +426,47 @@ app.get('/transactions/receipt/:receiptNumber', auth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Lister tous les reçus générés (registre)
+app.get('/transactions/receipts', auth, async (req, res) => {
+    try {
+        const { fromDate, toDate } = req.query;
+        const params = [];
+        let where = 'receipt_number IS NOT NULL';
+        if (fromDate) { params.push(fromDate); where += ` AND date >= $${params.length}`; }
+        if (toDate)   { params.push(toDate);   where += ` AND date <= $${params.length}`; }
+        const r = await pool.query(
+            `SELECT receipt_number, patient_id, patient_name,
+                    MIN(date) as date, MIN(payment_time) as payment_time,
+                    MIN(payment_method) as payment_method, MIN(payment_agent) as payment_agent,
+                    SUM(amount) as total, COUNT(*) as items
+             FROM transactions
+             WHERE ${where}
+             GROUP BY receipt_number, patient_id, patient_name
+             ORDER BY MIN(date) DESC NULLS LAST, MIN(payment_time) DESC NULLS LAST
+             LIMIT 500`,
+            params
+        );
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Lister tous les reçus (regroupés) d'un patient donné
+app.get('/transactions/receipts-by-patient/:patientId', auth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            `SELECT receipt_number, patient_id, patient_name,
+                    MIN(date) as date, MIN(payment_time) as payment_time,
+                    MIN(payment_method) as payment_method, SUM(amount) as total, COUNT(*) as items
+             FROM transactions
+             WHERE patient_id=$1 AND receipt_number IS NOT NULL
+             GROUP BY receipt_number, patient_id, patient_name
+             ORDER BY MIN(date) DESC NULLS LAST, MIN(payment_time) DESC NULLS LAST`,
+            [req.params.patientId.trim().toUpperCase()]
+        );
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/transactions/add', auth, async (req, res) => {
     const client = await pool.connect();
     try {
