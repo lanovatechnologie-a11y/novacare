@@ -31,29 +31,7 @@ const state = {
     },
     // Notifications locales
     localNotifications: [],
-    // Pagination des longues listes catalogue (10 par page, "Afficher plus")
-    listPages: {},
 };
-
-const LIST_PAGE_SIZE = 10;
-function pageSlice(key, arr) {
-    if (!state.listPages[key]) state.listPages[key] = LIST_PAGE_SIZE;
-    return arr.slice(0, state.listPages[key]);
-}
-function loadMoreList(key, total, rerenderFn) {
-    state.listPages[key] = Math.min((state.listPages[key] || LIST_PAGE_SIZE) + LIST_PAGE_SIZE, total);
-    rerenderFn();
-}
-function loadMoreButtonHtml(key, total, shown, rerenderFnName, colspan) {
-    if (shown >= total) return '';
-    const remaining = total - shown;
-    const btn = `<button type="button" class="btn btn-secondary btn-sm" onclick="loadMoreList('${key}', ${total}, ${rerenderFnName})">
-        <i class="fas fa-chevron-down"></i> Afficher plus (${remaining} restant${remaining>1?'s':''})
-    </button>`;
-    return colspan
-        ? `<tr><td colspan="${colspan}" style="text-align:center;padding:12px;">${btn}</td></tr>`
-        : `<div style="text-align:center;margin-top:10px;">${btn}</div>`;
-}
 
 // ─── Utilitaires monnaie ─────────────────────────────────────
 function htgToUsd(htg)  { return (htg / state.exchangeRate).toFixed(2); }
@@ -100,38 +78,88 @@ function formatDate(d) {
     return new Date(d).toLocaleDateString('fr-FR');
 }
 
-// ─── Son de notification (fort, synthétisé) ───────────────────
-let _audioCtx = null;
-function playNotificationSound() {
+// ─── Notification locale cross-département ───────────────────
+
+// ─── SON DE NOTIFICATION ──────────────────────────────────────
+function playNotifSound(type) {
     try {
-        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (_audioCtx.state === 'suspended') _audioCtx.resume();
-        const now = _audioCtx.currentTime;
-        // Triple bip aigu et fort pour bien attirer l'attention
-        [0, 0.18, 0.36].forEach(offset => {
-            const osc  = _audioCtx.createOscillator();
-            const gain = _audioCtx.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(1046.5, now + offset); // Do6
-            gain.gain.setValueAtTime(0, now + offset);
-            gain.gain.linearRampToValueAtTime(0.9, now + offset + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
-            osc.connect(gain);
-            gain.connect(_audioCtx.destination);
-            osc.start(now + offset);
-            osc.stop(now + offset + 0.16);
-        });
-    } catch(e) {}
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        type = type || 'notification';
+
+        if (type === 'message') {
+            // Son message: 2 bips rapides aigus
+            [0, 0.15].forEach(function(delay) {
+                var osc  = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 880;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + delay + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + 0.18);
+            });
+        } else if (type === 'alert') {
+            // Son alerte: 3 bips forts descendants
+            [0, 0.2, 0.4].forEach(function(delay, i) {
+                var osc  = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 700 - (i * 80);
+                osc.type = 'square';
+                gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + delay + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + 0.18);
+            });
+        } else {
+            // Son notification: 1 bip doux + harmonie
+            var freqs = [523, 659, 784]; // Do-Mi-Sol
+            freqs.forEach(function(freq, i) {
+                var osc  = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                var t = ctx.currentTime + i * 0.1;
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                osc.start(t);
+                osc.stop(t + 0.3);
+            });
+        }
+    } catch(e) { /* AudioContext non supporté */ }
 }
 
-// ─── Notification locale cross-département ───────────────────
+// Demander permission son au premier clic utilisateur
+var _soundReady = false;
+document.addEventListener('click', function() {
+    if (!_soundReady) {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            ctx.resume();
+            _soundReady = true;
+        } catch(e) {}
+    }
+}, { once: true });
+
 function addLocalNotification(title, body, icon = 'fas fa-bell', color = '#1a6bca') {
     const n = { id: Date.now(), title, body, icon, color, time: new Date(), read: false };
     state.localNotifications.unshift(n);
     if (state.localNotifications.length > 50) state.localNotifications.pop();
     updateNotifPanel();
     updateNotifBadge();
-    playNotificationSound();
+    // Son selon le type
+    var soundType = icon && icon.includes('comment') ? 'message'
+                  : color === '#dc3545' ? 'alert'
+                  : 'notification';
+    playNotifSound(soundType);
 }
 
 function updateNotifPanel() {
@@ -142,9 +170,7 @@ function updateNotifPanel() {
         list.innerHTML = '<div class="notif-empty"><i class="fas fa-check-circle" style="font-size:1.5rem;color:#28a745;display:block;margin-bottom:6px;"></i>Aucune notification</div>';
         return;
     }
-    if (!state.listPages['notifPanel']) state.listPages['notifPanel'] = LIST_PAGE_SIZE;
-    const page = pageSlice('notifPanel', notifs);
-    list.innerHTML = page.map(n => `
+    list.innerHTML = notifs.slice(0, 20).map(n => `
         <div class="notif-item ${n.read ? '' : 'unread'}" onclick="markNotifRead(${n.id})">
             <div class="notif-icon" style="background:${n.color};"><i class="${n.icon}"></i></div>
             <div class="notif-content">
@@ -153,7 +179,7 @@ function updateNotifPanel() {
                 <div class="notif-time">${n.time.toLocaleTimeString('fr-FR')}</div>
             </div>
             ${n.read ? '' : '<div class="notif-dot"></div>'}
-        </div>`).join('') + loadMoreButtonHtml('notifPanel', notifs.length, page.length, 'updateNotifPanel');
+        </div>`).join('');
 }
 
 function updateNotifBadge() {
@@ -214,7 +240,7 @@ document.addEventListener('click', function(e) {
 });
 
 // ─── CAISSE: Modal + Reset après paiement ────────────────────
-function showPrintModal(totalHTG, givenHTG, payCurrency, method, receiptNumber) {
+function showPrintModal(totalHTG, givenHTG, payCurrency, method) {
     const change = givenHTG - totalHTG;
     const nom = state.currentCashierPatient ? state.currentCashierPatient.full_name : '';
     var old = document.getElementById('print-modal');
@@ -227,8 +253,7 @@ function showPrintModal(totalHTG, givenHTG, payCurrency, method, receiptNumber) 
         '<div style="width:70px;height:70px;background:#d4edda;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">' +
         '<i class="fas fa-check-circle" style="font-size:2.2rem;color:#28a745;"></i></div>' +
         '<h3 style="color:#28a745;margin-bottom:6px;">Paiement confirmé !</h3>' +
-        '<p style="color:#6c757d;margin-bottom:6px;">' + nom + '</p>' +
-        (receiptNumber ? '<p style="margin-bottom:18px;"><span class="badge badge-primary" style="font-size:.95rem;padding:6px 12px;"><i class="fas fa-receipt"></i> ' + receiptNumber + '</span></p>' : '<div style="margin-bottom:18px;"></div>') +
+        '<p style="color:#6c757d;margin-bottom:18px;">' + nom + '</p>' +
         '<div style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;text-align:left;">' +
         '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Total HTG</span><strong>' + totalHTG.toFixed(2) + ' HTG</strong></div>' +
         '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Total USD</span><strong>$' + htgToUsd(totalHTG) + '</strong></div>' +
@@ -304,7 +329,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCurrencyHandlers();
     setupNotifBell();
     setupExchangeRateSettings();
-    setupExtraModeSettings();
 
     // Rafraîchir messages et notifs toutes les 30s
     setInterval(() => {
@@ -324,7 +348,6 @@ function setupLogin() {
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        try { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(eAudio) {}
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
         const role     = document.querySelector('.login-role-btn.active').dataset.role;
@@ -421,7 +444,6 @@ async function loadBaseData() {
 
         applyHospitalSettings();
         updateConsultationTypesSelect();
-        updateAssignedDoctorSelect();
         updateVitalsInputs();
         updateLabAnalysesSelect();
         updateExternalServicesSelect();
@@ -462,28 +484,6 @@ function applyHospitalSettings() {
     const eri = document.getElementById('exchange-rate-input');
     if (eri) eri.value = state.exchangeRate;
     updateExchangeRateDisplay();
-
-    // Mode Extra
-    const extraActive = s.extraMode === 'true' || s.extraMode === true;
-    const extraPct     = parseFloat(s.extraModePercentage) || 0;
-    const emt = document.getElementById('extra-mode-toggle');
-    const emp = document.getElementById('extra-mode-percentage');
-    if (emt) emt.checked = extraActive;
-    if (emp) emp.value   = extraPct;
-    updateExtraModeStatus(extraActive, extraPct);
-}
-
-function updateExtraModeStatus(active, pct) {
-    const txt = document.getElementById('extra-mode-status-text');
-    if (txt) {
-        txt.textContent = active
-            ? `Mode Extra activé : majoration de ${pct}% sur médicaments, analyses, services externes et consultations.`
-            : 'Mode Extra désactivé.';
-    }
-    document.querySelectorAll('[id*="extra-mode-badge"]').forEach(el => {
-        el.textContent = active ? `Mode Extra (+${pct}%)` : '';
-        el.classList.toggle('hidden', !active);
-    });
 }
 
 function updateExchangeRateDisplay() {
@@ -506,15 +506,12 @@ function setupNavigation() {
             document.getElementById(target).classList.add('active');
 
             if      (target === 'dashboard')      updateRoleDashboard();
-            else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); updateAssignedDoctorSelect(); loadAppointmentsList(); }
+            else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); loadAppointmentsList(); }
             else if (target === 'administration') updateAdminStats();
-            else if (target === 'pharmacy')       { updateMedicationStockDisplay(); state.pharmHospFilter = 'pending'; loadPharmacyHospPrescriptions(); }
+            else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
-            else if (target === 'nurse')          loadNurseHospList();
-            else if (target === 'cashier')        loadAllReceipts('today');
             else if (target === 'suppliers')      loadSuppliers();
-            else if (target === 'hospitalization') { closeHospDetail(); loadHospitalizations('active'); }
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
         });
     });
@@ -632,23 +629,6 @@ function setupExchangeRateSettings() {
             await apiCall(() => API.saveSettings({ ...state.hospitalSettings, exchangeRate: rate }));
             Object.assign(state.hospitalSettings, { exchangeRate: rate });
             toast(`Taux de change mis à jour: ${rate} HTG = 1 USD`);
-        } catch(e) {}
-    });
-}
-
-// ─── MODE EXTRA ────────────────────────────────────────────────
-function setupExtraModeSettings() {
-    document.getElementById('save-extra-mode-btn')?.addEventListener('click', async () => {
-        const active = document.getElementById('extra-mode-toggle').checked;
-        const pct    = parseFloat(document.getElementById('extra-mode-percentage').value) || 0;
-        if (active && pct <= 0) { toast('Indiquer un pourcentage supérieur à 0', 'error'); return; }
-        try {
-            await apiCall(() => API.saveSettings({ ...state.hospitalSettings, extraMode: active, extraModePercentage: pct }));
-            Object.assign(state.hospitalSettings, { extraMode: active ? 'true' : 'false', extraModePercentage: String(pct) });
-            updateExtraModeStatus(active, pct);
-            toast(active ? `Mode Extra activé (+${pct}%)` : 'Mode Extra désactivé');
-            // Recharger les catalogues pour refléter les nouveaux prix
-            await loadBaseData();
         } catch(e) {}
     });
 }
@@ -1122,55 +1102,17 @@ function updateConsultationTypesSelect() {
     });
 }
 
-async function updateAssignedDoctorSelect() {
-    const sel = document.getElementById('patient-assigned-doctor');
-    if (!sel) return;
-    const currentVal = sel.value;
-    try {
-        const users = await API.getUsers().catch(() => []);
-        const doctors = users.filter(u => (u.role === 'doctor' || (u.role === 'multi' && (u.extra_roles || '').split(',').map(s => s.trim()).includes('doctor'))) && u.active);
-        sel.innerHTML = '<option value="">Sélectionner un médecin...</option>' +
-            doctors.map(d => `<option value="${d.username}">${d.name}</option>`).join('');
-        if (currentVal) sel.value = currentVal;
-    } catch(e) {}
-}
-
 function updateExternalServicesOptions() {
     const container = document.getElementById('external-services-options');
     if (!container) return;
-    state.extSvcOptionsFull = state.externalServiceTypes.filter(s => s.active);
-    state.listPages['extSvcOptions'] = LIST_PAGE_SIZE;
-    container.innerHTML = '<div class="service-external-list"></div>';
-    appendExternalServicesOptions();
-}
-
-function appendExternalServicesOptions() {
-    const items = state.extSvcOptionsFull || [];
-    const total = items.length;
-    const container = document.getElementById('external-services-options');
-    if (!container) return;
-    const listWrap = container.querySelector('.service-external-list');
-    if (!listWrap) return;
-    const oldBtnWrap = container.querySelector('.load-more-wrap');
-    if (oldBtnWrap) oldBtnWrap.remove();
-    const shownCount = listWrap.querySelectorAll('.service-item.external-service-opt').length;
-    const pageLimit  = state.listPages['extSvcOptions'] || LIST_PAGE_SIZE;
-    items.slice(shownCount, pageLimit).forEach(s => {
-        const div = document.createElement('div');
-        div.className = 'service-item external-service-opt';
-        div.innerHTML = `<label>
+    let html = '<div class="service-external-list">';
+    state.externalServiceTypes.filter(s => s.active).forEach(s => {
+        html += `<div class="service-item"><label>
             <input type="checkbox" class="external-service-option" value="${s.id}" data-price="${s.price}">
-            ${s.name} — ${s.price} Gdes</label>`;
-        listWrap.appendChild(div);
+            ${s.name} — ${s.price} Gdes</label></div>`;
     });
-    if (pageLimit < total) {
-        const wrap = document.createElement('div');
-        wrap.className = 'load-more-wrap';
-        wrap.style.textAlign = 'center';
-        wrap.style.marginTop = '10px';
-        wrap.innerHTML = loadMoreButtonHtml('extSvcOptions', total, pageLimit, 'appendExternalServicesOptions');
-        container.appendChild(wrap);
-    }
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 function updateExternalServicesSelect() {
@@ -1194,12 +1136,9 @@ function syncExternalUI() {
     const extOnly = document.getElementById('external-only')?.checked;
     const isExt   = type === 'externe' || extOnly;
     document.getElementById('consultation-type-container')?.classList.toggle('hidden', isExt);
-    document.getElementById('assigned-doctor-container')?.classList.toggle('hidden', isExt);
     document.getElementById('external-services-selection')?.classList.toggle('hidden', !isExt);
     const ctSel = document.getElementById('consultation-type-secretary');
     if (ctSel) ctSel.required = !isExt;
-    const drSel = document.getElementById('patient-assigned-doctor');
-    if (drSel) drSel.required = !isExt;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1250,17 +1189,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const type               = document.querySelector('input[name="patient-type"]:checked').value;
         const externalOnly       = document.getElementById('external-only').checked;
         const consultationTypeId = parseInt(document.getElementById('consultation-type-secretary').value);
-        const assignedDoctorUsername = document.getElementById('patient-assigned-doctor').value;
 
         if (type !== 'externe' && !externalOnly && !consultationTypeId) {
             toast('Sélectionner un type de consultation', 'error'); return;
         }
-        if (type !== 'externe' && !externalOnly && !assignedDoctorUsername) {
-            toast('Sélectionner un médecin', 'error'); return;
-        }
-        const assignedDoctor = assignedDoctorUsername
-            ? (document.getElementById('patient-assigned-doctor').selectedOptions[0]?.textContent || '')
-            : '';
 
         const externalServices = [];
         document.querySelectorAll('.external-service-option:checked').forEach(cb => {
@@ -1279,8 +1211,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 externalOnly, consultationTypeId: externalOnly ? null : consultationTypeId,
                 modifiedConsultation: state.currentModifiedConsultation,
                 externalServices,
-                assignedDoctorUsername: externalOnly ? null : assignedDoctorUsername,
-                assignedDoctorName: externalOnly ? null : assignedDoctor,
             }));
 
             toast(`Patient enregistré ! ID: ${result.id}`);
@@ -1288,7 +1218,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('patient-normal').checked = true;
             document.getElementById('external-only').checked  = false;
             syncExternalUI();
-            document.getElementById('patient-assigned-doctor').value = '';
             document.getElementById('modify-consultation-type-btn')?.classList.add('hidden');
             document.getElementById('consultation-modification-secretary')?.classList.add('hidden');
             state.currentModifiedConsultation = null;
@@ -1372,83 +1301,227 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadExternalServicesList(patientId) {
     const txs = await API.getTransactions({ patientId, type: 'external' });
-    state.extSvcListFull = txs;
-    state.listPages['extSvcList'] = LIST_PAGE_SIZE;
-    renderExternalServicesList();
-}
-
-function renderExternalServicesList() {
-    const txs = state.extSvcListFull || [];
-    const total = txs.length;
     const container = document.getElementById('external-services-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p>Aucun service externe.</p>'; return; }
-    const page = pageSlice('extSvcList', txs);
-    container.innerHTML = page.map(t => `
+    if (!txs.length) { container.innerHTML = '<p>Aucun service externe.</p>'; return; }
+    container.innerHTML = txs.map(t => `
         <div class="service-item">
             <div>${t.service}</div>
             <div>${t.amount} Gdes</div>
             <div><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></div>
-        </div>`).join('') + loadMoreButtonHtml('extSvcList', total, page.length, 'renderExternalServicesList');
+        </div>`).join('');
+}
+
+
+// ─── TICKET PATIENT (Secrétariat + Médecin) ───────────────────
+async function openPatientTicket(patientId, patientName) {
+    var modal = document.getElementById('patient-ticket-modal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'patient-ticket-modal';
+    modal.className = 'transaction-details-modal';
+    modal.innerHTML =
+        '<div class="transaction-details-content" style="max-width:680px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+        '<h4><i class="fas fa-receipt" style="color:var(--primary);"></i> Ticket — ' + patientName + ' <small class="text-muted">#' + patientId + '</small></h4>' +
+        '<button class="btn btn-sm btn-secondary" onclick="document.getElementById(\'patient-ticket-modal\').remove()"><i class="fas fa-times"></i></button>' +
+        '</div>' +
+        '<div id="ticket-body"><div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div></div>' +
+
+        // Ajouter un service
+        '<div class="card mt-3" style="background:#f8f9fa;">' +
+        '<h5><i class="fas fa-plus-circle" style="color:#28a745;"></i> Ajouter au ticket</h5>' +
+        '<div class="add-form-grid" style="margin-top:10px;">' +
+        '<div><label class="form-label">Type</label>' +
+        '<select id="ticket-add-type" class="form-control" onchange="onTicketTypeChange()">' +
+        '<option value="consultation">Consultation</option>' +
+        '<option value="lab">Analyse laboratoire</option>' +
+        '<option value="medication">Médicament</option>' +
+        '<option value="external">Service externe</option>' +
+        '</select></div>' +
+        '<div id="ticket-service-select"><label class="form-label">Service</label>' +
+        '<select id="ticket-service" class="form-control" onchange="onTicketServiceChange()"></select></div>' +
+        '<div id="ticket-qty-div" style="display:none;"><label class="form-label">Quantité</label>' +
+        '<input type="number" id="ticket-qty" class="form-control" value="1" min="1"></div>' +
+        '<div><label class="form-label">Prix (HTG)</label>' +
+        '<input type="number" id="ticket-price" class="form-control" placeholder="0.00" min="0"></div>' +
+        '<div style="display:flex;align-items:flex-end;">' +
+        '<button class="btn btn-success" style="width:100%;" data-pid="' + patientId + '" data-pname="' + patientName + '" onclick="addToTicket(this.dataset.pid,this.dataset.pname)">' +
+        '<i class="fas fa-plus"></i> Ajouter</button></div>' +
+        '</div></div>' +
+
+        '<div class="d-flex gap-10 mt-3">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'patient-ticket-modal\').remove()">Fermer</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+
+    // Charger les services selon le type par défaut
+    await loadTicketServices('consultation');
+    await loadTicketTransactions(patientId);
+}
+
+async function loadTicketTransactions(patientId) {
+    var body = document.getElementById('ticket-body');
+    if (!body) return;
+    try {
+        var txs = await API.getTransactions({ patientId: patientId });
+        if (!txs.length) {
+            body.innerHTML = '<div class="alert alert-info">Aucune transaction pour ce patient.</div>';
+            return;
+        }
+        var totPaid   = txs.filter(function(t){return t.status==='paid';}).reduce(function(s,t){return s+parseFloat(t.amount);},0);
+        var totUnpaid = txs.filter(function(t){return t.status==='unpaid';}).reduce(function(s,t){return s+parseFloat(t.amount);},0);
+        body.innerHTML =
+            '<div class="d-flex gap-10 mb-2 flex-wrap">' +
+            '<span style="background:#d4edda;padding:6px 12px;border-radius:8px;font-size:.85rem;">✅ Payé: <strong>' + totPaid.toLocaleString('fr-FR') + ' HTG</strong></span>' +
+            '<span style="background:#f8d7da;padding:6px 12px;border-radius:8px;font-size:.85rem;">⏳ Non payé: <strong>' + totUnpaid.toLocaleString('fr-FR') + ' HTG</strong></span>' +
+            '</div>' +
+            '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th><th>Action</th></tr></thead><tbody>' +
+            txs.map(function(t) {
+                var amt = parseFloat(t.amount);
+                return '<tr>' +
+                    '<td>' + (t.date||'-') + '</td>' +
+                    '<td>' + t.service + '</td>' +
+                    '<td><strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
+                    '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
+                    '<td><button class="btn btn-xs btn-danger" data-tid="' + t.id + '" onclick="removeFromTicket(this.dataset.tid)">' +
+                    '<i class="fas fa-trash"></i></button></td></tr>';
+            }).join('') +
+            '</tbody></table></div>';
+    } catch(e) {
+        body.innerHTML = '<div class="alert alert-danger">Erreur chargement</div>';
+    }
+}
+
+async function loadTicketServices(type) {
+    var sel = document.getElementById('ticket-service');
+    var qtyDiv = document.getElementById('ticket-qty-div');
+    if (!sel) return;
+    var options = [];
+    if (type === 'consultation') {
+        options = state.consultationTypes.filter(function(c){return c.active;}).map(function(c){
+            return { id: c.id, label: c.name, price: c.price };
+        });
+        if (qtyDiv) qtyDiv.style.display = 'none';
+    } else if (type === 'lab') {
+        options = state.labAnalysisTypes.filter(function(a){return a.active;}).map(function(a){
+            return { id: a.id, label: a.name, price: a.price };
+        });
+        if (qtyDiv) qtyDiv.style.display = 'none';
+    } else if (type === 'medication') {
+        options = (state.medications||[]).map(function(m){
+            return { id: m.id, label: m.name + ' (' + m.quantity + ' en stock)', price: m.price };
+        });
+        if (qtyDiv) qtyDiv.style.display = 'block';
+    } else if (type === 'external') {
+        options = state.externalServiceTypes.filter(function(s){return s.active;}).map(function(s){
+            return { id: s.id, label: s.name, price: s.price };
+        });
+        if (qtyDiv) qtyDiv.style.display = 'none';
+    }
+    sel.innerHTML = options.map(function(o){
+        return '<option value="' + o.id + '" data-price="' + o.price + '">' + o.label + ' — ' + parseFloat(o.price).toLocaleString('fr-FR') + ' HTG</option>';
+    }).join('') || '<option>Aucun disponible</option>';
+    onTicketServiceChange();
+}
+
+function onTicketTypeChange() {
+    var type = document.getElementById('ticket-add-type').value;
+    loadTicketServices(type);
+}
+
+function onTicketServiceChange() {
+    var sel = document.getElementById('ticket-service');
+    var priceEl = document.getElementById('ticket-price');
+    if (!sel || !priceEl) return;
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.price) priceEl.value = opt.dataset.price;
+}
+
+async function addToTicket(patientId, patientName) {
+    var type    = document.getElementById('ticket-add-type').value;
+    var sel     = document.getElementById('ticket-service');
+    var price   = parseFloat(document.getElementById('ticket-price').value) || 0;
+    var qty     = parseInt(document.getElementById('ticket-qty')?.value) || 1;
+    var opt     = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) { toast('Sélectionner un service', 'error'); return; }
+    var serviceId = opt.value;
+    var serviceName = opt.text.split(' —')[0];
+    var serviceLabel = {consultation:'Consultation',lab:'Analyse',medication:'Médicament',external:'Service'}[type] || type;
+    var totalPrice = type === 'medication' ? price * qty : price;
+    var data = {
+        patientId:   patientId,
+        patientName: patientName,
+        service:     serviceLabel + ': ' + serviceName,
+        amount:      totalPrice,
+        type:        type,
+    };
+    if (type === 'consultation') data.consultationTypeId = serviceId;
+    if (type === 'lab')          data.analysisId         = serviceId;
+    if (type === 'medication')   { data.medicationId = serviceId; data.quantity = qty; }
+    try {
+        await apiCall(function() { return API.addTransaction(data); });
+        toast(serviceLabel + ' ajouté au ticket !', 'success');
+        await loadTicketTransactions(patientId);
+    } catch(e) {}
+}
+
+async function removeFromTicket(txId) {
+    if (!confirm('Supprimer cette ligne du ticket ?')) return;
+    try {
+        await apiCall(function() { return API.deleteTransaction(txId); });
+        toast('Ligne supprimée', 'warning');
+        // Recharger le ticket
+        var modal = document.getElementById('patient-ticket-modal');
+        if (modal) {
+            var pid = modal.querySelector('[data-pid]')?.dataset.pid;
+            if (pid) await loadTicketTransactions(pid);
+        }
+    } catch(e) {}
 }
 
 async function updateTodayPatientsList() {
     const today = new Date().toISOString().split('T')[0];
     try {
         const patients = await API.getPatients({ date: today });
-        state.todayPatientsFull = patients;
-        state.listPages['todayPatients'] = LIST_PAGE_SIZE;
-        renderTodayPatientsList();
+        const tbody = document.getElementById('today-patients-list');
+        tbody.innerHTML = patients.map(function(p) {
+            return '<tr>' +
+                '<td><strong>' + p.id + '</strong></td>' +
+                '<td>' + p.full_name + '</td>' +
+                '<td>' + (p.phone||'-') + '</td>' +
+                '<td>' + p.type + '</td>' +
+                '<td>' + (p.vip ? '<span class="vip-tag">VIP</span>' : p.sponsored ? '<span class="badge badge-primary">Sponsorisé ' + p.discount_percentage + '%</span>' : '-') + '</td>' +
+                '<td><div class="d-flex gap-10">' +
+                '<button class="btn btn-sm btn-primary" data-pid="' + p.id + '" data-pname="' + p.full_name + '" onclick="openPatientTicket(this.dataset.pid,this.dataset.pname)">' +
+                '<i class="fas fa-receipt"></i> Ticket</button>' +
+                '<button class="btn btn-sm btn-secondary" data-pid="' + p.id + '" onclick="printPatientCard(this.dataset.pid)">' +
+                '<i class="fas fa-id-card"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('') || '<tr><td colspan="6">Aucun patient aujourd\'hui</td></tr>';
     } catch(e) {}
-}
-
-function renderTodayPatientsList() {
-    const patients = state.todayPatientsFull || [];
-    const total = patients.length;
-    const tbody = document.getElementById('today-patients-list');
-    if (!tbody) return;
-    if (!total) { tbody.innerHTML = '<tr><td colspan="6">Aucun patient aujourd\'hui</td></tr>'; return; }
-    const page = pageSlice('todayPatients', patients);
-    tbody.innerHTML = page.map(p => `
-        <tr>
-            <td>${p.id}</td><td>${p.full_name}</td><td>${p.phone}</td>
-            <td>${p.type}</td>
-            <td>${p.vip?'<span class="vip-tag">VIP</span>':p.sponsored?`<span class="badge badge-primary">Sponsorisé ${p.discount_percentage}%</span>`:'-'}</td>
-            <td><button class="btn btn-sm btn-secondary" onclick="printPatientCard('${p.id}')"><i class="fas fa-id-card"></i></button></td>
-        </tr>`).join('') + loadMoreButtonHtml('todayPatients', total, page.length, 'renderTodayPatientsList', 6);
 }
 
 async function loadAppointmentsList() {
     try {
         const today = new Date().toISOString().split('T')[0];
         const apps = await API.getAppointments({ fromDate: today });
-        state.apptListFull = apps;
-        state.listPages['apptList'] = LIST_PAGE_SIZE;
-        renderAppointmentsList();
-    } catch(e) {}
-}
-
-function renderAppointmentsList() {
-    const apps = state.apptListFull || [];
-    const total = apps.length;
-    const container = document.getElementById('appointments-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun rendez-vous programmé.</p>'; return; }
-    const page = pageSlice('apptList', apps);
-    container.innerHTML = page.map(a => `
-        <div class="appointment-item">
-            <div class="d-flex justify-between">
-                <div>
-                    <strong>${a.patient_name}</strong> — ${a.date} à ${a.time}<br>
-                    <small class="text-muted">Motif: ${a.reason||'-'} | Médecin: ${a.doctor||'-'}</small>
+        const container = document.getElementById('appointments-list');
+        container.innerHTML = apps.map(a => `
+            <div class="appointment-item">
+                <div class="d-flex justify-between">
+                    <div>
+                        <strong>${a.patient_name}</strong> — ${a.date} à ${a.time}<br>
+                        <small class="text-muted">Motif: ${a.reason||'-'} | Médecin: ${a.doctor||'-'}</small>
+                    </div>
+                    <span class="appointment-status status-${a.status==='scheduled'?'pending':a.status}">${a.status}</span>
                 </div>
-                <span class="appointment-status status-${a.status==='scheduled'?'pending':a.status}">${a.status}</span>
-            </div>
-            <div class="appointment-actions">
-                <button class="btn btn-sm btn-success" onclick="updateApptStatus('${a.id}','confirmed')">Confirmer</button>
-                <button class="btn btn-sm btn-danger" onclick="updateApptStatus('${a.id}','cancelled')">Annuler</button>
-            </div>
-        </div>`).join('') + loadMoreButtonHtml('apptList', total, page.length, 'renderAppointmentsList');
+                <div class="appointment-actions">
+                    <button class="btn btn-sm btn-success" onclick="updateApptStatus('${a.id}','confirmed')">Confirmer</button>
+                    <button class="btn btn-sm btn-danger" onclick="updateApptStatus('${a.id}','cancelled')">Annuler</button>
+                </div>
+            </div>`).join('') || '<p class="text-muted">Aucun rendez-vous programmé.</p>';
+    } catch(e) {}
 }
 
 async function updateApptStatus(id, status) {
@@ -1499,8 +1572,6 @@ async function loadCashierReports(period) {
             const m = t.payment_method || 'espèces';
             byMethod[m] = (byMethod[m] || 0) + parseFloat(t.amount);
         });
-        state.cashierReportTxsFull = txs;
-        state.listPages['cashierReportTxs'] = LIST_PAGE_SIZE;
         const container = document.getElementById('cashier-report-result');
         container.innerHTML = `
             <div class="exchange-banner mb-3">
@@ -1521,20 +1592,10 @@ async function loadCashierReports(period) {
                     <div class="stat-info"><h3>${v.toLocaleString('fr-FR', {minimumFractionDigits:2})} HTG</h3><p>${m}</p></div>
                 </div>`).join('')}
             </div>
-            <div class="table-container mt-3" id="cashier-report-table-wrap"></div>`;
-        renderCashierReportTable();
-    } catch(e) {}
-}
-
-function renderCashierReportTable() {
-    const txs = state.cashierReportTxsFull || [];
-    const total = txs.length;
-    const wrap = document.getElementById('cashier-report-table-wrap');
-    if (!wrap) return;
-    const page = pageSlice('cashierReportTxs', txs);
-    wrap.innerHTML = `<table>
+            <div class="table-container mt-3">
+                <table>
                     <thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant HTG</th><th>USD</th><th>Méthode</th></tr></thead>
-                    <tbody>${page.map(t => `
+                    <tbody>${txs.map(t => `
                         <tr>
                             <td>${t.date} ${t.payment_time||''}</td>
                             <td>${t.patient_name}</td>
@@ -1544,7 +1605,9 @@ function renderCashierReportTable() {
                             <td>${t.payment_method||'-'}</td>
                         </tr>`).join('')}
                     </tbody>
-                </table>` + loadMoreButtonHtml('cashierReportTxs', total, page.length, 'renderCashierReportTable');
+                </table>
+            </div>`;
+    } catch(e) {}
 }
 
 // ─── CAISSE ───────────────────────────────────────────────────
@@ -1589,9 +1652,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const method = document.querySelector('.payment-method.active')?.dataset.method;
         const ids = state.selectedServices.map(s => s.id);
         try {
-            const payResult = await apiCall(() => API.payTransactions(ids, method));
-            const receiptNumber = payResult && payResult.receiptNumber;
-            generateInvoice(totalHTG, givenHTG, payCurrency, method, receiptNumber);
+            await apiCall(() => API.payTransactions(ids, method));
+            generateInvoice(totalHTG, givenHTG, payCurrency, method);
 
             // ── Notifications cross-département ciblées ──
             const txTypes = state.selectedServices.map(s => s.type);
@@ -1615,159 +1677,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${patientName} — ${totalHTG.toFixed(2)} HTG ($${htgToUsd(totalHTG)}) via ${method||'espèces'}. Agent: ${state.currentUser.name}`);
 
             // Afficher modal impression
-            showPrintModal(totalHTG, givenHTG, payCurrency, method, receiptNumber);
-            if (document.getElementById('all-receipts-list')) loadAllReceipts(state.allReceiptsFilter);
+            showPrintModal(totalHTG, givenHTG, payCurrency, method);
         } catch(e) {}
     });
 });
-
-// ── Registre de tous les reçus générés ─────────────────────────
-async function loadAllReceipts(filter) {
-    try {
-        var params = {};
-        if (filter === 'today') {
-            var today = new Date().toISOString().split('T')[0];
-            params = { fromDate: today, toDate: today };
-        }
-        state.allReceiptsFilter = filter;
-        state.allReceiptsFull = await apiCall(() => API.getAllReceipts(params));
-        state.listPages['allReceipts'] = LIST_PAGE_SIZE;
-        renderAllReceiptsList();
-    } catch(e) {}
-}
-
-function renderAllReceiptsList() {
-    const receipts = state.allReceiptsFull || [];
-    const total = receipts.length;
-    const container = document.getElementById('all-receipts-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun reçu trouvé.</p>'; return; }
-    const page = pageSlice('allReceipts', receipts);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>N° Reçu</th><th>Patient</th><th>Date</th><th>Montant</th><th>Méthode</th><th>Agent</th><th></th></tr></thead><tbody>' +
-        page.map(r => `<tr>
-            <td><strong>${r.receipt_number}</strong></td>
-            <td>${r.patient_name} <small class="text-muted">#${r.patient_id}</small></td>
-            <td>${r.date||'-'} ${r.payment_time||''}</td>
-            <td>${parseFloat(r.total).toFixed(2)} HTG</td>
-            <td>${r.payment_method||'-'}</td>
-            <td>${r.payment_agent||'-'}</td>
-            <td><button class="btn btn-sm btn-primary" onclick="viewReceiptFromRegistry('${r.receipt_number}')"><i class="fas fa-eye"></i> Voir</button></td>
-        </tr>`).join('') + '</tbody></table></div>' +
-        loadMoreButtonHtml('allReceipts', total, page.length, 'renderAllReceiptsList');
-}
-
-async function viewReceiptFromRegistry(receiptNumber) {
-    document.getElementById('receipt-search-input').value = receiptNumber;
-    try {
-        const txs = await apiCall(() => API.getReceipt(receiptNumber));
-        state.currentReceiptTxs = txs;
-        state.receiptCameFromPatientId = null;
-        renderReceiptResult(receiptNumber);
-        document.getElementById('receipt-search-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch(e) {}
-}
-
-// ── Recherche et modification de reçu ─────────────────────────
-async function searchReceipt() {
-    const raw = document.getElementById('receipt-search-input').value.trim().toUpperCase();
-    if (!raw) { toast('Entrer un numéro de reçu ou un ID patient', 'error'); return; }
-    const container = document.getElementById('receipt-search-result');
-    try {
-        if (raw.startsWith('REC')) {
-            const txs = await apiCall(() => API.getReceipt(raw));
-            state.currentReceiptTxs = txs;
-            if (!txs.length) {
-                container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Aucun reçu trouvé pour "' + raw + '".</div>';
-                return;
-            }
-            state.receiptCameFromPatientId = null;
-            renderReceiptResult(raw);
-        } else {
-            const receipts = await apiCall(() => API.getReceiptsByPatient(raw));
-            if (!receipts.length) {
-                container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Aucun reçu trouvé pour le patient "' + raw + '".</div>';
-                return;
-            }
-            state.patientReceiptsFull = receipts;
-            state.currentPatientReceiptsId = raw;
-            state.listPages['patientReceipts'] = LIST_PAGE_SIZE;
-            renderPatientReceiptsList();
-        }
-    } catch(e) {}
-}
-
-function renderPatientReceiptsList() {
-    const receipts = state.patientReceiptsFull || [];
-    const total = receipts.length;
-    const container = document.getElementById('receipt-search-result');
-    if (!container) return;
-    const page = pageSlice('patientReceipts', receipts);
-    const first = receipts[0];
-    container.innerHTML = `
-        <div class="card" style="background:#f8f9fa;">
-            <h4><i class="fas fa-user"></i> Reçus de ${first ? first.patient_name : ''} <small class="text-muted">(#${state.currentPatientReceiptsId})</small></h4>
-            <p class="text-muted" style="font-size:.85rem;">${total} reçu(s) trouvé(s)</p>
-            <div class="table-container mt-2">
-                <table><thead><tr><th>N° Reçu</th><th>Date</th><th>Montant</th><th>Méthode</th><th>Lignes</th><th></th></tr></thead><tbody>
-                ${page.map(r => `<tr>
-                    <td><strong>${r.receipt_number}</strong></td>
-                    <td>${r.date||'-'} ${r.payment_time||''}</td>
-                    <td>${parseFloat(r.total).toFixed(2)} HTG</td>
-                    <td>${r.payment_method||'-'}</td>
-                    <td>${r.items}</td>
-                    <td><button class="btn btn-sm btn-primary" onclick="viewReceiptFromPatientList('${r.receipt_number}')"><i class="fas fa-eye"></i> Voir</button></td>
-                </tr>`).join('')}
-                </tbody></table>
-            </div>
-        </div>` + loadMoreButtonHtml('patientReceipts', total, page.length, 'renderPatientReceiptsList');
-}
-
-async function viewReceiptFromPatientList(receiptNumber) {
-    try {
-        const txs = await apiCall(() => API.getReceipt(receiptNumber));
-        state.currentReceiptTxs = txs;
-        state.receiptCameFromPatientId = state.currentPatientReceiptsId;
-        renderReceiptResult(receiptNumber);
-    } catch(e) {}
-}
-
-function backToPatientReceipts() {
-    document.getElementById('receipt-search-input').value = state.currentPatientReceiptsId || '';
-    renderPatientReceiptsList();
-}
-
-function renderReceiptResult(num) {
-    const txs = state.currentReceiptTxs || [];
-    const container = document.getElementById('receipt-search-result');
-    if (!container || !txs.length) return;
-    const total = txs.reduce((s,t) => s + parseFloat(t.amount), 0);
-    const first = txs[0];
-    const canEdit = state.currentRole === 'admin' || state.currentRole === 'sub_admin' || state.currentRole === 'cashier';
-    container.innerHTML = `
-        <div class="card" style="background:#f8f9fa;">
-            ${state.receiptCameFromPatientId ? `<button class="btn btn-sm btn-secondary mb-2" onclick="backToPatientReceipts()"><i class="fas fa-arrow-left"></i> Retour aux reçus du patient</button>` : ''}
-            <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:10px;">
-                <div>
-                    <h4><i class="fas fa-receipt"></i> ${num}</h4>
-                    <p class="text-muted">${first.patient_name} (#${first.patient_id}) — ${first.date||'-'} ${first.payment_time||''} — ${first.payment_method||'-'}</p>
-                </div>
-                <div style="text-align:right;">
-                    <strong style="font-size:1.1rem;">${formatHTG(total)}</strong>
-                </div>
-            </div>
-            <div class="table-container mt-2">
-                <table><thead><tr><th>Service</th><th>Montant</th><th>Statut</th>${canEdit?'<th>Action</th>':''}</tr></thead><tbody>
-                ${txs.map(t => `<tr>
-                    <td>${t.service}</td>
-                    <td>${parseFloat(t.amount).toFixed(2)} HTG</td>
-                    <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td>
-                    ${canEdit?`<td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction('${t.id}')"><i class="fas fa-edit"></i></button></td>`:''}
-                </tr>`).join('')}
-                </tbody></table>
-            </div>
-            ${!canEdit ? '<p class="text-muted mt-2" style="font-size:.8rem;"><i class="fas fa-info-circle"></i> Seul un administrateur peut modifier un reçu.</p>' : ''}
-        </div>`;
-}
 
 async function loadServicesForPayment(patient) {
     const txs = await API.getTransactions({ patientId: patient.id, status: 'unpaid' });
@@ -1811,7 +1724,7 @@ async function loadServicesForPayment(patient) {
     });
 }
 
-function generateInvoice(totalHTG, givenHTG, payCurrency, method, receiptNumber) {
+function generateInvoice(totalHTG, givenHTG, payCurrency, method) {
     const p = state.currentCashierPatient;
     const s = state.hospitalSettings;
     const change = givenHTG - totalHTG;
@@ -1829,7 +1742,7 @@ function generateInvoice(totalHTG, givenHTG, payCurrency, method, receiptNumber)
     document.getElementById('invoice-amount-given').textContent  = `${givenHTG.toFixed(2)} HTG (donné en ${payCurrency})`;
     document.getElementById('invoice-change').textContent        = `${change.toFixed(2)} HTG ≈ $${htgToUsd(change)}`;
     document.getElementById('invoice-payment-method').textContent = method;
-    document.getElementById('invoice-number').textContent         = receiptNumber || 'INV-' + Date.now();
+    document.getElementById('invoice-number').textContent         = 'INV-' + Date.now();
     document.getElementById('invoice-services-list').innerHTML    = state.selectedServices.map(s =>
         `<div class="receipt-item"><span>${s.service}</span><span>${s.finalAmount.toFixed(2)} HTG</span></div>`
     ).join('');
@@ -1894,48 +1807,13 @@ async function loadVitalsHistory(patientId) {
     const vitals = await API.getVitals(patientId);
     const container = document.getElementById('vitals-history');
     if (!vitals.length) { container.innerHTML = '<p class="text-muted">Aucun signe vital.</p>'; return; }
-    state.vitalsHistoryFull = vitals;
-    state.listPages['vitalsHistory'] = LIST_PAGE_SIZE;
-    renderVitalsHistory();
-}
-
-function renderVitalsHistory() {
-    const vitals = state.vitalsHistoryFull || [];
-    const total = vitals.length;
-    const container = document.getElementById('vitals-history');
-    if (!container) return;
     const activeVitals = state.vitalTypes.filter(v => v.active);
-    const page = pageSlice('vitalsHistory', vitals);
-    const colspan = activeVitals.length + 2;
     container.innerHTML = `<div class="table-container"><table><thead><tr><th>Date/Heure</th>${activeVitals.map(v=>`<th>${v.name}</th>`).join('')}<th>Par</th></tr></thead><tbody>
-        ${page.map(r=>`<tr><td>${r.date} ${r.time}</td>${activeVitals.map(v=>{const val=r.values[v.name];return`<td>${val?val.value+' '+val.unit:'-'}</td>`;}).join('')}<td>${r.taken_by}</td></tr>`).join('')}
-        ${loadMoreButtonHtml('vitalsHistory', total, page.length, 'renderVitalsHistory', colspan)}
+        ${vitals.map(r=>`<tr><td>${r.date} ${r.time}</td>${activeVitals.map(v=>{const val=r.values[v.name];return`<td>${val?val.value+' '+val.unit:'-'}</td>`;}).join('')}<td>${r.taken_by}</td></tr>`).join('')}
     </tbody></table></div>`;
 }
 
 // ─── MÉDECIN ─────────────────────────────────────────────────
-function renderDoctorLabResults() {
-    const labResults = state.doctorLabResultsFull || [];
-    const total = labResults.length;
-    const labResultsContainer = document.getElementById('doctor-lab-results');
-    if (!labResultsContainer) return;
-    if (!total) { labResultsContainer.innerHTML = '<p class="text-muted">Aucun résultat disponible.</p>'; return; }
-    const page = pageSlice('doctorLabResults', labResults);
-    labResultsContainer.innerHTML = page.map(t => `
-                        <div class="card mb-2" style="border-left-color:#17a2b8;">
-                            <div class="d-flex justify-between align-center">
-                                <div>
-                                    <h5 style="color:#17a2b8;">${t.service}</h5>
-                                    <small class="text-muted">${t.date} — ${t.lab_status === 'completed' ? '<span class="status-paid">Complété</span>' : 'En cours'}</small>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                ${t.result && t.result.startsWith('data:') 
-                                    ? `<img src="${t.result}" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #e2ecf8;">` 
-                                    : `<div class="alert alert-info" style="white-space:pre-wrap;font-size:.88rem;">${t.result}</div>`}
-                            </div>
-                        </div>`).join('') + loadMoreButtonHtml('doctorLabResults', total, page.length, 'renderDoctorLabResults');
-}
 function updateDoctorConsultationTypes() {
     const sel = document.getElementById('doctor-consultation-type');
     if (!sel) return;
@@ -1946,40 +1824,36 @@ function updateDoctorConsultationTypes() {
 }
 
 function updateLabAnalysesSelect() {
-    const container = document.getElementById('lab-analyses-selection');
+    var container = document.getElementById('lab-analyses-selection');
     if (!container) return;
-    state.labAnalysesSelectFull = state.labAnalysisTypes.filter(a => a.active);
-    state.listPages['labAnalysesSelect'] = LIST_PAGE_SIZE;
-    container.innerHTML = '';
-    appendLabAnalysesSelect();
-}
-
-function appendLabAnalysesSelect() {
-    const items = state.labAnalysesSelectFull || [];
-    const total = items.length;
-    const container = document.getElementById('lab-analyses-selection');
-    if (!container) return;
-    const oldBtnWrap = container.querySelector('.load-more-wrap');
-    if (oldBtnWrap) oldBtnWrap.remove();
-    const shownCount = container.querySelectorAll('label.lab-analysis-option').length;
-    const pageLimit  = state.listPages['labAnalysesSelect'] || LIST_PAGE_SIZE;
-    items.slice(shownCount, pageLimit).forEach(a => {
-        const label = document.createElement('label');
-        label.className = 'lab-analysis-option';
-        label.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;';
-        label.innerHTML = `<input type="checkbox" value="${a.id}" data-price="${a.price}" style="accent-color:var(--primary);">
-            ${a.name} <span class="badge badge-primary">${a.price} Gdes</span>
-            <span class="result-type-badge ${a.result_type==='image'?'result-type-image':'result-type-text'}">${a.result_type==='image'?'Image':'Texte'}</span>`;
-        container.appendChild(label);
-    });
-    if (pageLimit < total) {
-        const wrap = document.createElement('div');
-        wrap.className = 'load-more-wrap';
-        wrap.style.textAlign = 'center';
-        wrap.style.marginTop = '10px';
-        wrap.innerHTML = loadMoreButtonHtml('labAnalysesSelect', total, pageLimit, 'appendLabAnalysesSelect');
-        container.appendChild(wrap);
+    var active = state.labAnalysisTypes.filter(function(a) { return a.active; });
+    var PAGE = 10;
+    var showing = PAGE;
+    function renderLab() {
+        var visible  = active.slice(0, showing);
+        var remaining = active.length - showing;
+        container.innerHTML = visible.map(function(a) {
+            return '<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;">' +
+                '<input type="checkbox" value="' + a.id + '" data-price="' + a.price + '" style="accent-color:var(--primary);">' +
+                a.name + ' <span class="badge badge-primary">' + a.price + ' Gdes</span>' +
+                '<span class="result-type-badge ' + (a.result_type==='image'?'result-type-image':'result-type-text') + '">' +
+                (a.result_type==='image'?'Image':'Texte') + '</span></label>';
+        }).join('') +
+        (remaining > 0 ?
+            '<div style="text-align:center;margin-top:8px;">' +
+            '<button class="btn btn-sm btn-secondary" id="lab-show-more">' +
+            '<i class="fas fa-chevron-down"></i> Voir ' + remaining + ' de plus</button></div>'
+        : (active.length > PAGE ?
+            '<div style="text-align:center;margin-top:8px;">' +
+            '<button class="btn btn-sm btn-secondary" id="lab-show-less">' +
+            '<i class="fas fa-chevron-up"></i> Réduire</button></div>'
+        : ''));
+        var btnMore = document.getElementById('lab-show-more');
+        var btnLess = document.getElementById('lab-show-less');
+        if (btnMore) btnMore.addEventListener('click', function() { showing = active.length; renderLab(); });
+        if (btnLess) btnLess.addEventListener('click', function() { showing = PAGE; renderLab(); });
     }
+    renderLab();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2015,10 +1889,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const labResults = labTxs.filter(t => t.result);
             const labResultsContainer = document.getElementById('doctor-lab-results');
             if (labResultsContainer) {
-                state.doctorLabResultsFull = labResults;
-                state.listPages['doctorLabResults'] = LIST_PAGE_SIZE;
-                renderDoctorLabResults();
-                labResultsContainer.closest('.card').classList.remove('hidden');
+                if (labResults.length > 0) {
+                    labResultsContainer.innerHTML = labResults.map(t => `
+                        <div class="card mb-2" style="border-left-color:#17a2b8;">
+                            <div class="d-flex justify-between align-center">
+                                <div>
+                                    <h5 style="color:#17a2b8;">${t.service}</h5>
+                                    <small class="text-muted">${t.date} — ${t.lab_status === 'completed' ? '<span class="status-paid">Complété</span>' : 'En cours'}</small>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                ${t.result && t.result.startsWith('data:') 
+                                    ? `<img src="${t.result}" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #e2ecf8;">` 
+                                    : `<div class="alert alert-info" style="white-space:pre-wrap;font-size:.88rem;">${t.result}</div>`}
+                            </div>
+                        </div>`).join('');
+                    labResultsContainer.closest('.card').classList.remove('hidden');
+                } else {
+                    labResultsContainer.innerHTML = '<p class="text-muted">Aucun résultat disponible.</p>';
+                    labResultsContainer.closest('.card').classList.remove('hidden');
+                }
             }
 
             // Signes vitaux récents
@@ -2202,28 +2092,17 @@ async function loadDoctorAppointments() {
     try {
         const today = new Date().toISOString().split('T')[0];
         const apps = await API.getAppointments({ doctor: state.currentUser.username, fromDate: today });
-        state.docApptFull = apps;
-        state.listPages['docAppt'] = LIST_PAGE_SIZE;
-        renderDoctorAppointments();
+        const container = document.getElementById('doctor-appointments-list');
+        container.innerHTML = apps.map(a=>`
+            <div class="appointment-item">
+                <strong>${a.patient_name}</strong> — ${a.date} à ${a.time}<br>
+                <small class="text-muted">Motif: ${a.reason||'-'}</small>
+                <span class="appointment-status status-${a.status==='scheduled'?'pending':a.status} ms-2">${a.status}</span>
+                <div class="appointment-actions">
+                    <button class="btn btn-sm btn-success" onclick="updateApptStatus('${a.id}','completed')">Terminé</button>
+                </div>
+            </div>`).join('') || '<p class="text-muted">Aucun rendez-vous.</p>';
     } catch(e) {}
-}
-
-function renderDoctorAppointments() {
-    const apps = state.docApptFull || [];
-    const total = apps.length;
-    const container = document.getElementById('doctor-appointments-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun rendez-vous.</p>'; return; }
-    const page = pageSlice('docAppt', apps);
-    container.innerHTML = page.map(a=>`
-        <div class="appointment-item">
-            <strong>${a.patient_name}</strong> — ${a.date} à ${a.time}<br>
-            <small class="text-muted">Motif: ${a.reason||'-'}</small>
-            <span class="appointment-status status-${a.status==='scheduled'?'pending':a.status} ms-2">${a.status}</span>
-            <div class="appointment-actions">
-                <button class="btn btn-sm btn-success" onclick="updateApptStatus('${a.id}','completed')">Terminé</button>
-            </div>
-        </div>`).join('') + loadMoreButtonHtml('docAppt', total, page.length, 'renderDoctorAppointments');
 }
 
 // ─── LABORATOIRE ─────────────────────────────────────────────
@@ -2244,23 +2123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('lab-payment-status').textContent = statusText;
             document.getElementById('lab-payment-status').className   = `patient-status-badge ${statusClass}`;
             const labList = document.getElementById('lab-analyses-list');
-            state.labPatientTxsFull = txs;
-            state.listPages['labPatientTxs'] = LIST_PAGE_SIZE;
-            renderLabPatientAnalyses();
-            document.getElementById('lab-patient-details').classList.remove('hidden');
-            updatePendingAnalysesList();
-        } catch(e) {}
-    });
-});
-
-function renderLabPatientAnalyses() {
-    const txs = state.labPatientTxsFull || [];
-    const total = txs.length;
-    const labList = document.getElementById('lab-analyses-list');
-    if (!labList) return;
-    if (!total) { labList.innerHTML = '<p class="text-muted">Aucune analyse.</p>'; return; }
-    const page = pageSlice('labPatientTxs', txs);
-    labList.innerHTML = page.map(t=>`
+            labList.innerHTML = txs.map(t=>`
                 <div class="card mb-2">
                     <div class="d-flex justify-between align-center">
                         <div>
@@ -2274,30 +2137,24 @@ function renderLabPatientAnalyses() {
                         </div>
                     </div>
                     ${t.result?`<div class="mt-2"><strong>Résultat:</strong><br>${t.result.startsWith('data:')?`<img src="${t.result}" class="image-preview">`:t.result}</div>`:''}
-                </div>`).join('') + loadMoreButtonHtml('labPatientTxs', total, page.length, 'renderLabPatientAnalyses');
-}
+                </div>`).join('') || '<p class="text-muted">Aucune analyse.</p>';
+            document.getElementById('lab-patient-details').classList.remove('hidden');
+            updatePendingAnalysesList();
+        } catch(e) {}
+    });
+});
 
 async function updatePendingAnalysesList() {
     try {
         const txs = await API.getTransactions({ type: 'lab' });
         const pending = txs.filter(t=>t.status==='paid'&&t.lab_status!=='completed');
-        state.pendingAnalysesFull = pending;
-        state.listPages['pendingAnalyses'] = LIST_PAGE_SIZE;
-        renderPendingAnalysesList();
-    } catch(e) {}
-}
-
-function renderPendingAnalysesList() {
-    const pending = state.pendingAnalysesFull || [];
-    const total = pending.length;
-    const container = document.getElementById('pending-analyses-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucune analyse en attente.</p>'; return; }
-    const page = pageSlice('pendingAnalyses', pending);
-    container.innerHTML = `<div class="table-container"><table><thead><tr><th>Patient</th><th>Analyse</th><th>Date</th><th>Action</th></tr></thead><tbody>
-                ${page.map(t=>`<tr><td>${t.patient_name}</td><td>${t.service}</td><td>${t.date}</td>
+        const container = document.getElementById('pending-analyses-list');
+        container.innerHTML = pending.length ?
+            `<div class="table-container"><table><thead><tr><th>Patient</th><th>Analyse</th><th>Date</th><th>Action</th></tr></thead><tbody>
+                ${pending.map(t=>`<tr><td>${t.patient_name}</td><td>${t.service}</td><td>${t.date}</td>
                 <td><button class="btn btn-sm btn-success" onclick="enterLabResult('${t.id}')"><i class="fas fa-pen"></i> Saisir</button></td></tr>`).join('')}
-            </tbody></table></div>` + loadMoreButtonHtml('pendingAnalyses', total, page.length, 'renderPendingAnalysesList');
+            </tbody></table></div>` : '<p class="text-muted">Aucune analyse en attente.</p>';
+    } catch(e) {}
 }
 
 function enterLabResult(txId) {
@@ -2370,19 +2227,9 @@ function viewLabResult(txId) {
 async function updateMedicationStockDisplay() {
     const meds = await API.getMedications().catch(()=>[]);
     state.medications = meds;
-    state.pharmacyStockFull = meds;
-    state.listPages['pharmacyStock'] = LIST_PAGE_SIZE;
-    renderMedicationStockDisplay();
-}
-
-function renderMedicationStockDisplay() {
-    const meds = state.pharmacyStockFull || [];
-    const total = meds.length;
     const container = document.getElementById('medication-stock-list');
-    if (!container) return;
-    const page = pageSlice('pharmacyStock', meds);
     container.innerHTML = '<table><thead><tr><th>Médicament</th><th>Forme</th><th>Stock</th><th>Prix</th><th>Emplacement</th><th>Statut</th></tr></thead><tbody>' +
-        page.map(function(m) {
+        meds.map(function(m) {
             var statusBadge = m.quantity === 0
                 ? '<span class="status-unpaid">Rupture</span>'
                 : m.quantity <= m.alert_threshold
@@ -2403,7 +2250,7 @@ function renderMedicationStockDisplay() {
                 '<td>' + statusBadge + '</td>' +
             '</tr>';
         }).join('') +
-    '</tbody></table>' + loadMoreButtonHtml('pharmacyStock', total, page.length, 'renderMedicationStockDisplay');
+    '</tbody></table>';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2422,9 +2269,19 @@ document.addEventListener('DOMContentLoaded', () => {
             let statusClass = unpaid===0&&paid>0?'status-paid':paid>0&&unpaid>0?'status-partial':'status-unpaid';
             document.getElementById('pharmacy-payment-status').textContent = statusText;
             document.getElementById('pharmacy-payment-status').className   = `patient-status-badge ${statusClass}`;
-            state.pharmPatientTxsFull = txs;
-            state.listPages['pharmPatientTxs'] = LIST_PAGE_SIZE;
-            renderPharmacyPatientPrescriptions();
+            document.getElementById('pharmacy-prescriptions-list').innerHTML = txs.map(t=>`
+                <div class="card mb-2">
+                    <div class="d-flex justify-between align-center">
+                        <div>
+                            <h5>${t.service}</h5>
+                            <p><strong>Dosage:</strong> ${t.dosage||'-'} | <strong>Qté:</strong> ${t.quantity||'-'}</p>
+                            <p>Paiement: <span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></p>
+                            <p>Livraison: <span class="${t.delivery_status==='delivered'?'status-paid':'status-unpaid'}">${t.delivery_status||'En attente'}</span></p>
+                        </div>
+                        ${t.status==='paid'&&t.delivery_status!=='delivered'?
+                            `<button class="btn btn-success btn-sm" onclick="deliverMed('${t.id}')"><i class="fas fa-pills"></i> Délivrer</button>`:''}
+                    </div>
+                </div>`).join('') || '<p class="text-muted">Aucun médicament prescrit.</p>';
             const hasDeliverable = txs.some(t=>t.status==='paid'&&t.delivery_status!=='delivered');
             document.getElementById('deliver-medications').disabled = !hasDeliverable;
             document.getElementById('pharmacy-patient-details').classList.remove('hidden');
@@ -2483,38 +2340,12 @@ async function deliverMed(txId) {
     } catch(e) {}
 }
 
-function renderPharmacyPatientPrescriptions() {
-    const txs = state.pharmPatientTxsFull || [];
-    const total = txs.length;
-    const container = document.getElementById('pharmacy-prescriptions-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun médicament prescrit.</p>'; return; }
-    const page = pageSlice('pharmPatientTxs', txs);
-    container.innerHTML = page.map(t=>`
-                <div class="card mb-2">
-                    <div class="d-flex justify-between align-center">
-                        <div>
-                            <h5>${t.service}</h5>
-                            <p><strong>Dosage:</strong> ${t.dosage||'-'} | <strong>Qté:</strong> ${t.quantity||'-'}</p>
-                            <p>Paiement: <span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></p>
-                            <p>Livraison: <span class="${t.delivery_status==='delivered'?'status-paid':'status-unpaid'}">${t.delivery_status||'En attente'}</span></p>
-                        </div>
-                        ${t.status==='paid'&&t.delivery_status!=='delivered'?
-                            `<button class="btn btn-success btn-sm" onclick="deliverMed('${t.id}')"><i class="fas fa-pills"></i> Délivrer</button>`:''}
-                    </div>
-                </div>`).join('') + loadMoreButtonHtml('pharmPatientTxs', total, page.length, 'renderPharmacyPatientPrescriptions');
-}
-
 // ─── MESSAGERIE ──────────────────────────────────────────────
 let currentConversationPartner = null;
 
 async function checkUnreadMessages() {
     try {
         const data = await API.getUnreadCount();
-        if (data.count > (state.lastUnreadCount || 0)) {
-            playNotificationSound();
-        }
-        state.lastUnreadCount = data.count;
         const badge = document.getElementById('message-badge');
         if (!badge) return;
         if (data.count > 0) { badge.textContent = data.count; badge.classList.remove('hidden'); }
@@ -2531,19 +2362,8 @@ async function loadConversations() {
         convMap[partner].messages.push(m);
         if (!m.read && m.recipient === state.currentUser.username) convMap[partner].unread++;
     });
-    state.conversationsFull = Object.entries(convMap);
-    state.listPages['conversations'] = LIST_PAGE_SIZE;
-    renderConversationList();
-}
-
-function renderConversationList() {
-    const entries = state.conversationsFull || [];
-    const total = entries.length;
     const list = document.getElementById('conversation-list');
-    if (!list) return;
-    if (!total) { list.innerHTML = '<div class="notif-empty">Aucune conversation</div>'; return; }
-    const page = pageSlice('conversations', entries);
-    list.innerHTML = page.map(([partner, data]) => `
+    list.innerHTML = Object.entries(convMap).map(([partner, data]) => `
         <div class="conversation-item d-flex ${partner===currentConversationPartner?'active':''}" onclick="openConversation('${partner}')">
             <div class="conversation-avatar">${partner[0]?.toUpperCase()}</div>
             <div class="conversation-info">
@@ -2553,7 +2373,7 @@ function renderConversationList() {
                 </div>
                 <p class="conversation-last-message">${data.messages[data.messages.length-1]?.subject||data.messages[data.messages.length-1]?.content||''}</p>
             </div>
-        </div>`).join('') + loadMoreButtonHtml('conversations', total, page.length, 'renderConversationList');
+        </div>`).join('') || '<div class="notif-empty">Aucune conversation</div>';
 }
 
 async function openConversation(partner) {
@@ -2823,8 +2643,6 @@ async function renderCashManagement(stats) {
 
     // Encaissements par agent aujourd\'hui
     var byAgent = stats.byAgent || [];
-    state.cashWithdrawalsFull = withdrawals;
-    state.listPages['cashWithdrawals'] = LIST_PAGE_SIZE;
 
     section.innerHTML =
         '<h3><i class="fas fa-cash-register" style="color:#28a745;"></i> Gestion de Caisse — ' + today + '</h3>' +
@@ -2877,7 +2695,23 @@ async function renderCashManagement(stats) {
 
         // Liste des retraits du jour
         '<h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Retraits du jour</h4>' +
-        '<div id="cash-withdrawals-container"></div>' +
+        (withdrawals.length ?
+        '<div class="table-container"><table><thead><tr><th>Agent</th><th>Montant</th><th>USD</th><th>Note</th><th>Heure</th><th>Par</th><th>Action</th></tr></thead><tbody>' +
+        withdrawals.map(function(w) {
+            var amt = parseFloat(w.amount);
+            var rate = 130;
+            return '<tr>' +
+                '<td><strong>' + w.agent_name + '</strong><br><small>' + w.agent_username + '</small></td>' +
+                '<td><strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
+                '<td>$' + (amt/rate).toFixed(2) + '</td>' +
+                '<td>' + (w.note || '-') + '</td>' +
+                '<td>' + (w.created_at ? new Date(w.created_at).toLocaleTimeString('fr-FR') : '-') + '</td>' +
+                '<td>' + (w.created_by || '-') + '</td>' +
+                '<td><button class="btn btn-xs btn-danger" onclick="supprimerRetrait(\'' + w.id + '\') ">' +
+                '<i class="fas fa-trash"></i></button></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table></div>'
+        : '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun retrait enregistré aujourd\'hui.</div>') +
 
         // Rapport par agent
         (byAgent.length ?
@@ -2895,7 +2729,6 @@ async function renderCashManagement(stats) {
                 '<td><strong style="color:' + (net>=0?'#28a745':'#dc3545') + ';">' + net.toLocaleString('fr-FR') + ' HTG</strong></td>' +
             '</tr>';
         }).join('') + '</tbody></table></div>' : '');
-    renderCashWithdrawalsList();
 
     // Afficher infos agent au changement
     document.getElementById('wd-agent')?.addEventListener('change', function() {
@@ -2913,32 +2746,6 @@ async function renderCashManagement(stats) {
             '</div>';
         document.getElementById('wd-amount').max = dispo;
     });
-}
-
-function renderCashWithdrawalsList() {
-    var withdrawals = state.cashWithdrawalsFull || [];
-    var total = withdrawals.length;
-    var container = document.getElementById('cash-withdrawals-container');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun retrait enregistré aujourd\'hui.</div>'; return; }
-    var page = pageSlice('cashWithdrawals', withdrawals);
-    var rate = 130;
-    container.innerHTML =
-        '<div class="table-container"><table><thead><tr><th>Agent</th><th>Montant</th><th>USD</th><th>Note</th><th>Heure</th><th>Par</th><th>Action</th></tr></thead><tbody>' +
-        page.map(function(w) {
-            var amt = parseFloat(w.amount);
-            return '<tr>' +
-                '<td><strong>' + w.agent_name + '</strong><br><small>' + w.agent_username + '</small></td>' +
-                '<td><strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></td>' +
-                '<td>$' + (amt/rate).toFixed(2) + '</td>' +
-                '<td>' + (w.note || '-') + '</td>' +
-                '<td>' + (w.created_at ? new Date(w.created_at).toLocaleTimeString('fr-FR') : '-') + '</td>' +
-                '<td>' + (w.created_by || '-') + '</td>' +
-                '<td><button class="btn btn-xs btn-danger" onclick="supprimerRetrait(\'' + w.id + '\') ">' +
-                '<i class="fas fa-trash"></i></button></td>' +
-            '</tr>';
-        }).join('') + '</tbody></table></div>' +
-        loadMoreButtonHtml('cashWithdrawals', total, page.length, 'renderCashWithdrawalsList');
 }
 
 async function enregistrerRetrait() {
@@ -3122,7 +2929,7 @@ async function adminEditTransaction(txId) {
             </div>
             <div class="d-flex gap-10 mt-3">
                 <button class="btn btn-success" onclick="saveAdminTxEdit('${t.id}')"><i class="fas fa-save"></i> Enregistrer</button>
-                ${(state.currentRole === 'admin' || state.currentRole === 'sub_admin') ? `<button class="btn btn-danger" onclick="deleteAdminTx('${t.id}')"><i class="fas fa-trash"></i> Supprimer</button>` : ''}
+                <button class="btn btn-danger" onclick="deleteAdminTx('${t.id}')"><i class="fas fa-trash"></i> Supprimer</button>
                 <button class="btn btn-secondary" onclick="document.getElementById(\'admin-edit-tx-modal\').remove()">Annuler</button>
             </div>
         </div>`;
@@ -3138,8 +2945,7 @@ async function saveAdminTxEdit(txId) {
         await apiCall(() => API.updateTransaction(txId, { service, amount, status, paymentMethod: method }));
         toast('Transaction modifiée!');
         document.getElementById('admin-edit-tx-modal').remove();
-        if (state.currentRole === 'admin' || state.currentRole === 'sub_admin') updateAdminStats();
-        if (document.getElementById('receipt-search-input')?.value) searchReceipt();
+        updateAdminStats();
     } catch(e) {}
 }
 
@@ -3154,10 +2960,7 @@ async function deleteAdminTx(txId) {
 }
 
 function updateRecentTransactionsTable(txs) {
-    state.recentTransactionsFull = txs;
-    var total = txs.length;
-    var page  = pageSlice('recentTransactions', txs);
-    document.getElementById('recent-transactions-list').innerHTML = page.map(t => {
+    document.getElementById('recent-transactions-list').innerHTML = txs.map(t => {
         const amtHTG = parseFloat(t.amount);
         return `<tr>
             <td>${t.date} ${t.time||''}</td>
@@ -3170,11 +2973,7 @@ function updateRecentTransactionsTable(txs) {
             <td><span class="${t.status==='paid'?'status-paid':'status-unpaid'}">${t.status==='paid'?'Payé':'Non payé'}</span></td>
         <td><button class="btn btn-xs btn-warning" onclick="adminEditTransaction('${t.id}')"><i class="fas fa-edit"></i></button></td>
         </tr>`;
-    }).join('') + loadMoreButtonHtml('recentTransactions', total, page.length, 'rerenderRecentTransactions', 9);
-}
-
-function rerenderRecentTransactions() {
-    updateRecentTransactionsTable(state.recentTransactionsFull || []);
+    }).join('');
 }
 
 function setupAdminSearch() {
@@ -3201,10 +3000,21 @@ async function searchAdminPatient() {
         ]);
         const totalPaye   = txs.filter(t => t.status === 'paid').reduce((s, t) => s + parseFloat(t.amount), 0);
         const totalImpaye = txs.filter(t => t.status === 'unpaid').reduce((s, t) => s + parseFloat(t.amount), 0);
-        state.adminPatientTxsFull = txs;
-        state.adminPatientConsultsFull = consultations;
-        state.listPages['adminPatientTxs'] = LIST_PAGE_SIZE;
-        state.listPages['adminPatientConsults'] = LIST_PAGE_SIZE;
+
+        let txRows = txs.map(t => {
+            const amt = parseFloat(t.amount);
+            return '<tr>' +
+                '<td>' + (t.date||'-') + '</td>' +
+                '<td>' + t.service + '</td>' +
+                '<td>' + amt.toFixed(2) + ' HTG <small class="text-muted">$' + htgToUsd(amt) + '</small></td>' +
+                '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
+                '<td>' + (t.payment_method||'-') + '</td>' +
+                '<td>' +
+                  '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button> ' +
+                  '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect(\'' + t.id + '\')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
+                '</td>' +
+            '</tr>';
+        }).join('');
 
         let vitalRows = '';
         if (vitals.length > 0) {
@@ -3213,6 +3023,13 @@ async function searchAdminPatient() {
                 return '<span class="badge badge-primary" style="margin:2px;">' + entry[0] + ': ' + entry[1].value + ' ' + entry[1].unit + '</span>';
             }).join('');
         }
+
+        let consultRows = consultations.map(c =>
+            '<div class="card mb-2" style="padding:10px;">' +
+            '<strong>' + (c.date||'-') + '</strong> — Dr. ' + (c.doctor||'-') + '<br>' +
+            '<span style="font-size:.85rem;white-space:pre-wrap;">' + (c.diagnosis||'-') + '</span>' +
+            '</div>'
+        ).join('');
 
         container.innerHTML =
             '<div class="card">' +
@@ -3249,7 +3066,8 @@ async function searchAdminPatient() {
 
             // Transactions
             '<div class="mt-3"><h4><i class="fas fa-receipt"></i> Transactions (' + txs.length + ')</h4>' +
-            '<div id="admin-patient-txs-container"></div></div>' +
+            '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Actions</th></tr></thead>' +
+            '<tbody>' + (txRows || '<tr><td colspan="6">Aucune transaction</td></tr>') + '</tbody></table></div></div>' +
 
             // Signes vitaux
             '<div class="mt-3"><h4><i class="fas fa-heartbeat"></i> Derniers signes vitaux</h4>' +
@@ -3257,54 +3075,11 @@ async function searchAdminPatient() {
 
             // Consultations
             '<div class="mt-3"><h4><i class="fas fa-stethoscope"></i> Consultations</h4>' +
-            '<div id="admin-patient-consults-container"></div></div>' +
+            (consultRows || '<p class="text-muted">Aucune consultation.</p>') + '</div>' +
 
             '</div>';
         container.classList.remove('hidden');
-        renderAdminPatientTxs();
-        renderAdminPatientConsults();
     } catch(e) { console.error(e); toast('Erreur lors de la recherche', 'error'); }
-}
-
-function renderAdminPatientTxs() {
-    const txs = state.adminPatientTxsFull || [];
-    const total = txs.length;
-    const container = document.getElementById('admin-patient-txs-container');
-    if (!container) return;
-    const page = pageSlice('adminPatientTxs', txs);
-    const txRows = page.map(t => {
-        const amt = parseFloat(t.amount);
-        return '<tr>' +
-            '<td>' + (t.date||'-') + '</td>' +
-            '<td>' + t.service + '</td>' +
-            '<td>' + amt.toFixed(2) + ' HTG <small class="text-muted">$' + htgToUsd(amt) + '</small></td>' +
-            '<td><span class="' + (t.status==='paid'?'status-paid':'status-unpaid') + '">' + (t.status==='paid'?'Payé':'Non payé') + '</span></td>' +
-            '<td>' + (t.payment_method||'-') + '</td>' +
-            '<td>' +
-              '<button class="btn btn-xs btn-warning" onclick="adminEditTransaction(\'' + t.id + '\')"><i class="fas fa-edit"></i></button> ' +
-              '<button class="btn btn-xs btn-danger" onclick="adminDeleteTxDirect(\'' + t.id + '\')" style="margin-left:4px;"><i class="fas fa-trash"></i></button>' +
-            '</td>' +
-        '</tr>';
-    }).join('');
-    container.innerHTML =
-        '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Statut</th><th>Méthode</th><th>Actions</th></tr></thead>' +
-        '<tbody>' + (txRows || '<tr><td colspan="6">Aucune transaction</td></tr>') + '</tbody></table></div>' +
-        loadMoreButtonHtml('adminPatientTxs', total, page.length, 'renderAdminPatientTxs');
-}
-
-function renderAdminPatientConsults() {
-    const consultations = state.adminPatientConsultsFull || [];
-    const total = consultations.length;
-    const container = document.getElementById('admin-patient-consults-container');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucune consultation.</p>'; return; }
-    const page = pageSlice('adminPatientConsults', consultations);
-    container.innerHTML = page.map(c =>
-        '<div class="card mb-2" style="padding:10px;">' +
-        '<strong>' + (c.date||'-') + '</strong> — Dr. ' + (c.doctor||'-') + '<br>' +
-        '<span style="font-size:.85rem;white-space:pre-wrap;">' + (c.diagnosis||'-') + '</span>' +
-        '</div>'
-    ).join('') + loadMoreButtonHtml('adminPatientConsults', total, page.length, 'renderAdminPatientConsults');
 }
 
 // Créer / modifier compte patient (accès espace patient)
@@ -3479,8 +3254,6 @@ async function generateReport(tab) {
                 var m=t.payment_method||'Non precis'; if(!byMethod[m]) byMethod[m]={c:0,tot:0}; byMethod[m].c++; byMethod[m].tot+=parseFloat(t.amount);
             });
             var tl={consultation:'Consultation',lab:'Laboratoire',medication:'Medicaments',external:'Services ext.'};
-            state.rptTxsFull = txs;
-            state.listPages['rptTxs'] = LIST_PAGE_SIZE;
             el.innerHTML = periodLabel +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-check-circle','Encaisse',fmtHTG(totP),fmtUSD(totP)+' | '+paid.length+' tx','#28a745') +
@@ -3493,17 +3266,18 @@ async function generateReport(tab) {
                 tbl(['Type','Nb','HTG','USD'],Object.entries(byType).map(function(e){return '<tr><td>'+(tl[e[0]]||e[0])+'</td><td>'+e[1].c+'</td><td>'+fmtHTG(e[1].tot)+'</td><td>'+fmtUSD(e[1].tot)+'</td></tr>';}).join(''))+'</div>' +
                 '<div class="card"><h4 style="margin-bottom:10px;">Par methode</h4>' +
                 tbl(['Methode','Nb','HTG','USD'],Object.entries(byMethod).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1].c+'</td><td>'+fmtHTG(e[1].tot)+'</td><td>'+fmtUSD(e[1].tot)+'</td></tr>';}).join(''))+'</div></div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Detail (' + txs.length + ')</h4>' +
-                '<div id="rpt-txs-detail"></div></div>';
-            renderRptTxsDetail(fmtHTG);
+                '<div class="card"><h4 style="margin-bottom:10px;">Detail ('+Math.min(txs.length,100)+'/'+txs.length+')</h4>' +
+                tbl(['Date','Patient','Service','Montant','Statut','Methode','Agent'],
+                    txs.slice(0,100).map(function(t){
+                        var sc=t.status==='paid'?'status-paid':t.status==='refunded'?'status-partial':'status-unpaid';
+                        return '<tr><td>'+(t.date||'-')+'</td><td>'+t.patient_name+'</td><td>'+t.service+'</td><td>'+fmtHTG(t.amount)+'</td><td><span class="'+sc+'">'+t.status+'</span></td><td>'+(t.payment_method||'-')+'</td><td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
+                    }).join(''))+'</div>';
 
         } else if (tab === 'patients') {
             var pats = await API.getPatients({});
             pats = pats.filter(function(p){ var d=(p.registration_date||''); return(!from||d>=from)&&(!to||d<=to); });
             var types={};
             pats.forEach(function(p){ types[p.type]=(types[p.type]||0)+1; });
-            state.rptPatientsFull = pats;
-            state.listPages['rptPatients'] = LIST_PAGE_SIZE;
             el.innerHTML = periodLabel +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-users','Total',pats.length+' patients','','#1a6bca') +
@@ -3512,17 +3286,15 @@ async function generateReport(tab) {
                 '</div>' +
                 '<div class="card mb-3"><h4 style="margin-bottom:10px;">Par type</h4>' +
                 tbl(['Type','Nombre','%'],Object.entries(types).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1]+'</td><td>'+(e[1]/(pats.length||1)*100).toFixed(1)+'%</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Liste (' + pats.length + ')</h4>' +
-                '<div id="rpt-patients-detail"></div></div>';
-            renderRptPatientsDetail();
+                '<div class="card"><h4 style="margin-bottom:10px;">Liste ('+Math.min(pats.length,100)+')</h4>' +
+                tbl(['ID','Nom','Tel','Type','Date','Privilege'],
+                    pats.slice(0,100).map(function(p){return '<tr><td>'+p.id+'</td><td>'+p.full_name+'</td><td>'+(p.phone||'-')+'</td><td>'+p.type+'</td><td>'+(p.registration_date||'-')+'</td><td>'+(p.vip?'VIP':p.sponsored?'Sponsor.':'-')+'</td></tr>';}).join(''))+'</div>';
 
         } else if (tab === 'medications') {
             var meds = await API.getMedications();
             var low=meds.filter(function(m){return parseFloat(m.quantity)>0&&parseFloat(m.quantity)<=parseFloat(m.alert_threshold);});
             var out=meds.filter(function(m){return parseFloat(m.quantity)===0;});
             var val=meds.reduce(function(s,m){return s+parseFloat(m.price||0)*parseFloat(m.quantity||0);},0);
-            state.rptMedsFull = meds;
-            state.listPages['rptMeds'] = LIST_PAGE_SIZE;
             el.innerHTML =
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-pills','Total',meds.length+' refs','','#1a6bca') +
@@ -3532,38 +3304,36 @@ async function generateReport(tab) {
                 '</div>' +
                 (out.length?'<div class="alert alert-danger mb-2">Rupture: '+out.map(function(m){return m.name;}).join(', ')+'</div>':'') +
                 (low.length?'<div class="alert alert-warning mb-2">Faible: '+low.map(function(m){return m.name+'('+m.quantity+')';}).join(', ')+'</div>':'') +
-                '<div class="card"><h4 style="margin-bottom:10px;">Stock complet (' + meds.length + ')</h4>' +
-                '<div id="rpt-meds-detail"></div></div>';
-            renderRptMedsDetail();
+                '<div class="card"><h4 style="margin-bottom:10px;">Stock complet</h4>' +
+                tbl(['Medicament','Forme','Stock','Seuil','Prix','Valeur','Emplacement','Fournisseur'],
+                    meds.map(function(m){
+                        var cls=parseFloat(m.quantity)===0?'out-of-stock':parseFloat(m.quantity)<=parseFloat(m.alert_threshold)?'low-stock':'';
+                        var loc=(m.espace||'')+(m.espace&&m.etagere?'/':'')+(m.etagere||'');
+                        return '<tr class="'+cls+'"><td>'+m.name+'</td><td>'+(m.form||'-')+'</td><td>'+m.quantity+'</td><td>'+m.alert_threshold+'</td><td>'+fmtHTG(m.price)+'</td><td>'+fmtHTG(parseFloat(m.price||0)*parseFloat(m.quantity||0))+'</td><td>'+(loc||'-')+'</td><td>'+(m.supplier_name||'-')+'</td></tr>';
+                    }).join(''))+'</div>';
 
         } else if (tab === 'suppliers') {
             var sups = await API.getSuppliers().catch(function(){return[];});
             var purs = await API.getSupplierPurchases({}).catch(function(){return[];});
             var totDebt=sups.reduce(function(s,sup){return s+parseFloat(sup.total_debt||0);},0);
             var totPur=purs.reduce(function(s,p){return s+parseFloat(p.total_amount||0);},0);
-            state.rptSupsFull = sups;
-            state.rptPursFull = purs;
-            state.listPages['rptSups'] = LIST_PAGE_SIZE;
-            state.listPages['rptPurs'] = LIST_PAGE_SIZE;
             el.innerHTML =
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-truck','Fournisseurs',sups.length,'','#1a6bca') +
                 scard('fa-shopping-cart','Achats totaux',fmtHTG(totPur),fmtUSD(totPur),'#6f42c1') +
                 scard('fa-exclamation','Dettes totales',fmtHTG(totDebt),fmtUSD(totDebt),'#dc3545') +
                 '</div>' +
-                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Fournisseurs (' + sups.length + ')</h4>' +
-                '<div id="rpt-sups-detail"></div></div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Historique achats (' + purs.length + ')</h4>' +
-                '<div id="rpt-purs-detail"></div></div>';
-            renderRptSupsDetail();
-            renderRptPursDetail();
+                '<div class="card mb-3"><h4 style="margin-bottom:10px;">Fournisseurs</h4>' +
+                tbl(['Nom','Tel','Email','Dette','Statut'],
+                    sups.map(function(s){var d=parseFloat(s.total_debt||0); return '<tr><td>'+s.name+'</td><td>'+(s.phone||'-')+'</td><td>'+(s.email||'-')+'</td><td style="color:'+(d>0?'#dc3545':'#28a745')+';">'+fmtHTG(d)+'</td><td><span class="'+(d>0?'status-unpaid':'status-paid')+'">'+(d>0?'Dette':'Solde')+'</span></td></tr>';}).join(''))+'</div>' +
+                '<div class="card"><h4 style="margin-bottom:10px;">Historique achats</h4>' +
+                tbl(['Date','Description','Total','Paye','Restant','Type'],
+                    purs.slice(0,50).map(function(p){return '<tr><td>'+(p.date||'-')+'</td><td>'+p.description+'</td><td>'+fmtHTG(p.total_amount)+'</td><td style="color:#28a745;">'+fmtHTG(p.amount_paid)+'</td><td style="color:'+(parseFloat(p.amount_due)>0?'#dc3545':'#28a745')+';">'+fmtHTG(p.amount_due)+'</td><td>'+p.payment_type+'</td></tr>';}).join(''))+'</div>';
 
         } else if (tab === 'users') {
             var us = await API.getUsers();
             var byRole={};
             us.forEach(function(u){ byRole[u.role]=(byRole[u.role]||0)+1; });
-            state.rptUsersFull = us;
-            state.listPages['rptUsers'] = LIST_PAGE_SIZE;
             el.innerHTML =
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-users','Total',us.length+' comptes','','#1a6bca') +
@@ -3572,17 +3342,15 @@ async function generateReport(tab) {
                 '</div>' +
                 '<div class="card mb-3"><h4 style="margin-bottom:10px;">Par role</h4>' +
                 tbl(['Role','Nombre'],Object.entries(byRole).map(function(e){return '<tr><td>'+getRoleLabel(e[0])+'</td><td>'+e[1]+'</td></tr>';}).join(''))+'</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Liste utilisateurs (' + us.length + ')</h4>' +
-                '<div id="rpt-users-detail"></div></div>';
-            renderRptUsersDetail();
+                '<div class="card"><h4 style="margin-bottom:10px;">Liste utilisateurs</h4>' +
+                tbl(['Nom','Identifiant','Role','Extra roles','Statut'],
+                    us.map(function(u){return '<tr><td>'+u.name+'</td><td>'+u.username+'</td><td>'+getRoleLabel(u.role)+'</td><td>'+(u.extra_roles||'-')+'</td><td><span class="'+(u.active?'status-paid':'status-unpaid')+'">'+(u.active?'Actif':'Inactif')+'</span></td></tr>';}).join(''))+'</div>';
 
         } else if (tab === 'hospitalization') {
             var hosps = await API.getHospitalizations({}).catch(function(){return[];});
             hosps = hosps.filter(function(h){var d=h.admission_date||'';return(!from||d>=from)&&(!to||d<=to);});
             var totDep=hosps.reduce(function(s,h){return s+parseFloat(h.deposit||0);},0);
             var totDebt2=hosps.filter(function(h){return parseFloat(h.balance||0)<0;}).reduce(function(s,h){return s+Math.abs(parseFloat(h.balance));},0);
-            state.rptHospsFull = hosps;
-            state.listPages['rptHosps'] = LIST_PAGE_SIZE;
             el.innerHTML = periodLabel +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">' +
                 scard('fa-bed','Admissions',hosps.length,'','#1a6bca') +
@@ -3591,9 +3359,9 @@ async function generateReport(tab) {
                 scard('fa-money-bill','Total depots',fmtHTG(totDep),fmtUSD(totDep),'#28a745') +
                 scard('fa-exclamation','Dettes',fmtHTG(totDebt2),fmtUSD(totDebt2),'#dc3545') +
                 '</div>' +
-                '<div class="card"><h4 style="margin-bottom:10px;">Detail (' + hosps.length + ')</h4>' +
-                '<div id="rpt-hosps-detail"></div></div>';
-            renderRptHospsDetail();
+                '<div class="card"><h4 style="margin-bottom:10px;">Detail</h4>' +
+                tbl(['Patient','Chambre','Admission','Sortie','Depot','Solde','Statut'],
+                    hosps.map(function(h){var b=parseFloat(h.balance||0); return '<tr><td>'+(h.full_name||h.patient_id)+'</td><td>'+(h.room||'-')+'</td><td>'+(h.admission_date||'-')+'</td><td>'+(h.discharge_date||'-')+'</td><td>'+fmtHTG(h.deposit)+'</td><td style="color:'+(b<0?'#dc3545':'#28a745')+';">'+fmtHTG(b)+'</td><td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalise':'Sorti')+'</span></td></tr>';}).join(''))+'</div>';
         }
     } catch(e) {
         el.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
@@ -3601,92 +3369,6 @@ async function generateReport(tab) {
 }
 
 // ─── DÉCAISSEMENTS ────────────────────────────────────────────
-function fmtHTGDefault(v) { return parseFloat(v||0).toLocaleString('fr-FR') + ' HTG'; }
-function fmtUSDDefault(v, rate) { rate = rate || (state.exchangeRate || 130); return '≈$' + (parseFloat(v||0)/rate).toFixed(2); }
-
-function renderRptTxsDetail(fmtHTG) {
-    fmtHTG = fmtHTG || fmtHTGDefault;
-    var txs = state.rptTxsFull || [];
-    var total = txs.length;
-    var container = document.getElementById('rpt-txs-detail');
-    if (!container) return;
-    var page = pageSlice('rptTxs', txs);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Patient</th><th>Service</th><th>Montant</th><th>Statut</th><th>Methode</th><th>Agent</th></tr></thead><tbody>' +
-        page.map(function(t){
-            var sc=t.status==='paid'?'status-paid':t.status==='refunded'?'status-partial':'status-unpaid';
-            return '<tr><td>'+(t.date||'-')+'</td><td>'+t.patient_name+'</td><td>'+t.service+'</td><td>'+fmtHTG(t.amount)+'</td><td><span class="'+sc+'">'+t.status+'</span></td><td>'+(t.payment_method||'-')+'</td><td>'+(t.payment_agent||t.created_by||'-')+'</td></tr>';
-        }).join('') + '</tbody></table></div>' +
-        loadMoreButtonHtml('rptTxs', total, page.length, 'renderRptTxsDetail');
-}
-
-function renderRptPatientsDetail() {
-    var pats = state.rptPatientsFull || [];
-    var total = pats.length;
-    var container = document.getElementById('rpt-patients-detail');
-    if (!container) return;
-    var page = pageSlice('rptPatients', pats);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>ID</th><th>Nom</th><th>Tel</th><th>Type</th><th>Date</th><th>Privilege</th></tr></thead><tbody>' +
-        page.map(function(p){return '<tr><td>'+p.id+'</td><td>'+p.full_name+'</td><td>'+(p.phone||'-')+'</td><td>'+p.type+'</td><td>'+(p.registration_date||'-')+'</td><td>'+(p.vip?'VIP':p.sponsored?'Sponsor.':'-')+'</td></tr>';}).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('rptPatients', total, page.length, 'renderRptPatientsDetail');
-}
-
-function renderRptMedsDetail() {
-    var meds = state.rptMedsFull || [];
-    var total = meds.length;
-    var container = document.getElementById('rpt-meds-detail');
-    if (!container) return;
-    var page = pageSlice('rptMeds', meds);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Medicament</th><th>Forme</th><th>Stock</th><th>Seuil</th><th>Prix</th><th>Valeur</th><th>Emplacement</th><th>Fournisseur</th></tr></thead><tbody>' +
-        page.map(function(m){
-            var cls=parseFloat(m.quantity)===0?'out-of-stock':parseFloat(m.quantity)<=parseFloat(m.alert_threshold)?'low-stock':'';
-            var loc=(m.espace||'')+(m.espace&&m.etagere?'/':'')+(m.etagere||'');
-            return '<tr class="'+cls+'"><td>'+m.name+'</td><td>'+(m.form||'-')+'</td><td>'+m.quantity+'</td><td>'+m.alert_threshold+'</td><td>'+fmtHTGDefault(m.price)+'</td><td>'+fmtHTGDefault(parseFloat(m.price||0)*parseFloat(m.quantity||0))+'</td><td>'+(loc||'-')+'</td><td>'+(m.supplier_name||'-')+'</td></tr>';
-        }).join('') + '</tbody></table></div>' + loadMoreButtonHtml('rptMeds', total, page.length, 'renderRptMedsDetail');
-}
-
-function renderRptSupsDetail() {
-    var sups = state.rptSupsFull || [];
-    var total = sups.length;
-    var container = document.getElementById('rpt-sups-detail');
-    if (!container) return;
-    var page = pageSlice('rptSups', sups);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Nom</th><th>Tel</th><th>Email</th><th>Dette</th><th>Statut</th></tr></thead><tbody>' +
-        page.map(function(s){var d=parseFloat(s.total_debt||0); return '<tr><td>'+s.name+'</td><td>'+(s.phone||'-')+'</td><td>'+(s.email||'-')+'</td><td style="color:'+(d>0?'#dc3545':'#28a745')+';">'+fmtHTGDefault(d)+'</td><td><span class="'+(d>0?'status-unpaid':'status-paid')+'">'+(d>0?'Dette':'Solde')+'</span></td></tr>';}).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('rptSups', total, page.length, 'renderRptSupsDetail');
-}
-
-function renderRptPursDetail() {
-    var purs = state.rptPursFull || [];
-    var total = purs.length;
-    var container = document.getElementById('rpt-purs-detail');
-    if (!container) return;
-    var page = pageSlice('rptPurs', purs);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Description</th><th>Total</th><th>Paye</th><th>Restant</th><th>Type</th></tr></thead><tbody>' +
-        page.map(function(p){return '<tr><td>'+(p.date||'-')+'</td><td>'+p.description+'</td><td>'+fmtHTGDefault(p.total_amount)+'</td><td style="color:#28a745;">'+fmtHTGDefault(p.amount_paid)+'</td><td style="color:'+(parseFloat(p.amount_due)>0?'#dc3545':'#28a745')+';">'+fmtHTGDefault(p.amount_due)+'</td><td>'+p.payment_type+'</td></tr>';}).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('rptPurs', total, page.length, 'renderRptPursDetail');
-}
-
-function renderRptUsersDetail() {
-    var us = state.rptUsersFull || [];
-    var total = us.length;
-    var container = document.getElementById('rpt-users-detail');
-    if (!container) return;
-    var page = pageSlice('rptUsers', us);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Nom</th><th>Identifiant</th><th>Role</th><th>Extra roles</th><th>Statut</th></tr></thead><tbody>' +
-        page.map(function(u){return '<tr><td>'+u.name+'</td><td>'+u.username+'</td><td>'+getRoleLabel(u.role)+'</td><td>'+(u.extra_roles||'-')+'</td><td><span class="'+(u.active?'status-paid':'status-unpaid')+'">'+(u.active?'Actif':'Inactif')+'</span></td></tr>';}).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('rptUsers', total, page.length, 'renderRptUsersDetail');
-}
-
-function renderRptHospsDetail() {
-    var hosps = state.rptHospsFull || [];
-    var total = hosps.length;
-    var container = document.getElementById('rpt-hosps-detail');
-    if (!container) return;
-    var page = pageSlice('rptHosps', hosps);
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Patient</th><th>Chambre</th><th>Admission</th><th>Sortie</th><th>Depot</th><th>Solde</th><th>Statut</th></tr></thead><tbody>' +
-        page.map(function(h){var b=parseFloat(h.balance||0); return '<tr><td>'+(h.full_name||h.patient_id)+'</td><td>'+(h.room||'-')+'</td><td>'+(h.admission_date||'-')+'</td><td>'+(h.discharge_date||'-')+'</td><td>'+fmtHTGDefault(h.deposit)+'</td><td style="color:'+(b<0?'#dc3545':'#28a745')+';">'+fmtHTGDefault(b)+'</td><td><span class="badge" style="background:'+(h.status==='active'?'#28a745':'#6c757d')+';color:#fff;">'+(h.status==='active'?'Hospitalise':'Sorti')+'</span></td></tr>';}).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('rptHosps', total, page.length, 'renderRptHospsDetail');
-}
 async function loadDecaissements() {
     var section = document.getElementById('decaissement-section');
     if (!section) {
@@ -3699,8 +3381,6 @@ async function loadDecaissements() {
     var rate  = state.exchangeRate || 130;
     var today = new Date().toISOString().split('T')[0];
     var decList = await API.getCashWithdrawals({ fromDate: today }).catch(function(){return[];});
-    state.decaissementsFull = decList;
-    state.listPages['decaissements'] = LIST_PAGE_SIZE;
     var totDec  = decList.reduce(function(s,d){return s+parseFloat(d.amount);},0);
     var users    = await API.getUsers().catch(function(){return[];});
     var patients = await API.getPatients({}).catch(function(){return[];});
@@ -3742,33 +3422,17 @@ async function loadDecaissements() {
         '<button class="btn btn-danger" style="width:100%;" onclick="saveDecaissement()"><i class="fas fa-money-bill-wave-alt"></i> Effectuer</button></div>' +
         '</div></div>' +
         '<h4 style="margin-bottom:10px;"><i class="fas fa-history"></i> Historique du jour</h4>' +
-        '<div id="dec-history-container"></div>';
-    renderDecaissementsHistory(acctLabels);
-}
-
-function renderDecaissementsHistory(acctLabels) {
-    var decList = state.decaissementsFull || [];
-    var total = decList.length;
-    var container = document.getElementById('dec-history-container');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<div class="alert alert-info">Aucun decaissement aujourd\'hui.</div>'; return; }
-    var page = pageSlice('decaissements', decList);
-    container.innerHTML =
+        (decList.length ?
         '<div class="table-container"><table><thead><tr><th>Heure</th><th>Beneficiaire</th><th>Montant</th><th>Compte</th><th>Note</th><th>Par</th><th></th></tr></thead><tbody>' +
-        page.map(function(d){
+        decList.map(function(d){
             return '<tr><td>'+(d.created_at?new Date(d.created_at).toLocaleTimeString('fr-FR'):'-')+'</td>' +
                 '<td><strong>'+(d.agent_name||'-')+'</strong></td>' +
                 '<td><strong style="color:#dc3545;">-'+parseFloat(d.amount).toLocaleString('fr-FR')+' HTG</strong></td>' +
                 '<td>'+(acctLabels[d.payment_method]||d.payment_method||'Especes')+'</td>' +
                 '<td>'+(d.note||'-')+'</td><td>'+(d.created_by||'-')+'</td>' +
                 '<td><button class="btn btn-xs btn-danger" data-wid="'+d.id+'" onclick="deleteDecaissement(this.dataset.wid)"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('')+'</tbody></table></div>' +
-        loadMoreButtonHtml('decaissements', total, page.length, 'renderDecaissementsHistoryNoArgs');
-}
-
-function renderDecaissementsHistoryNoArgs() {
-    var acctLabels = { cash:'Especes', moncash:'MonCash', natcash:'NatCash', card:'Carte', virement:'Virement', petite_caisse:'Petite Caisse' };
-    renderDecaissementsHistory(acctLabels);
+        }).join('')+'</tbody></table></div>'
+        : '<div class="alert alert-info">Aucun decaissement aujourd\'hui.</div>');
 }
 
 function filterDecBenefs(val) {
@@ -3849,42 +3513,35 @@ async function deleteDecaissement(id) {
 async function loadSuppliers() {
     try {
         var suppliers = await apiCall(function() { return API.getSuppliers(); });
-        state.suppliersFull = suppliers;
-        state.listPages['suppliers'] = LIST_PAGE_SIZE;
-        renderSuppliersList();
+        var list = document.getElementById('suppliers-list');
+        if (!suppliers.length) {
+            list.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun fournisseur enregistré.</div>';
+            return;
+        }
+        list.innerHTML = '<div class="table-container"><table><thead><tr>' +
+            '<th>Nom</th><th>Téléphone</th><th>Email</th><th>Dette totale</th><th>Actions</th>' +
+            '</tr></thead><tbody>' +
+            suppliers.map(function(s) {
+                var debt = parseFloat(s.total_debt || 0);
+                return '<tr>' +
+                    '<td><strong>' + s.name + '</strong>' + (s.note ? '<br><small class="text-muted">' + s.note + '</small>' : '') + '</td>' +
+                    '<td>' + (s.phone || '-') + '</td>' +
+                    '<td>' + (s.email || '-') + '</td>' +
+                    '<td><strong style="color:' + (debt > 0 ? '#dc3545' : '#28a745') + ';">' +
+                        debt.toLocaleString('fr-FR') + ' HTG</strong>' +
+                        (debt > 0 ? ' <span class="badge badge-danger">Dû</span>' : ' <span class="badge badge-success">OK</span>') +
+                    '</td>' +
+                    '<td><div class="d-flex gap-10">' +
+                        '<button class="btn btn-sm btn-primary" data-sid="' + s.id + '" data-sname="' + s.name + '" onclick="openSupplierDetail(this.dataset.sid,this.dataset.sname)"><i class="fas fa-eye"></i> Détails</button>' +
+                        '<i class="fas fa-eye"></i> Détails</button>' +
+                        '<button class="btn btn-sm btn-warning" data-sid="' + s.id + '" onclick="editSupplier(this.dataset.sid)"><i class="fas fa-edit"></i></button>' +
+                        '<i class="fas fa-edit"></i></button>' +
+                        '<button class="btn btn-sm btn-danger" data-sid="' + s.id + '" data-sname="' + s.name + '" onclick="deleteSupplierFn(this.dataset.sid,this.dataset.sname)"><i class="fas fa-trash"></i></button>' +
+                        '<i class="fas fa-trash"></i></button>' +
+                    '</div></td>' +
+                '</tr>';
+            }).join('') + '</tbody></table></div>';
     } catch(e) {}
-}
-
-function renderSuppliersList() {
-    var suppliers = state.suppliersFull || [];
-    var total = suppliers.length;
-    var list = document.getElementById('suppliers-list');
-    if (!list) return;
-    if (!total) {
-        list.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun fournisseur enregistré.</div>';
-        return;
-    }
-    var page = pageSlice('suppliers', suppliers);
-    list.innerHTML = '<div class="table-container"><table><thead><tr>' +
-        '<th>Nom</th><th>Téléphone</th><th>Email</th><th>Dette totale</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        page.map(function(s) {
-            var debt = parseFloat(s.total_debt || 0);
-            return '<tr>' +
-                '<td><strong>' + s.name + '</strong>' + (s.note ? '<br><small class="text-muted">' + s.note + '</small>' : '') + '</td>' +
-                '<td>' + (s.phone || '-') + '</td>' +
-                '<td>' + (s.email || '-') + '</td>' +
-                '<td><strong style="color:' + (debt > 0 ? '#dc3545' : '#28a745') + ';">' +
-                    debt.toLocaleString('fr-FR') + ' HTG</strong>' +
-                    (debt > 0 ? ' <span class="badge badge-danger">Dû</span>' : ' <span class="badge badge-success">OK</span>') +
-                '</td>' +
-                '<td><div class="d-flex gap-10">' +
-                    '<button class="btn btn-sm btn-primary" data-sid="' + s.id + '" data-sname="' + s.name + '" onclick="openSupplierDetail(this.dataset.sid,this.dataset.sname)"><i class="fas fa-eye"></i> Détails</button>' +
-                    '<button class="btn btn-sm btn-warning" data-sid="' + s.id + '" onclick="editSupplier(this.dataset.sid)"><i class="fas fa-edit"></i></button>' +
-                    '<button class="btn btn-sm btn-danger" data-sid="' + s.id + '" data-sname="' + s.name + '" onclick="deleteSupplierFn(this.dataset.sid,this.dataset.sname)"><i class="fas fa-trash"></i></button>' +
-                '</div></td>' +
-            '</tr>';
-        }).join('') + '</tbody></table></div>' + loadMoreButtonHtml('suppliers', total, page.length, 'renderSuppliersList');
 }
 
 async function saveNewSupplier() {
@@ -4102,61 +3759,53 @@ async function loadSupplierPurchases() {
         var purchases = await apiCall(function() {
             return API.getSupplierPurchases({ supplierId: _currentSupplierId });
         });
-        state.supplierPurchasesFull = purchases;
-        state.listPages['supplierPurchases'] = LIST_PAGE_SIZE;
-        renderSupplierPurchasesList();
+        var container = document.getElementById('supplier-purchases-list');
+        if (!purchases.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun achat enregistré pour ce fournisseur.</div>';
+            return;
+        }
+        container.innerHTML = purchases.map(function(p) {
+            var total = parseFloat(p.total_amount);
+            var paid  = parseFloat(p.amount_paid);
+            var due   = parseFloat(p.amount_due);
+            var isPaid = due <= 0;
+            var statusColor = isPaid ? '#28a745' : p.payment_type === 'credit' ? '#dc3545' : '#856404';
+            var statusLabel = isPaid ? 'Soldé' : p.payment_type === 'credit' ? 'À crédit' : 'Partiel';
+            return '<div class="card mb-2" style="border-left-color:' + statusColor + ';">' +
+                '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                '<div>' +
+                '<h5 style="margin-bottom:4px;">' + p.description + '</h5>' +
+                '<small class="text-muted">' + (p.date||'-') + (p.note ? ' — ' + p.note : '') + '</small>' +
+                '</div>' +
+                '<span class="badge" style="background:' + statusColor + ';color:#fff;font-size:.8rem;">' + statusLabel + '</span>' +
+                '</div>' +
+                (p.medication_id ?
+                '<div class="alert alert-info mt-2" style="padding:8px 12px;font-size:.82rem;">' +
+                '<i class="fas fa-pills"></i> Médicament: <strong>' +
+                (function() {
+                    var med = state.medications.find(function(m) { return m.id === p.medication_id; });
+                    return med ? med.name : p.medication_id;
+                })() +
+                (p.quantity_received ? ' — Qté reçue: <strong>+' + p.quantity_received + '</strong>' : '') +
+                '</div>' : '') +
+                '<div class="d-flex gap-15 flex-wrap mt-2">' +
+                '<span>Total: <strong>' + total.toLocaleString('fr-FR') + ' HTG</strong></span>' +
+                '<span>Payé: <strong style="color:#28a745;">' + paid.toLocaleString('fr-FR') + ' HTG</strong></span>' +
+                (due > 0 ? '<span>Restant: <strong style="color:#dc3545;">' + due.toLocaleString('fr-FR') + ' HTG</strong></span>' : '') +
+                '</div>' +
+                (due > 0 ?
+                '<div class="d-flex gap-10 mt-2 align-center flex-wrap">' +
+                '<input type="number" class="form-control" id="pay-' + p.id + '" placeholder="Montant à payer (HTG)" min="0" max="' + due + '" style="width:200px;font-size:.88rem;">' +
+                '<input type="text" class="form-control" id="paynote-' + p.id + '" placeholder="Note paiement" style="width:180px;font-size:.88rem;">' +
+                '<button class="btn btn-success btn-sm" data-pid="' + p.id + '" onclick="paySupplierDebt(this.dataset.pid)"><i class="fas fa-money-bill-wave"></i> Payer</button>' +
+                '<i class="fas fa-money-bill-wave"></i> Payer</button>' +
+                '</div>' : '') +
+                '<div class="mt-2">' +
+                '<button class="btn btn-xs btn-danger" data-pid="' + p.id + '" onclick="deleteSupplierPurchaseFn(this.dataset.pid)"><i class="fas fa-trash"></i> Supprimer</button>' +
+                '<i class="fas fa-trash"></i> Supprimer</button>' +
+                '</div></div>';
+        }).join('');
     } catch(e) {}
-}
-
-function renderSupplierPurchasesList() {
-    var purchases = state.supplierPurchasesFull || [];
-    var total = purchases.length;
-    var container = document.getElementById('supplier-purchases-list');
-    if (!container) return;
-    if (!total) {
-        container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Aucun achat enregistré pour ce fournisseur.</div>';
-        return;
-    }
-    var page = pageSlice('supplierPurchases', purchases);
-    container.innerHTML = page.map(function(p) {
-        var total2 = parseFloat(p.total_amount);
-        var paid  = parseFloat(p.amount_paid);
-        var due   = parseFloat(p.amount_due);
-        var isPaid = due <= 0;
-        var statusColor = isPaid ? '#28a745' : p.payment_type === 'credit' ? '#dc3545' : '#856404';
-        var statusLabel = isPaid ? 'Soldé' : p.payment_type === 'credit' ? 'À crédit' : 'Partiel';
-        return '<div class="card mb-2" style="border-left-color:' + statusColor + ';">' +
-            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
-            '<div>' +
-            '<h5 style="margin-bottom:4px;">' + p.description + '</h5>' +
-            '<small class="text-muted">' + (p.date||'-') + (p.note ? ' — ' + p.note : '') + '</small>' +
-            '</div>' +
-            '<span class="badge" style="background:' + statusColor + ';color:#fff;font-size:.8rem;">' + statusLabel + '</span>' +
-            '</div>' +
-            (p.medication_id ?
-            '<div class="alert alert-info mt-2" style="padding:8px 12px;font-size:.82rem;">' +
-            '<i class="fas fa-pills"></i> Médicament: <strong>' +
-            (function() {
-                var med = state.medications.find(function(m) { return m.id === p.medication_id; });
-                return med ? med.name : p.medication_id;
-            })() +
-            (p.quantity_received ? ' — Qté reçue: <strong>+' + p.quantity_received + '</strong>' : '') +
-            '</div>' : '') +
-            '<div class="d-flex gap-15 flex-wrap mt-2">' +
-            '<span>Total: <strong>' + total2.toLocaleString('fr-FR') + ' HTG</strong></span>' +
-            '<span>Payé: <strong style="color:#28a745;">' + paid.toLocaleString('fr-FR') + ' HTG</strong></span>' +
-            (due > 0 ? '<span>Restant: <strong style="color:#dc3545;">' + due.toLocaleString('fr-FR') + ' HTG</strong></span>' : '') +
-            '</div>' +
-            (due > 0 ?
-            '<div class="d-flex gap-10 mt-2 align-center flex-wrap">' +
-            '<input type="number" class="form-control" id="pay-' + p.id + '" placeholder="Montant à payer (HTG)" min="0" max="' + due + '" style="width:200px;font-size:.88rem;">' +
-            '<input type="text" class="form-control" id="paynote-' + p.id + '" placeholder="Note paiement" style="width:180px;font-size:.88rem;">' +
-            '<button class="btn btn-success btn-sm" data-pid="' + p.id + '" onclick="paySupplierDebt(this.dataset.pid)"><i class="fas fa-money-bill-wave"></i> Payer</button>' +
-            '</div>' : '') +
-            '<div class="mt-2">' +
-            '<button class="btn btn-xs btn-danger" data-pid="' + p.id + '" onclick="deleteSupplierPurchaseFn(this.dataset.pid)"><i class="fas fa-trash"></i> Supprimer</button>' +
-            '</div></div>';
-    }).join('') + loadMoreButtonHtml('supplierPurchases', total, page.length, 'renderSupplierPurchasesList');
 }
 
 async function paySupplierDebt(purchaseId) {
@@ -4266,44 +3915,35 @@ async function loadAllPatientsAccounts() {
     container.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
     try {
         var patients = await API.getPatients({}).catch(function() { return []; });
+        var accounts = await API.getUsers().catch(function() { return []; }); // pour référence future
+
         if (!patients.length) {
             container.innerHTML = '<p class="text-muted">Aucun patient enregistré.</p>';
             return;
         }
-        state.pacAllPatientsFull = patients;
-        state.listPages['pacAllPatients'] = LIST_PAGE_SIZE;
-        renderAllPatientsAccounts();
+
+        container.innerHTML =
+            '<div class="table-container"><table><thead><tr>' +
+            '<th>ID</th><th>Nom</th><th>Téléphone</th><th>Type</th><th>Action</th>' +
+            '</tr></thead><tbody>' +
+            patients.map(function(p) {
+                return '<tr>' +
+                    '<td><strong>' + p.id + '</strong></td>' +
+                    '<td>' + p.full_name + '</td>' +
+                    '<td>' + (p.phone||'-') + '</td>' +
+                    '<td>' + p.type + (p.vip?' <span class="vip-tag">VIP</span>':'') + '</td>' +
+                    '<td>' +
+                    '<button class="btn btn-sm btn-info" data-pid="' + p.id + '" data-pname="' + p.full_name + '" ' +
+                    'onclick="quickSetPassword(this.dataset.pid, this.dataset.pname)">' +
+                    '<i class="fas fa-key"></i> Définir MDP</button>' +
+                    '</td></tr>';
+            }).join('') +
+            '</tbody></table></div>' +
+            '<p class="text-muted mt-2" style="font-size:.8rem;"><i class="fas fa-info-circle"></i> ' +
+            patients.length + ' patient(s) au total. Cliquez "Définir MDP" pour créer ou modifier le mot de passe.</p>';
     } catch(e) {
         container.innerHTML = '<div class="alert alert-danger">Erreur chargement</div>';
     }
-}
-
-function renderAllPatientsAccounts() {
-    var patients = state.pacAllPatientsFull || [];
-    var total = patients.length;
-    var container = document.getElementById('pac-all-patients-list');
-    if (!container) return;
-    var page = pageSlice('pacAllPatients', patients);
-    container.innerHTML =
-        '<div class="table-container"><table><thead><tr>' +
-        '<th>ID</th><th>Nom</th><th>Téléphone</th><th>Type</th><th>Action</th>' +
-        '</tr></thead><tbody>' +
-        page.map(function(p) {
-            return '<tr>' +
-                '<td><strong>' + p.id + '</strong></td>' +
-                '<td>' + p.full_name + '</td>' +
-                '<td>' + (p.phone||'-') + '</td>' +
-                '<td>' + p.type + (p.vip?' <span class="vip-tag">VIP</span>':'') + '</td>' +
-                '<td>' +
-                '<button class="btn btn-sm btn-info" data-pid="' + p.id + '" data-pname="' + p.full_name + '" ' +
-                'onclick="quickSetPassword(this.dataset.pid, this.dataset.pname)">' +
-                '<i class="fas fa-key"></i> Définir MDP</button>' +
-                '</td></tr>';
-        }).join('') +
-        '</tbody></table></div>' +
-        loadMoreButtonHtml('pacAllPatients', total, page.length, 'renderAllPatientsAccounts') +
-        '<p class="text-muted mt-2" style="font-size:.8rem;"><i class="fas fa-info-circle"></i> ' +
-        total + ' patient(s) au total. Cliquez "Définir MDP" pour créer ou modifier le mot de passe.</p>';
 }
 
 function quickSetPassword(patientId, patientName) {
@@ -4328,14 +3968,46 @@ function quickSetPassword(patientId, patientName) {
 }
 
 // ─── PARAMÈTRES ──────────────────────────────────────────────
+
+// ─── PAGINATION LISTES ────────────────────────────────────────
+function renderPagedList(items, containerId, renderFn, pageSize) {
+    pageSize = pageSize || 10;
+    window['_pg_' + containerId] = { items: items, fn: renderFn, size: pageSize, showing: pageSize };
+    refreshPagedList(containerId);
+}
+function refreshPagedList(cid) {
+    var st = window['_pg_' + cid];
+    var el = document.getElementById(cid);
+    if (!st || !el) return;
+    var rows = st.items.slice(0, st.showing).map(st.fn).join('');
+    var rem  = st.items.length - st.showing;
+    if (rem > 0) {
+        rows += '<tr><td colspan="10" style="text-align:center;padding:10px;">' +
+            '<button class="btn btn-sm btn-secondary" data-cid="' + cid + '" onclick="showMorePaged(this.dataset.cid)">' +
+            '<i class="fas fa-chevron-down"></i> Voir ' + rem + ' de plus (Total: ' + st.items.length + ')' +
+            '</button></td></tr>';
+    } else if (st.items.length > st.size) {
+        rows += '<tr><td colspan="10" style="text-align:center;padding:8px;">' +
+            '<button class="btn btn-sm btn-secondary" data-cid="' + cid + '" onclick="showLessPaged(this.dataset.cid)">' +
+            '<i class="fas fa-chevron-up"></i> Réduire</button></td></tr>';
+    }
+    el.innerHTML = rows;
+}
+function showMorePaged(cid) {
+    var st = window['_pg_' + cid];
+    if (st) { st.showing = st.items.length; refreshPagedList(cid); }
+}
+function showLessPaged(cid) {
+    var st = window['_pg_' + cid];
+    if (st) { st.showing = st.size; refreshPagedList(cid); }
+}
+
 async function updateSettingsDisplay() {
     // Types de consultation
-    var ctTotal = state.consultationTypes.length;
-    var ctPage  = pageSlice('consultationTypes', state.consultationTypes);
     document.getElementById('consultation-types-list').innerHTML =
-        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Description</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
-        ctPage.map(function(ct) {
-            return '<tr>' +
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Description</th><th>Actif</th><th>Actions</th></tr></thead><tbody id="consultation-types-list-tb"></tbody></table></div>';
+    renderPagedList(state.consultationTypes, 'consultation-types-list-tb', function(ct) {
+        return '<tr>' +
                 '<td><strong>' + ct.name + '</strong></td>' +
                 '<td>' + ct.price + ' HTG</td>' +
                 '<td>' + (ct.description||'-') + '</td>' +
@@ -4345,19 +4017,13 @@ async function updateSettingsDisplay() {
                     '<button class="btn btn-sm btn-danger" onclick="deleteConsultationType(' + ct.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
                 '</div></td>' +
             '</tr>';
-        }).join('') +
-        '<tr>' +
-            '<td colspan="5" style="text-align:center;padding:6px;border:none;">' +
-                loadMoreButtonHtml('consultationTypes', ctTotal, ctPage.length, 'updateSettingsDisplay') +
-            '</td>' +
-        '</tr>' +
-        '</tbody></table></div>';
+    }, 10);
 
     // Types signes vitaux
     document.getElementById('vitals-types-list').innerHTML =
-        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Unité</th><th>Min</th><th>Max</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
-        state.vitalTypes.map(function(v) {
-            return '<tr>' +
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Unité</th><th>Min</th><th>Max</th><th>Actif</th><th>Actions</th></tr></thead><tbody id="vitals-types-list-tb"></tbody></table></div>';
+    renderPagedList(state.vitalTypes, 'vitals-types-list-tb', function(v) {
+        return '<tr>' +
                 '<td>' + v.name + '</td><td>' + v.unit + '</td><td>' + v.min + '</td><td>' + v.max + '</td>' +
                 '<td><input type="checkbox" ' + (v.active?'checked':'') + ' onchange="toggleVitalType(' + v.id + ',this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>' +
                 '<td><div class="d-flex gap-10">' +
@@ -4365,16 +4031,13 @@ async function updateSettingsDisplay() {
                     '<button class="btn btn-sm btn-danger" onclick="deleteVitalType(' + v.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
                 '</div></td>' +
             '</tr>';
-        }).join('') +
-        '</tbody></table></div>';
+    }, 10);
 
     // Types analyses labo
-    var latTotal = state.labAnalysisTypes.length;
-    var latPage  = pageSlice('labAnalysisTypes', state.labAnalysisTypes);
     document.getElementById('lab-analyses-types-list').innerHTML =
-        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix</th><th>Type</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
-        latPage.map(function(a) {
-            return '<tr>' +
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix</th><th>Type</th><th>Actif</th><th>Actions</th></tr></thead><tbody id="lab-analyses-types-list-tb"></tbody></table></div>';
+    renderPagedList(state.labAnalysisTypes, 'lab-analyses-types-list-tb', function(a) {
+        return '<tr>' +
                 '<td>' + a.name + '</td>' +
                 '<td>' + a.price + ' HTG</td>' +
                 '<td><span class="result-type-badge ' + (a.result_type==='image'?'result-type-image':'result-type-text') + '">' + (a.result_type==='image'?'Image':'Texte') + '</span></td>' +
@@ -4384,19 +4047,13 @@ async function updateSettingsDisplay() {
                     '<button class="btn btn-sm btn-danger" onclick="deleteLabAnalysisType(' + a.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
                 '</div></td>' +
             '</tr>';
-        }).join('') +
-        '<tr>' +
-            '<td colspan="5" style="text-align:center;padding:6px;border:none;">' +
-                loadMoreButtonHtml('labAnalysisTypes', latTotal, latPage.length, 'updateSettingsDisplay') +
-            '</td>' +
-        '</tr>' +
-        '</tbody></table></div>';
+    }, 10);
 
     // Services externes
     document.getElementById('external-services-types-list').innerHTML =
-        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Actif</th><th>Actions</th></tr></thead><tbody>' +
-        state.externalServiceTypes.map(function(s) {
-            return '<tr>' +
+        '<div class="table-container"><table><thead><tr><th>Nom</th><th>Prix (Gdes)</th><th>Actif</th><th>Actions</th></tr></thead><tbody id="es-tb"></tbody></table></div>';
+    renderPagedList(state.externalServiceTypes, 'es-tb', function(s) {
+        return '<tr>' +
                 '<td>' + s.name + '</td>' +
                 '<td>' + s.price + ' Gdes</td>' +
                 '<td><input type="checkbox" ' + (s.active?'checked':'') + ' onchange="toggleExternalServiceType(' + s.id + ',this.checked)" style="width:18px;height:18px;accent-color:var(--primary);"></td>' +
@@ -4405,8 +4062,7 @@ async function updateSettingsDisplay() {
                     '<button class="btn btn-sm btn-danger" onclick="deleteExternalServiceType(' + s.id + ')" title="Supprimer"><i class="fas fa-trash"></i></button>' +
                 '</div></td>' +
             '</tr>';
-        }).join('') +
-        '</tbody></table></div>';
+    }, 10);
 }
 
 // ─── MODAL MODIFICATION UNIVERSELLE ──────────────────────────
@@ -4561,9 +4217,7 @@ async function saveEditMedication(id) {
 async function updateMedicationsSettingsList() {
     var meds = await API.getMedications().catch(function() { return []; });
     state.medications = meds;
-    var medsTotal = meds.length;
-    var medsPage  = pageSlice('medications', meds);
-    document.getElementById('medications-settings-list').innerHTML = medsPage.map(function(m) {
+    renderPagedList(meds, 'medications-settings-list', function(m) {
         return '<tr class="' + (m.quantity === 0 ? 'out-of-stock' : m.quantity <= m.alert_threshold ? 'low-stock' : '') + '">' +
             '<td><strong>' + m.name + '</strong>' + (m.generic_name && m.generic_name !== m.name ? '<br><small class="text-muted">' + m.generic_name + '</small>' : '') + '</td>' +
             '<td>' + (m.form||'-') + '</td>' +
@@ -4576,43 +4230,32 @@ async function updateMedicationsSettingsList() {
                 '<button class="btn btn-sm btn-warning" onclick="openEditModal(\'medication\',\'' + m.id + '\')" title="Modifier"><i class="fas fa-edit"></i></button>' +
                 '<button class="btn btn-sm btn-danger" onclick="deleteMedicationSettings(\'' + m.id + '\') " title="Supprimer"><i class="fas fa-trash"></i></button>' +
             '</div></td>' +
-        '</tr>';
-    }).join('') + loadMoreButtonHtml('medications', medsTotal, medsPage.length, 'updateMedicationsSettingsList', 8);
+        '</tr>';;
+    }, 10);;
 
     if (state.currentRole === 'admin' || (state.currentRole === 'sub_admin' && state.subAdminPermissions.users)) {
         var users = await API.getUsers().catch(function() { return []; });
-        state.usersListFull = users;
-        state.listPages['usersList'] = LIST_PAGE_SIZE;
-        renderUsersList();
+        document.getElementById('users-list').innerHTML = users.map(function(u) {
+            var extraRolesLabel = u.extra_roles
+                ? u.extra_roles.split(',').map(function(r) {
+                    return '<span class="badge badge-info" style="margin:1px;font-size:.7rem;">' + getRoleLabel(r.trim()) + '</span>';
+                  }).join('')
+                : '';
+            return '<tr>' +
+                '<td><strong>' + u.name + '</strong></td>' +
+                '<td><span class="badge badge-primary">' + getRoleLabel(u.role) + '</span>' + extraRolesLabel + '</td>' +
+                '<td><code>' + u.username + '</code></td>' +
+                '<td>' + (u.active
+                    ? '<span class="badge badge-success"><i class="fas fa-check"></i> Actif</span>'
+                    : '<span class="badge badge-danger"><i class="fas fa-times"></i> Inactif</span>') + '</td>' +
+                '<td><div class="d-flex gap-10">' +
+                    '<button class="btn btn-sm btn-warning" onclick="openEditUserModal(\'' + u.id + '\' )" title="Modifier"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-sm ' + (u.active ? 'btn-secondary' : 'btn-success') + '" onclick="toggleUser(\'' + u.id + '\' ,' + !u.active + ',\'' + u.name + '\' )" title="' + (u.active ? 'Désactiver' : 'Activer') + '"><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\' ,\'' + u.name + '\' )" title="Supprimer"><i class="fas fa-trash"></i></button>' +
+                '</div></td>' +
+            '</tr>';
+        }).join('');
     }
-}
-
-function renderUsersList() {
-    var users = state.usersListFull || [];
-    var total = users.length;
-    var container = document.getElementById('users-list');
-    if (!container) return;
-    var page = pageSlice('usersList', users);
-    container.innerHTML = page.map(function(u) {
-        var extraRolesLabel = u.extra_roles
-            ? u.extra_roles.split(',').map(function(r) {
-                return '<span class="badge badge-info" style="margin:1px;font-size:.7rem;">' + getRoleLabel(r.trim()) + '</span>';
-              }).join('')
-            : '';
-        return '<tr>' +
-            '<td><strong>' + u.name + '</strong></td>' +
-            '<td><span class="badge badge-primary">' + getRoleLabel(u.role) + '</span>' + extraRolesLabel + '</td>' +
-            '<td><code>' + u.username + '</code></td>' +
-            '<td>' + (u.active
-                ? '<span class="badge badge-success"><i class="fas fa-check"></i> Actif</span>'
-                : '<span class="badge badge-danger"><i class="fas fa-times"></i> Inactif</span>') + '</td>' +
-            '<td><div class="d-flex gap-10">' +
-                '<button class="btn btn-sm btn-warning" onclick="openEditUserModal(\'' + u.id + '\' )" title="Modifier"><i class="fas fa-edit"></i></button>' +
-                '<button class="btn btn-sm ' + (u.active ? 'btn-secondary' : 'btn-success') + '" onclick="toggleUser(\'' + u.id + '\' ,' + !u.active + ',\'' + u.name + '\' )" title="' + (u.active ? 'Désactiver' : 'Activer') + '"><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
-                '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\' ,\'' + u.name + '\' )" title="Supprimer"><i class="fas fa-trash"></i></button>' +
-            '</div></td>' +
-        '</tr>';
-    }).join('') + loadMoreButtonHtml('usersList', total, page.length, 'renderUsersList', 6);
 }
 
 // Fonctions paramètres CRUD
@@ -5052,617 +4695,3 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPatientTypeChange();
     setupAdminSearch();
 });
-
-// ════════════════════════════════════════════════════════════
-//  HOSPITALISATION — module frontend
-// ════════════════════════════════════════════════════════════
-
-async function populateHospDoctorSelect() {
-    const sel = document.getElementById('hosp-doctor');
-    if (!sel) return;
-    try {
-        const users = await API.getUsers().catch(() => []);
-        const doctors = users.filter(u => u.role === 'doctor' && u.active);
-        sel.innerHTML = '<option value="">Sélectionner...</option>' +
-            doctors.map(d => `<option value="${d.username}">${d.name}</option>`).join('');
-    } catch(e) {}
-}
-
-function toggleAdmitForm() {
-    const form = document.getElementById('admit-form');
-    if (!form) return;
-    const show = form.style.display === 'none' || !form.style.display;
-    form.style.display = show ? 'block' : 'none';
-    if (show) {
-        populateHospDoctorSelect();
-        document.getElementById('hosp-patient-search').value = '';
-        document.getElementById('hosp-patient-found').style.display = 'none';
-        document.getElementById('hosp-patient-found').innerHTML = '';
-        document.getElementById('hosp-room').value = '';
-        document.getElementById('hosp-bed').value = '';
-        document.getElementById('hosp-reason').value = '';
-        document.getElementById('hosp-deposit').value = '';
-        state.hospSelectedPatient = null;
-    }
-}
-
-async function searchPatientForHosp() {
-    const search = document.getElementById('hosp-patient-search').value.trim();
-    if (!search) { toast('Entrer un ID ou un nom', 'error'); return; }
-    try {
-        const patients = await apiCall(() => API.getPatients({ search }));
-        state.hospSearchResults = patients.slice(0, 8);
-        const box = document.getElementById('hosp-patient-found');
-        box.style.display = 'block';
-        if (!state.hospSearchResults.length) {
-            box.innerHTML = '<p class="text-muted">Aucun patient trouvé.</p>';
-            state.hospSelectedPatient = null;
-            return;
-        }
-        box.innerHTML = state.hospSearchResults.map((p, i) => `
-            <div class="d-flex gap-10" style="align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">
-                <div style="flex:1;"><strong>${p.full_name}</strong> <small class="text-muted">#${p.id}</small></div>
-                <button type="button" class="btn btn-sm btn-primary" onclick="selectHospPatient(${i})">Choisir</button>
-            </div>`).join('');
-    } catch(e) {}
-}
-
-function selectHospPatient(idx) {
-    const p = (state.hospSearchResults || [])[idx];
-    if (!p) return;
-    state.hospSelectedPatient = p;
-    document.getElementById('hosp-patient-found').innerHTML =
-        `<div style="padding:8px 12px;border-radius:8px;background:#e6ffed;border:1px solid #28a745;">
-            <i class="fas fa-check-circle" style="color:#28a745;"></i> Patient sélectionné : <strong>${p.full_name}</strong> (#${p.id})
-        </div>`;
-}
-
-async function admitPatient() {
-    const p = state.hospSelectedPatient;
-    if (!p) { toast('Sélectionner un patient', 'error'); return; }
-    const reason = document.getElementById('hosp-reason').value.trim();
-    if (!reason) { toast("Indiquer le motif d'admission", 'error'); return; }
-    const room   = document.getElementById('hosp-room').value.trim();
-    const bed    = document.getElementById('hosp-bed').value.trim();
-    const doctorUsername  = document.getElementById('hosp-doctor').value;
-    const depositAmount   = parseFloat(document.getElementById('hosp-deposit').value) || 0;
-    try {
-        await apiCall(() => API.admitPatient({ patientId: p.id, room, bed, reason, doctorUsername, depositAmount }));
-        toast('Patient hospitalisé avec succès');
-        toggleAdmitForm();
-        loadHospitalizations('active');
-        notifyDepartment('nurse', 'Nouveau patient hospitalisé',
-            `${p.full_name} (ID: ${p.id}) a été admis${room ? ' — Chambre ' + room : ''}.`, '#6f42c1');
-    } catch(e) {}
-}
-
-async function loadHospitalizations(status) {
-    try {
-        const list = await apiCall(() => API.getHospitalizations(status ? { status } : {}));
-        state.hospListFull = list;
-        state.listPages['hospitalizations'] = LIST_PAGE_SIZE;
-        renderHospitalizationsList();
-    } catch(e) {}
-}
-
-function getFilteredHospList() {
-    const term = (document.getElementById('hosp-list-search')?.value || '').trim().toLowerCase();
-    const list = state.hospListFull || [];
-    if (!term) return list;
-    return list.filter(h =>
-        (h.full_name || '').toLowerCase().includes(term) ||
-        (h.patient_id || '').toLowerCase().includes(term) ||
-        (h.room || '').toLowerCase().includes(term) ||
-        (h.bed || '').toLowerCase().includes(term)
-    );
-}
-
-function filterHospitalizationsList() {
-    state.listPages['hospitalizations'] = LIST_PAGE_SIZE;
-    renderHospitalizationsList();
-}
-
-function renderHospitalizationsList() {
-    const list  = getFilteredHospList();
-    const total = list.length;
-    const page  = pageSlice('hospitalizations', list);
-    const container = document.getElementById('hospitalizations-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucune hospitalisation.</p>'; return; }
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Patient</th><th>Chambre/Lit</th><th>Médecin</th><th>Admission</th><th>Statut</th><th>Solde</th><th>Action</th></tr></thead><tbody>' +
-        page.map(h => `
-            <tr>
-                <td><strong>${h.full_name}</strong><br><small class="text-muted">#${h.patient_id}</small></td>
-                <td>${h.room || '-'}${h.bed ? ' / ' + h.bed : ''}</td>
-                <td>${h.doctor || '-'}</td>
-                <td>${h.admission_date ? new Date(h.admission_date).toLocaleDateString('fr-FR') : '-'}</td>
-                <td><span class="${h.status === 'active' ? 'status-paid' : 'status-unpaid'}">${h.status === 'active' ? 'Actif' : 'Sorti'}</span></td>
-                <td>${formatHTG(h.balance)}</td>
-                <td><button class="btn btn-sm btn-primary" onclick="openHospDetail('${h.id}')"><i class="fas fa-folder-open"></i> Dossier</button></td>
-            </tr>`).join('') +
-        '</tbody></table></div>' +
-        loadMoreButtonHtml('hospitalizations', total, page.length, 'renderHospitalizationsList');
-}
-
-async function openHospDetail(hospId) {
-    try {
-        const h = await apiCall(() => API.getHospitalization(hospId));
-        state.currentHosp = h;
-        document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
-        document.getElementById('admit-patient-card').style.display = 'none';
-        document.getElementById('hosp-detail-section').style.display = 'block';
-        document.getElementById('hosp-detail-title').innerHTML =
-            `<i class="fas fa-user-injured"></i> Dossier: ${h.full_name} (#${h.patient_id})`;
-        renderHospFinancialSummary(h);
-        showHospTab('nursing');
-        populateRxMedicationSelect();
-        await Promise.all([refreshNursingNotes(), refreshPrescriptions(), refreshDeposits(), refreshHospServices()]);
-    } catch(e) {}
-}
-
-function closeHospDetail() {
-    const detail = document.getElementById('hosp-detail-section');
-    if (detail) detail.style.display = 'none';
-    document.getElementById('hospitalizations-list')?.closest('.card') &&
-        (document.getElementById('hospitalizations-list').closest('.card').style.display = 'block');
-    const admitCard = document.getElementById('admit-patient-card');
-    if (admitCard) admitCard.style.display = 'block';
-    state.currentHosp = null;
-}
-
-function renderHospFinancialSummary(h) {
-    const el = document.getElementById('hosp-financial-summary');
-    if (!el) return;
-    el.innerHTML = `
-        <div class="d-flex gap-20" style="flex-wrap:wrap;">
-            <div><strong>Chambre:</strong> ${h.room || '-'}${h.bed ? ' / ' + h.bed : ''}</div>
-            <div><strong>Médecin:</strong> ${h.doctor || '-'}</div>
-            <div><strong>Admission:</strong> ${h.admission_date ? new Date(h.admission_date).toLocaleDateString('fr-FR') : '-'}</div>
-            <div><strong>Statut:</strong> <span class="${h.status === 'active' ? 'status-paid' : 'status-unpaid'}">${h.status === 'active' ? 'Actif' : 'Sorti'}</span></div>
-            <div><strong>Dépôts totaux:</strong> ${formatHTG(h.deposit)}</div>
-            <div><strong>Solde restant:</strong> ${formatHTG(h.balance)}</div>
-        </div>
-        ${h.admission_reason ? `<p class="mt-2"><strong>Motif:</strong> ${h.admission_reason}</p>` : ''}
-    `;
-}
-
-function showHospTab(tab) {
-    document.querySelectorAll('.hosp-tab-content').forEach(el => el.style.display = 'none');
-    const target = document.getElementById('hosp-tab-' + tab);
-    if (target) target.style.display = 'block';
-    document.querySelectorAll('.hosp-tab-btn').forEach(btn => {
-        const active = btn.dataset.tab === tab;
-        btn.style.color        = active ? 'var(--primary)' : 'var(--muted)';
-        btn.style.borderBottom = active ? '3px solid var(--primary)' : '3px solid transparent';
-    });
-}
-
-// ── Suivi infirmier ─────────────────────────────────────────
-async function saveNursingNote() {
-    const h = state.currentHosp;
-    if (!h) return;
-    const data = {
-        hospitalizationId: h.id,
-        patientId:         h.patient_id,
-        temperature:  document.getElementById('nur-temp').value || null,
-        bloodPressure:document.getElementById('nur-bp').value || null,
-        pulse:        document.getElementById('nur-pulse').value || null,
-        oxygenSat:    document.getElementById('nur-o2').value || null,
-        weight:       document.getElementById('nur-weight').value || null,
-        generalState: document.getElementById('nur-state').value || null,
-        notes:        document.getElementById('nur-notes').value.trim() || null,
-    };
-    if (!data.notes && !data.temperature && !data.pulse && !data.generalState) {
-        toast('Renseigner au moins une donnée', 'error'); return;
-    }
-    try {
-        await apiCall(() => API.addHospNursing(data));
-        toast('Suivi enregistré');
-        ['nur-temp','nur-bp','nur-pulse','nur-o2','nur-weight','nur-notes'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('nur-state').value = '';
-        refreshNursingNotes();
-    } catch(e) {}
-}
-
-async function refreshNursingNotes() {
-    const h = state.currentHosp;
-    if (!h) return;
-    try {
-        state.hospNursingFull = await apiCall(() => API.getHospNursing(h.id));
-        state.listPages['hospNursing'] = LIST_PAGE_SIZE;
-        renderNursingNotes();
-    } catch(e) {}
-}
-
-function renderNursingNotes() {
-    const notes = state.hospNursingFull || [];
-    const total = notes.length;
-    const page  = pageSlice('hospNursing', notes);
-    const container = document.getElementById('nursing-notes-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun suivi enregistré.</p>'; return; }
-    container.innerHTML = page.map(n => `
-        <div class="card" style="margin-bottom:10px;">
-            <div class="d-flex gap-20" style="flex-wrap:wrap;font-size:.9rem;">
-                ${n.temperature   ? `<div><i class="fas fa-thermometer-half"></i> ${n.temperature}°C</div>` : ''}
-                ${n.blood_pressure? `<div><i class="fas fa-heartbeat"></i> ${n.blood_pressure}</div>` : ''}
-                ${n.pulse         ? `<div><i class="fas fa-heart"></i> ${n.pulse} bpm</div>` : ''}
-                ${n.oxygen_sat    ? `<div><i class="fas fa-lungs"></i> ${n.oxygen_sat}%</div>` : ''}
-                ${n.weight        ? `<div><i class="fas fa-weight"></i> ${n.weight} kg</div>` : ''}
-                ${n.general_state ? `<div><span class="badge badge-primary">${n.general_state}</span></div>` : ''}
-            </div>
-            ${n.notes ? `<p class="mt-2">${n.notes}</p>` : ''}
-            <small class="text-muted">${n.created_at ? new Date(n.created_at).toLocaleString('fr-FR') : ''} — ${n.recorded_by||''}</small>
-        </div>`).join('') + loadMoreButtonHtml('hospNursing', total, page.length, 'renderNursingNotes');
-}
-
-// ── Prescriptions ────────────────────────────────────────────
-function populateRxMedicationSelect() {
-    const sel = document.getElementById('rx-medication');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Sélectionner...</option>' +
-        (state.medications || []).filter(m => m.quantity > 0).map(m =>
-            `<option value="${m.id}" data-price="${m.price}">${m.name} (Stock: ${m.quantity})</option>`).join('');
-}
-
-function onRxMedSelect() {
-    const sel = document.getElementById('rx-medication');
-    const opt = sel.options[sel.selectedIndex];
-    if (opt && opt.dataset && opt.dataset.price) {
-        document.getElementById('rx-price').value = opt.dataset.price;
-        document.getElementById('rx-med-name').value = '';
-    }
-    updateRxCostPreview();
-}
-
-function updateRxCostPreview() {
-    const price = parseFloat(document.getElementById('rx-price').value) || 0;
-    const qty   = parseInt(document.getElementById('rx-qty').value) || 1;
-    const total = price * qty;
-    const el = document.getElementById('rx-cost-preview');
-    if (el) el.innerHTML = total > 0 ? `<strong>Coût total:</strong> ${formatAmount(total)}` : '';
-}
-
-async function savePrescription() {
-    const h = state.currentHosp;
-    if (!h) return;
-    const medSel = document.getElementById('rx-medication');
-    const medId  = medSel.value || null;
-    const medName = medId
-        ? medSel.options[medSel.selectedIndex].textContent.replace(/\s*\(Stock:.*\)$/, '')
-        : document.getElementById('rx-med-name').value.trim();
-    const dosage = document.getElementById('rx-dosage').value.trim();
-    if (!medName) { toast('Sélectionner un médicament ou saisir un nom', 'error'); return; }
-    if (!dosage)  { toast('Indiquer le dosage', 'error'); return; }
-    const data = {
-        hospitalizationId: h.id,
-        patientId:         h.patient_id,
-        medicationId:      medId,
-        medicationName:    medName,
-        dosage,
-        frequency: document.getElementById('rx-frequency').value,
-        duration:  document.getElementById('rx-duration').value.trim() || null,
-        route:     document.getElementById('rx-route').value,
-        note:      document.getElementById('rx-note').value.trim() || null,
-        pricePerUnit: parseFloat(document.getElementById('rx-price').value) || 0,
-        quantity:     parseInt(document.getElementById('rx-qty').value) || 1,
-    };
-    try {
-        await apiCall(() => API.addHospPrescription(data));
-        toast('Prescription enregistrée');
-        notifyDepartment('nurse', 'Nouvelle prescription',
-            `${state.currentUser?.name || 'Le médecin'} a prescrit ${medName} pour ${h.full_name} (#${h.patient_id}).`, '#6f42c1');
-        notifyDepartment('pharmacy', 'Nouvelle prescription (hospitalisation)',
-            `${medName} prescrit pour ${h.full_name} (#${h.patient_id}) — Chambre ${h.room || '-'}.`, '#6f42c1');
-        ['rx-med-name','rx-dosage','rx-duration','rx-note'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('rx-medication').value = '';
-        document.getElementById('rx-qty').value = 1;
-        document.getElementById('rx-price').value = '';
-        updateRxCostPreview();
-        refreshPrescriptions();
-        const updated = await apiCall(() => API.getHospitalization(h.id));
-        state.currentHosp = updated;
-        renderHospFinancialSummary(updated);
-        state.medications = await API.getMedications().catch(() => state.medications);
-        populateRxMedicationSelect();
-    } catch(e) {}
-}
-
-async function refreshPrescriptions() {
-    const h = state.currentHosp;
-    if (!h) return;
-    try {
-        state.hospRxFull = await apiCall(() => API.getHospPrescriptions(h.id));
-        state.listPages['hospPrescriptions'] = LIST_PAGE_SIZE;
-        renderPrescriptions();
-    } catch(e) {}
-}
-
-function renderPrescriptions() {
-    const list  = state.hospRxFull || [];
-    const total = list.length;
-    const page  = pageSlice('hospPrescriptions', list);
-    const container = document.getElementById('prescriptions-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucune prescription.</p>'; return; }
-    container.innerHTML = page.map(rx => `
-        <div class="card" style="margin-bottom:10px;border-left-color:${rx.status === 'administered' ? '#28a745' : '#ff9800'};">
-            <div class="d-flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
-                <div style="flex:1;min-width:220px;">
-                    <strong>${rx.medication_name}</strong> — ${rx.dosage}
-                    <br><small class="text-muted">${rx.frequency || ''} ${rx.duration ? '· ' + rx.duration : ''} ${rx.route ? '· ' + rx.route : ''}</small>
-                    ${rx.note ? `<p class="mt-2" style="background:#fff8e1;padding:6px 10px;border-radius:6px;"><i class="fas fa-sticky-note"></i> ${rx.note}</p>` : ''}
-                    ${rx.status === 'administered' ? `<p class="mt-2 text-muted"><i class="fas fa-check-circle" style="color:#28a745;"></i> Exécuté par ${rx.administered_by||''} le ${rx.administered_at ? new Date(rx.administered_at).toLocaleString('fr-FR') : ''}${rx.nurse_note ? ' — ' + rx.nurse_note : ''}</p>` : ''}
-                </div>
-                <div style="text-align:right;">
-                    <span class="${rx.status === 'administered' ? 'status-paid' : 'status-unpaid'}">${rx.status === 'administered' ? 'Administré' : 'En attente'}</span>
-                    <br><small class="text-muted">${formatHTG(rx.total_price)}</small>
-                    ${rx.status !== 'administered' ? `<br><button class="btn btn-sm btn-success mt-2" onclick="markPrescriptionAdministered('${rx.id}')"><i class="fas fa-check"></i> Marquer exécuté</button>` : ''}
-                </div>
-            </div>
-        </div>`).join('') + loadMoreButtonHtml('hospPrescriptions', total, page.length, 'renderPrescriptions');
-}
-
-async function markPrescriptionAdministered(rxId) {
-    const note = prompt("Note de l'infirmière (optionnel) :", '') || '';
-    try {
-        await apiCall(() => API.updateHospPrescription(rxId, {
-            status: 'administered',
-            administeredAt: new Date().toISOString(),
-            administeredBy: (state.currentUser && (state.currentUser.name || state.currentUser.username)) || '',
-            nurseNote: note,
-        }));
-        toast('Prescription marquée comme exécutée');
-        refreshPrescriptions();
-    } catch(e) {}
-}
-
-// ── Dépôts ────────────────────────────────────────────────────
-async function addDeposit() {
-    const h = state.currentHosp;
-    if (!h) return;
-    const amount = parseFloat(document.getElementById('dep-amount').value);
-    if (!amount || amount <= 0) { toast('Indiquer un montant valide', 'error'); return; }
-    const note = document.getElementById('dep-note').value.trim();
-    try {
-        await apiCall(() => API.addHospDeposit({ hospitalizationId: h.id, patientId: h.patient_id, amount, note }));
-        toast('Dépôt ajouté');
-        document.getElementById('dep-amount').value = '';
-        document.getElementById('dep-note').value = '';
-        refreshDeposits();
-        const updated = await apiCall(() => API.getHospitalization(h.id));
-        state.currentHosp = updated;
-        renderHospFinancialSummary(updated);
-    } catch(e) {}
-}
-
-async function refreshDeposits() {
-    const h = state.currentHosp;
-    if (!h) return;
-    try {
-        state.hospDepositsFull = await apiCall(() => API.getHospDeposits(h.id));
-        state.listPages['hospDeposits'] = LIST_PAGE_SIZE;
-        renderDeposits();
-    } catch(e) {}
-}
-
-function renderDeposits() {
-    const list  = state.hospDepositsFull || [];
-    const total = list.length;
-    const page  = pageSlice('hospDeposits', list);
-    const container = document.getElementById('deposits-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun dépôt.</p>'; return; }
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
-        page.map(d => `<tr><td>${d.created_at ? new Date(d.created_at).toLocaleString('fr-FR') : ''}</td><td>${formatHTG(d.amount)}</td><td>${d.note || '-'}</td><td>${d.created_by||''}</td></tr>`).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('hospDeposits', total, page.length, 'renderDeposits');
-}
-
-// ── Services supplémentaires ────────────────────────────────
-async function addHospService() {
-    const h = state.currentHosp;
-    if (!h) return;
-    const service = document.getElementById('svc-name').value.trim();
-    const amount  = parseFloat(document.getElementById('svc-amount').value);
-    if (!service) { toast('Indiquer le service', 'error'); return; }
-    if (!amount || amount <= 0) { toast('Indiquer un montant valide', 'error'); return; }
-    const note = document.getElementById('svc-note').value.trim();
-    try {
-        await apiCall(() => API.addHospService({ hospitalizationId: h.id, patientId: h.patient_id, service, amount, note }));
-        toast('Service ajouté');
-        document.getElementById('svc-name').value = '';
-        document.getElementById('svc-amount').value = '';
-        document.getElementById('svc-note').value = '';
-        refreshHospServices();
-        const updated = await apiCall(() => API.getHospitalization(h.id));
-        state.currentHosp = updated;
-        renderHospFinancialSummary(updated);
-    } catch(e) {}
-}
-
-async function refreshHospServices() {
-    const h = state.currentHosp;
-    if (!h) return;
-    try {
-        state.hospServicesFull = await apiCall(() => API.getHospServices(h.id));
-        state.listPages['hospServices'] = LIST_PAGE_SIZE;
-        renderHospServicesList();
-    } catch(e) {}
-}
-
-function renderHospServicesList() {
-    const list  = state.hospServicesFull || [];
-    const total = list.length;
-    const page  = pageSlice('hospServices', list);
-    const container = document.getElementById('hosp-services-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun service ajouté.</p>'; return; }
-    container.innerHTML = '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Note</th><th>Par</th></tr></thead><tbody>' +
-        page.map(s => `<tr><td>${s.created_at ? new Date(s.created_at).toLocaleString('fr-FR') : ''}</td><td>${s.service}</td><td>${formatHTG(s.amount)}</td><td>${s.note || '-'}</td><td>${s.created_by||''}</td></tr>`).join('') +
-        '</tbody></table></div>' + loadMoreButtonHtml('hospServices', total, page.length, 'renderHospServicesList');
-}
-
-// ── Sortie du patient ────────────────────────────────────────
-async function dischargePatient() {
-    const h = state.currentHosp;
-    if (!h) return;
-    if (!confirm('Confirmer la sortie de ce patient ?')) return;
-    const note = document.getElementById('discharge-note').value.trim();
-    try {
-        await apiCall(() => API.updateHospitalization(h.id, {
-            status: 'discharged',
-            dischargeDate: new Date().toISOString().slice(0, 10),
-            dischargeNote: note || null,
-        }));
-        toast('Patient sorti avec succès');
-        closeHospDetail();
-        loadHospitalizations('active');
-    } catch(e) {}
-}
-
-// ── Vue infirmier : patients hospitalisés ────────────────────
-async function loadNurseHospList() {
-    try {
-        state.nurseHospFull = await apiCall(() => API.getHospitalizations({ status: 'active' }));
-        state.listPages['nurseHosp'] = LIST_PAGE_SIZE;
-        renderNurseHospList();
-    } catch(e) {}
-}
-
-function getFilteredNurseHospList() {
-    const term = (document.getElementById('nurse-hosp-search')?.value || '').trim().toLowerCase();
-    const list = state.nurseHospFull || [];
-    if (!term) return list;
-    return list.filter(h =>
-        (h.full_name || '').toLowerCase().includes(term) ||
-        (h.patient_id || '').toLowerCase().includes(term) ||
-        (h.room || '').toLowerCase().includes(term) ||
-        (h.bed || '').toLowerCase().includes(term)
-    );
-}
-
-function filterNurseHospList() {
-    state.listPages['nurseHosp'] = LIST_PAGE_SIZE;
-    renderNurseHospList();
-}
-
-function renderNurseHospList() {
-    const list  = getFilteredNurseHospList();
-    const total = list.length;
-    const page  = pageSlice('nurseHosp', list);
-    const container = document.getElementById('nurse-hosp-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucun patient hospitalisé actif.</p>'; return; }
-    container.innerHTML = page.map(h => `
-        <div class="card" style="margin-bottom:8px;padding:12px;">
-            <div class="d-flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <div>
-                    <strong>${h.full_name}</strong> <small class="text-muted">#${h.patient_id}</small>
-                    <br><small class="text-muted">${h.room || 'Chambre non assignée'}${h.bed ? ' / ' + h.bed : ''} — Dr. ${h.doctor || '-'}</small>
-                </div>
-                <button class="btn btn-sm btn-primary" onclick="openHospDetailFromNurse('${h.id}')"><i class="fas fa-folder-open"></i> Voir le dossier</button>
-            </div>
-        </div>`).join('') + loadMoreButtonHtml('nurseHosp', total, page.length, 'renderNurseHospList');
-}
-
-function openHospDetailFromNurse(hospId) {
-    showSection('hospitalization');
-    openHospDetail(hospId);
-}
-
-// ── Vue pharmacie : prescriptions des patients hospitalisés ──
-async function loadPharmacyHospPrescriptions() {
-    try {
-        state.pharmHospRxFull = await apiCall(() => API.getAllHospPrescriptions());
-        state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
-        renderPharmacyHospPrescriptions();
-    } catch(e) {}
-}
-
-function setPharmHospFilter(filter) {
-    state.pharmHospFilter = filter;
-    state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
-    renderPharmacyHospPrescriptions();
-}
-
-function getFilteredPharmHospRx() {
-    const term = (document.getElementById('pharm-hosp-search')?.value || '').trim().toLowerCase();
-    let list = state.pharmHospRxFull || [];
-    if (state.pharmHospFilter === 'pending') list = list.filter(rx => !rx.delivered);
-    if (!term) return list;
-    return list.filter(rx =>
-        (rx.full_name || '').toLowerCase().includes(term) ||
-        (rx.patient_id || '').toLowerCase().includes(term) ||
-        (rx.medication_name || '').toLowerCase().includes(term) ||
-        (rx.room || '').toLowerCase().includes(term)
-    );
-}
-
-function filterPharmacyHospPrescriptions() {
-    state.listPages['pharmHospRx'] = LIST_PAGE_SIZE;
-    renderPharmacyHospPrescriptions();
-}
-
-function renderPharmacyHospPrescriptions() {
-    const list  = getFilteredPharmHospRx();
-    const total = list.length;
-    const container = document.getElementById('pharm-hosp-list');
-    if (!container) return;
-    if (!total) { container.innerHTML = '<p class="text-muted">Aucune prescription pour le moment.</p>'; return; }
-    const page = pageSlice('pharmHospRx', list);
-    container.innerHTML = page.map(rx => `
-        <div class="card mb-2" style="border-left-color:${rx.delivered ? '#28a745' : '#ff9800'};">
-            <div class="d-flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
-                <div style="flex:1;min-width:220px;">
-                    <strong>${rx.medication_name}</strong> — ${rx.dosage}
-                    <br><small class="text-muted">${rx.full_name} (#${rx.patient_id}) — ${rx.room || 'Chambre non assignée'}${rx.bed ? ' / ' + rx.bed : ''} — Dr. ${rx.doctor || '-'}</small>
-                    <br><small class="text-muted">${rx.frequency || ''} ${rx.duration ? '· ' + rx.duration : ''} ${rx.route ? '· ' + rx.route : ''} · Qté: ${rx.quantity}</small>
-                    ${rx.note ? `<p class="mt-2" style="background:#fff8e1;padding:6px 10px;border-radius:6px;"><i class="fas fa-sticky-note"></i> ${rx.note}</p>` : ''}
-                    ${rx.delivered ? `<p class="mt-2 text-muted"><i class="fas fa-check-circle" style="color:#28a745;"></i> Délivré par ${rx.delivered_by||''} le ${rx.delivered_at ? new Date(rx.delivered_at).toLocaleString('fr-FR') : ''}</p>` : ''}
-                </div>
-                <div style="text-align:right;">
-                    <span class="${rx.delivered ? 'status-paid' : 'status-unpaid'}">${rx.delivered ? 'Délivré (pharmacie)' : 'À délivrer'}</span>
-                    <br><span class="${rx.status === 'administered' ? 'status-paid' : 'status-unpaid'}" style="font-size:.78rem;">${rx.status === 'administered' ? 'Administré (infirmier)' : 'Non administré'}</span>
-                    <br><small class="text-muted">${formatHTG(rx.total_price)}</small>
-                    ${!rx.delivered ? `<br><button class="btn btn-sm btn-success mt-2" onclick="markPrescriptionDelivered('${rx.id}')"><i class="fas fa-check"></i> Marquer délivré</button>` : ''}
-                </div>
-            </div>
-        </div>`).join('') + loadMoreButtonHtml('pharmHospRx', total, page.length, 'renderPharmacyHospPrescriptions');
-}
-
-async function markPrescriptionDelivered(rxId) {
-    try {
-        const deliveredBy = (state.currentUser && (state.currentUser.name || state.currentUser.username)) || '';
-        const deliveredAt = new Date().toISOString();
-        await apiCall(() => API.updateHospPrescription(rxId, { delivered: true, deliveredAt, deliveredBy }));
-        toast('Médicament marqué comme délivré');
-        const list = state.pharmHospRxFull || [];
-        const idx  = list.findIndex(r => r.id === rxId);
-        if (idx > -1) {
-            list[idx].delivered    = true;
-            list[idx].delivered_at = deliveredAt;
-            list[idx].delivered_by = deliveredBy;
-        }
-        renderPharmacyHospPrescriptions();
-    } catch(e) {}
-}
-async function quickHospitalize() {
-    const p = state.currentDoctorPatient;
-    if (!p) { toast('Sélectionner un patient', 'error'); return; }
-    showSection('hospitalization');
-    const form = document.getElementById('admit-form');
-    if (form) form.style.display = 'block';
-    await populateHospDoctorSelect();
-    const sel = document.getElementById('hosp-doctor');
-    if (sel && state.currentRole === 'doctor' && state.currentUser) sel.value = state.currentUser.username;
-    state.hospSelectedPatient = { id: p.id, full_name: p.full_name };
-    const searchInput = document.getElementById('hosp-patient-search');
-    if (searchInput) searchInput.value = p.full_name;
-    const box = document.getElementById('hosp-patient-found');
-    if (box) {
-        box.style.display = 'block';
-        box.innerHTML = `<div style="padding:8px 12px;border-radius:8px;background:#e6ffed;border:1px solid #28a745;">
-            <i class="fas fa-check-circle" style="color:#28a745;"></i> Patient sélectionné : <strong>${p.full_name}</strong> (#${p.id})
-        </div>`;
-    }
-}
