@@ -1,6 +1,5 @@
 // ============================================================
 //  API.JS — Couche d'appels au serveur backend
-//  Toutes les fonctions retournent des promesses
 // ============================================================
 
 const API = (() => {
@@ -31,16 +30,16 @@ const API = (() => {
         login: (username, password, role) =>
             request('POST', '/auth/login', { username, password, role }),
 
-        // ── Paramètres hôpital ────────────────────────────────
-        getSettings:  ()      => request('GET',  '/settings'),
-        saveSettings: (data)  => request('PUT',  '/settings', data),
+        // ── Paramètres ────────────────────────────────────────
+        getSettings:  ()     => request('GET', '/settings'),
+        saveSettings: (data) => request('PUT', '/settings', data),
 
         // ── Utilisateurs ─────────────────────────────────────
-        getUsers:     ()          => request('GET',    '/users'),
-        addUser:      (data)      => request('POST',   '/users', data),
-        updateUser:      (id, data)  => request('PUT',    `/users/${id}`, data),
+        getUsers:           ()         => request('GET',    '/users'),
+        addUser:            (data)     => request('POST',   '/users', data),
+        updateUser:         (id, data) => request('PUT',    `/users/${id}`, data),
         updateUserPassword: (id, pwd)  => request('PUT',    `/users/${id}/password`, { password: pwd }),
-        deleteUser:   (id)        => request('DELETE', `/users/${id}`),
+        deleteUser:         (id)       => request('DELETE', `/users/${id}`),
 
         // ── Patients ─────────────────────────────────────────
         getPatients: (params = {}) => {
@@ -57,17 +56,11 @@ const API = (() => {
             return request('GET', '/transactions' + (qs ? '?' + qs : ''));
         },
         payTransactions:   (ids, method) => request('POST', '/transactions/pay', { transactionIds: ids, paymentMethod: method }),
-        getReceipt:        (receiptNumber) => request('GET', `/transactions/receipt/${encodeURIComponent(receiptNumber)}`),
-        getReceiptsByPatient: (patientId) => request('GET', `/transactions/receipts-by-patient/${encodeURIComponent(patientId)}`),
-        getAllReceipts: (params = {}) => {
-            const qs = new URLSearchParams(params).toString();
-            return request('GET', '/transactions/receipts' + (qs ? '?' + qs : ''));
-        },
         addTransaction:    (data)        => request('POST', '/transactions/add', data),
         saveLabResult:     (id, result)  => request('PUT',  `/transactions/${id}/lab-result`, { result }),
         updateTransactionConsultationType: (id, typeId) => request('PUT', `/transactions/${id}/consultation-type`, { consultationTypeId: typeId }),
         deliverMedication: (id)          => request('PUT',  `/transactions/${id}/deliver`, {}),
-        updateTransaction: (id, data)    => request('PUT',    `/transactions/${id}`, data),
+        updateTransaction: (id, data)    => request('PUT',  `/transactions/${id}`, data),
         deleteTransaction: (id)          => request('DELETE', `/transactions/${id}`),
 
         // ── Signes vitaux ─────────────────────────────────────
@@ -114,8 +107,8 @@ const API = (() => {
             const qs = new URLSearchParams(params).toString();
             return request('GET', '/appointments' + (qs ? '?' + qs : ''));
         },
-        addAppointment:    (data)      => request('POST', '/appointments', data),
-        updateAppointment: (id, data)  => request('PUT',  `/appointments/${id}`, data),
+        addAppointment:    (data)     => request('POST', '/appointments', data),
+        updateAppointment: (id, data) => request('PUT',  `/appointments/${id}`, data),
 
         // ── Messagerie ────────────────────────────────────────
         getMessages:    ()     => request('GET',  '/messages'),
@@ -130,13 +123,21 @@ const API = (() => {
         deletePatientAccount: (patientId) =>
             request('DELETE', `/patient-accounts/${patientId}`),
 
-        // ── Gestion de caisse (retraits / commissions) ────────
+        // ── Gestion de caisse ─────────────────────────────────
         getCashWithdrawals: (params = {}) => {
             const qs = new URLSearchParams(params).toString();
             return request('GET', '/cash-withdrawals' + (qs ? '?' + qs : ''));
         },
         addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
         deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
+
+        // ── Petite caisse ─────────────────────────────────────
+        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
+        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
+        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
+
+        // ── Soldes comptes ────────────────────────────────────
+        getAccountBalances: () => request('GET', '/account-balances'),
 
         // ── Fournisseurs ──────────────────────────────────────
         getSuppliers:    ()          => request('GET',    '/suppliers'),
@@ -152,56 +153,52 @@ const API = (() => {
         addSupplierPurchase:    (data) => request('POST',   '/supplier-purchases', data),
         deleteSupplierPurchase: (id)   => request('DELETE', `/supplier-purchases/${id}`),
 
-        // ── Paiements partiels fournisseurs ───────────────────
+        // ── Paiements fournisseurs ────────────────────────────
         getSupplierPayments: (params = {}) => {
             const qs = new URLSearchParams(params).toString();
             return request('GET', '/supplier-payments' + (qs ? '?' + qs : ''));
         },
         addSupplierPayment: (data) => request('POST', '/supplier-payments', data),
 
-        // ── Gestion de caisse (retraits / commissions) ────────
-        getCashWithdrawals: (params = {}) => {
+        // ── Remboursements ────────────────────────────────────
+        getRefunds: (params = {}) => {
             const qs = new URLSearchParams(params).toString();
-            return request('GET', '/cash-withdrawals' + (qs ? '?' + qs : ''));
+            return request('GET', '/refunds' + (qs ? '?' + qs : ''));
         },
-        addCashWithdrawal:    (data) => request('POST',   '/cash-withdrawals', data),
-        deleteCashWithdrawal: (id)   => request('DELETE', `/cash-withdrawals/${id}`),
+        addRefund:    (data) => request('POST',   '/refunds', data),
+        deleteRefund: (id)   => request('DELETE', `/refunds/${id}`),
 
-        // ── Petite caisse ──────────────────────────────────────
-        getPetiteCaisse:    ()      => request('GET',    '/petite-caisse'),
-        addPetiteCaisse:    (data)  => request('POST',   '/petite-caisse', data),
-        deletePetiteCaisse: (id)    => request('DELETE', `/petite-caisse/${id}`),
+        // ── Hospitalisation ───────────────────────────────────
+        getHospitalizations: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return request('GET', '/hospitalizations' + (qs ? '?' + qs : ''));
+        },
+        getHospitalization:    (id)       => request('GET',  `/hospitalizations/${id}`),
+        admitPatient:          (data)     => request('POST', '/hospitalizations', data),
+        updateHospitalization: (id, data) => request('PUT',  `/hospitalizations/${id}`, data),
+
+        getHospDeposits:  (hospId)   => request('GET',  `/hosp-deposits/${hospId}`),
+        addHospDeposit:   (data)     => request('POST', '/hosp-deposits', data),
+
+        getHospPrescriptions:   (hospId)   => request('GET',  `/hosp-prescriptions/${hospId}`),
+        addHospPrescription:    (data)     => request('POST', '/hosp-prescriptions', data),
+        updateHospPrescription: (id, data) => request('PUT',  `/hosp-prescriptions/${id}`, data),
+
+        getHospNursing: (hospId) => request('GET',  `/hosp-nursing/${hospId}`),
+        addHospNursing: (data)   => request('POST', '/hosp-nursing', data),
+
+        addHospService:  (data)   => request('POST', '/hosp-services', data),
+        getHospServices: (hospId) => request('GET',  `/hosp-services/${hospId}`),
+
+        getHospTasks:   (hospId)   => request('GET',    `/hosp-tasks/${hospId}`),
+        addHospTask:    (data)     => request('POST',   '/hosp-tasks', data),
+        updateHospTask: (id, data) => request('PUT',    `/hosp-tasks/${id}`, data),
+        deleteHospTask: (id)       => request('DELETE', `/hosp-tasks/${id}`),
 
         // ── Stats admin ───────────────────────────────────────
         getStats: (params = {}) => {
             const qs = new URLSearchParams(params).toString();
             return request('GET', '/stats' + (qs ? '?' + qs : ''));
         },
-
-        // ── Hospitalisation ────────────────────────────────────
-        getHospitalizations: (params = {}) => {
-            const qs = new URLSearchParams(params).toString();
-            return request('GET', '/hospitalizations' + (qs ? '?' + qs : ''));
-        },
-        getHospitalization:    (id)   => request('GET',  `/hospitalizations/${id}`),
-        admitPatient:          (data) => request('POST', '/hospitalizations', data),
-        updateHospitalization: (id, data) => request('PUT', `/hospitalizations/${id}`, data),
-
-        getHospDeposits: (hospId) => request('GET',  `/hosp-deposits/${hospId}`),
-        addHospDeposit:  (data)   => request('POST', '/hosp-deposits', data),
-
-        getHospPrescriptions:  (hospId)     => request('GET',  `/hosp-prescriptions/${hospId}`),
-        getAllHospPrescriptions: (params = {}) => {
-            const qs = new URLSearchParams(params).toString();
-            return request('GET', '/hosp-prescriptions' + (qs ? '?' + qs : ''));
-        },
-        addHospPrescription:   (data)       => request('POST', '/hosp-prescriptions', data),
-        updateHospPrescription:(id, data)   => request('PUT',  `/hosp-prescriptions/${id}`, data),
-
-        getHospNursing: (hospId) => request('GET',  `/hosp-nursing/${hospId}`),
-        addHospNursing: (data)   => request('POST', '/hosp-nursing', data),
-
-        getHospServices: (hospId) => request('GET',  `/hosp-services/${hospId}`),
-        addHospService:  (data)   => request('POST', '/hosp-services', data),
     };
 })();
