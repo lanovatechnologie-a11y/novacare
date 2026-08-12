@@ -1276,6 +1276,99 @@ app.get('/hosp-services/:hospId', auth, async (req, res) => {
     res.json(r.rows);
 });
 
+
+// ════════════════════════════════════════════════════════════
+//  TÂCHES HOSPITALISATION (Ordres médecin → Infirmière)
+// ════════════════════════════════════════════════════════════
+
+// Lister les tâches d'une hospitalisation
+app.get('/hosp-tasks/:hospId', auth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            'SELECT * FROM hosp_tasks WHERE hospitalization_id=$1 ORDER BY created_at DESC',
+            [req.params.hospId]
+        );
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Créer une tâche (médecin ordonne)
+app.post('/hosp-tasks', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { hospitalizationId, patientId, taskType, description,
+                medicationId, medicationName, dosage, frequency, duration,
+                route, analysisId, analysisName, amount, priority, note } = req.body;
+        const id = 'TASK' + Date.now();
+        await client.query(
+            `INSERT INTO hosp_tasks(
+                id, hospitalization_id, patient_id, task_type, description,
+                medication_id, medication_name, dosage, frequency, duration,
+                route, analysis_id, analysis_name, amount, priority, note,
+                status, ordered_by, created_at
+            ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17,NOW())`,
+            [id, hospitalizationId, patientId, taskType, description,
+             medicationId||null, medicationName||null, dosage||null, frequency||null, duration||null,
+             route||null, analysisId||null, analysisName||null, amount||0, priority||'normal', note||null,
+             req.user.username]
+        );
+        // Déduire du solde même si négatif (dette)
+        if (parseFloat(amount||0) > 0) {
+            await client.query(
+                'UPDATE hospitalizations SET balance=balance-$1 WHERE id=$2',
+                [amount, hospitalizationId]
+            );
+        }
+        // Réduire stock si médicament
+        if (medicationId && req.body.quantity) {
+            await client.query(
+                'UPDATE medications SET quantity=GREATEST(0,quantity-$1) WHERE id=$2',
+                [req.body.quantity, medicationId]
+            );
+        }
+        await client.query('COMMIT');
+        res.status(201).json({ id, success: true });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
+// Mettre à jour le statut d'une tâche (infirmière exécute)
+app.put('/hosp-tasks/:id', auth, async (req, res) => {
+    try {
+        const { status, executedNote, executedAt } = req.body;
+        await pool.query(
+            `UPDATE hosp_tasks SET status=$1, executed_note=$2, executed_by=$3, executed_at=$4 WHERE id=$5`,
+            [status, executedNote||null, req.user.username, executedAt||new Date().toISOString(), req.params.id]
+        );
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Supprimer une tâche (médecin annule)
+app.delete('/hosp-tasks/:id', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const t = await client.query('SELECT * FROM hosp_tasks WHERE id=$1', [req.params.id]);
+        if (t.rows.length && parseFloat(t.rows[0].amount||0) > 0 && t.rows[0].status === 'pending') {
+            // Remettre le montant si tâche annulée
+            await client.query(
+                'UPDATE hospitalizations SET balance=balance+$1 WHERE id=$2',
+                [t.rows[0].amount, t.rows[0].hospitalization_id]
+            );
+        }
+        await client.query('DELETE FROM hosp_tasks WHERE id=$1', [req.params.id]);
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch(e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    } finally { client.release(); }
+});
+
 // ════════════════════════════════════════════════════════════
 //  REMBOURSEMENTS / RETOURS
 // ════════════════════════════════════════════════════════════
