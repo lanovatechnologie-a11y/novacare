@@ -1320,44 +1320,171 @@ async function openPatientTicket(patientId, patientName) {
     modal = document.createElement('div');
     modal.id = 'patient-ticket-modal';
     modal.className = 'transaction-details-modal';
+
+    function tabBtn(cat, icon, label) {
+        return '<button class="tkt-cat-btn" data-cat="'+cat+'" onclick="switchTicketCat(\''+cat+'\')" '+
+            'style="padding:8px 12px;border:none;background:none;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:.8rem;">'+
+            '<i class="fas '+icon+'"></i> '+label+'</button>';
+    }
+
     modal.innerHTML =
-        '<div class="transaction-details-content" style="max-width:680px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
-        '<h4><i class="fas fa-receipt" style="color:var(--primary);"></i> Ticket — ' + patientName + ' <small class="text-muted">#' + patientId + '</small></h4>' +
+        '<div class="transaction-details-content" style="max-width:720px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<h4><i class="fas fa-receipt" style="color:var(--primary);"></i> Ticket — '+patientName+' <small class="text-muted">#'+patientId+'</small></h4>' +
         '<button class="btn btn-sm btn-secondary" onclick="document.getElementById(\'patient-ticket-modal\').remove()"><i class="fas fa-times"></i></button>' +
         '</div>' +
-        '<div id="ticket-body"><div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div></div>' +
-
-        // Ajouter un service
+        '<div id="ticket-body"></div>' +
         '<div class="card mt-3" style="background:#f8f9fa;">' +
         '<h5><i class="fas fa-plus-circle" style="color:#28a745;"></i> Ajouter au ticket</h5>' +
-        '<div class="add-form-grid" style="margin-top:10px;">' +
-        '<div><label class="form-label">Type</label>' +
-        '<select id="ticket-add-type" class="form-control" onchange="onTicketTypeChange()">' +
-        '<option value="consultation">Consultation</option>' +
-        '<option value="lab">Analyse laboratoire</option>' +
-        '<option value="medication">Médicament</option>' +
-        '<option value="external">Service externe</option>' +
-        '</select></div>' +
-        '<div id="ticket-service-select"><label class="form-label">Service</label>' +
-        '<select id="ticket-service" class="form-control" onchange="onTicketServiceChange()"></select></div>' +
-        '<div id="ticket-qty-div" style="display:none;"><label class="form-label">Quantité</label>' +
-        '<input type="number" id="ticket-qty" class="form-control" value="1" min="1"></div>' +
-        '<div><label class="form-label">Prix (HTG)</label>' +
-        '<input type="number" id="ticket-price" class="form-control" placeholder="0.00" min="0"></div>' +
-        '<div style="display:flex;align-items:flex-end;">' +
-        '<button class="btn btn-success" style="width:100%;" data-pid="' + patientId + '" data-pname="' + patientName + '" onclick="addToTicket(this.dataset.pid,this.dataset.pname)">' +
-        '<i class="fas fa-plus"></i> Ajouter</button></div>' +
+        '<div style="display:flex;border-bottom:2px solid var(--border);margin:8px 0 12px;overflow-x:auto;">' +
+        tabBtn('consultation','fa-stethoscope','Consultations') +
+        tabBtn('lab','fa-flask','Analyses') +
+        tabBtn('medication','fa-pills','Médicaments') +
+        tabBtn('external','fa-clipboard-list','Services ext.') +
+        tabBtn('custom','fa-pen','Personnalisé') +
+        '</div>' +
+        // Consultation
+        '<div id="tkt-cat-consultation" class="tkt-cat">' +
+        '<div class="add-form-grid">' +
+        '<div><label class="form-label">Type de consultation</label>' +
+        '<select id="tkt-sel-consultation" class="form-control" onchange="document.getElementById(\'tkt-price-consultation\').value=this.options[this.selectedIndex].dataset.price||0"></select></div>' +
+        '<div><label class="form-label">Prix (HTG)</label><input type="number" id="tkt-price-consultation" class="form-control" placeholder="0.00"></div>' +
+        '<div style="display:flex;align-items:flex-end;"><button class="btn btn-success" style="width:100%;" data-pid="'+patientId+'" data-pname="'+patientName+'" data-cat="consultation" onclick="tktAdd(this)"><i class="fas fa-plus"></i> Ajouter</button></div>' +
         '</div></div>' +
+        // Analyses
+        '<div id="tkt-cat-lab" class="tkt-cat" style="display:none;">' +
+        '<div class="add-form-grid">' +
+        '<div><label class="form-label">Type d\'analyse</label>' +
+        '<select id="tkt-sel-lab" class="form-control" onchange="document.getElementById(\'tkt-price-lab\').value=this.options[this.selectedIndex].dataset.price||0"></select></div>' +
+        '<div><label class="form-label">Prix (HTG)</label><input type="number" id="tkt-price-lab" class="form-control" placeholder="0.00"></div>' +
+        '<div style="display:flex;align-items:flex-end;"><button class="btn btn-success" style="width:100%;" data-pid="'+patientId+'" data-pname="'+patientName+'" data-cat="lab" onclick="tktAdd(this)"><i class="fas fa-plus"></i> Ajouter</button></div>' +
+        '</div></div>' +
+        // Médicaments
+        '<div id="tkt-cat-medication" class="tkt-cat" style="display:none;">' +
+        '<div class="add-form-grid">' +
+        '<div><label class="form-label">Médicament</label>' +
+        '<select id="tkt-sel-medication" class="form-control" onchange="tktMedChange()"></select></div>' +
+        '<div><label class="form-label">Qté</label><input type="number" id="tkt-qty-medication" class="form-control" value="1" min="1" oninput="tktMedChange()"></div>' +
+        '<div><label class="form-label">Prix/unité (HTG)</label><input type="number" id="tkt-price-medication" class="form-control" placeholder="0.00"></div>' +
+        '<div><label class="form-label">Total</label><div style="padding:10px 0;font-weight:700;color:#28a745;" id="tkt-med-total">0 HTG</div></div>' +
+        '<div style="display:flex;align-items:flex-end;"><button class="btn btn-success" style="width:100%;" data-pid="'+patientId+'" data-pname="'+patientName+'" data-cat="medication" onclick="tktAdd(this)"><i class="fas fa-plus"></i> Ajouter</button></div>' +
+        '</div></div>' +
+        // Services externes
+        '<div id="tkt-cat-external" class="tkt-cat" style="display:none;">' +
+        '<div class="add-form-grid">' +
+        '<div><label class="form-label">Service externe</label>' +
+        '<select id="tkt-sel-external" class="form-control" onchange="document.getElementById(\'tkt-price-external\').value=this.options[this.selectedIndex].dataset.price||0"></select></div>' +
+        '<div><label class="form-label">Prix (HTG)</label><input type="number" id="tkt-price-external" class="form-control" placeholder="0.00"></div>' +
+        '<div style="display:flex;align-items:flex-end;"><button class="btn btn-success" style="width:100%;" data-pid="'+patientId+'" data-pname="'+patientName+'" data-cat="external" onclick="tktAdd(this)"><i class="fas fa-plus"></i> Ajouter</button></div>' +
+        '</div></div>' +
+        // Personnalisé
+        '<div id="tkt-cat-custom" class="tkt-cat" style="display:none;">' +
+        '<div class="alert alert-info" style="font-size:.82rem;margin-bottom:8px;"><i class="fas fa-info-circle"></i> Service non listé en base de données.</div>' +
+        '<div class="add-form-grid">' +
+        '<div style="grid-column:1/-1"><label class="form-label">Nom du service *</label>' +
+        '<input type="text" id="tkt-custom-name" class="form-control" placeholder="Ex: Radio, Pansement spécial..."></div>' +
+        '<div><label class="form-label">Prix (HTG) *</label><input type="number" id="tkt-custom-price" class="form-control" placeholder="0.00"></div>' +
+        '<div><label class="form-label">Quantité</label><input type="number" id="tkt-custom-qty" class="form-control" value="1" min="1"></div>' +
+        '<div style="display:flex;align-items:flex-end;"><button class="btn btn-warning" style="width:100%;color:#212529;" data-pid="'+patientId+'" data-pname="'+patientName+'" onclick="tktAddCustom(this)"><i class="fas fa-plus"></i> Ajouter</button></div>' +
+        '</div></div>' +
+        '</div>' +
+        '<div class="d-flex gap-10 mt-3"><button class="btn btn-secondary" onclick="document.getElementById(\'patient-ticket-modal\').remove()">Fermer</button></div>' +
+        '</div>';
 
-        '<div class="d-flex gap-10 mt-3">' +
-        '<button class="btn btn-secondary" onclick="document.getElementById(\'patient-ticket-modal\').remove()">Fermer</button>' +
-        '</div></div>';
     document.body.appendChild(modal);
-
-    // Charger les services selon le type par défaut
-    await loadTicketServices('consultation');
+    tktFillSelects();
+    switchTicketCat('consultation');
     await loadTicketTransactions(patientId);
+}
+
+function switchTicketCat(cat) {
+    document.querySelectorAll('.tkt-cat').forEach(function(el){ el.style.display='none'; });
+    document.querySelectorAll('.tkt-cat-btn').forEach(function(btn){
+        var a = btn.dataset.cat === cat;
+        btn.style.color        = a ? 'var(--primary)' : 'var(--muted)';
+        btn.style.borderBottom = a ? '3px solid var(--primary)' : '3px solid transparent';
+        btn.style.background   = a ? 'var(--primary-light)' : 'none';
+    });
+    var el = document.getElementById('tkt-cat-'+cat);
+    if (el) el.style.display = 'block';
+}
+
+function tktFillSelects() {
+    // Consultations
+    var s1 = document.getElementById('tkt-sel-consultation');
+    if (s1) s1.innerHTML = '<option value="">Sélectionner...</option>' +
+        state.consultationTypes.filter(function(c){return c.active;}).map(function(c){
+            return '<option value="'+c.id+'" data-price="'+c.price+'">'+c.name+' — '+parseFloat(c.price).toLocaleString('fr-FR')+' HTG</option>';
+        }).join('');
+    // Analyses
+    var s2 = document.getElementById('tkt-sel-lab');
+    if (s2) s2.innerHTML = '<option value="">Sélectionner...</option>' +
+        state.labAnalysisTypes.filter(function(a){return a.active;}).map(function(a){
+            return '<option value="'+a.id+'" data-price="'+a.price+'">'+a.name+' — '+parseFloat(a.price).toLocaleString('fr-FR')+' HTG</option>';
+        }).join('');
+    // Médicaments
+    var s3 = document.getElementById('tkt-sel-medication');
+    if (s3) s3.innerHTML = '<option value="">Sélectionner...</option>' +
+        (state.medications||[]).map(function(m){
+            return '<option value="'+m.id+'" data-price="'+m.price+'">'+m.name+' (Stock:'+m.quantity+') — '+parseFloat(m.price).toLocaleString('fr-FR')+' HTG</option>';
+        }).join('');
+    // Services externes
+    var s4 = document.getElementById('tkt-sel-external');
+    if (s4) s4.innerHTML = '<option value="">Sélectionner...</option>' +
+        state.externalServiceTypes.filter(function(s){return s.active;}).map(function(s){
+            return '<option value="'+s.id+'" data-price="'+s.price+'">'+s.name+' — '+parseFloat(s.price).toLocaleString('fr-FR')+' HTG</option>';
+        }).join('');
+}
+
+function tktMedChange() {
+    var sel   = document.getElementById('tkt-sel-medication');
+    var opt   = sel ? sel.options[sel.selectedIndex] : null;
+    var qty   = parseInt(document.getElementById('tkt-qty-medication').value)||1;
+    var price = opt && opt.dataset.price ? parseFloat(opt.dataset.price) : parseFloat(document.getElementById('tkt-price-medication').value)||0;
+    if (opt && opt.dataset.price) document.getElementById('tkt-price-medication').value = opt.dataset.price;
+    var el = document.getElementById('tkt-med-total');
+    if (el) el.textContent = (price*qty).toLocaleString('fr-FR')+' HTG';
+}
+
+async function tktAdd(btn) {
+    var cat     = btn.dataset.cat;
+    var pid     = btn.dataset.pid;
+    var pname   = btn.dataset.pname;
+    var sel     = document.getElementById('tkt-sel-'+cat);
+    var priceEl = document.getElementById('tkt-price-'+cat);
+    var opt     = sel ? sel.options[sel.selectedIndex] : null;
+    var price   = parseFloat(priceEl ? priceEl.value : 0)||0;
+    var qty     = cat==='medication' ? (parseInt(document.getElementById('tkt-qty-medication').value)||1) : 1;
+    if (!opt || !opt.value) { toast('Sélectionner un service', 'error'); return; }
+    if (!price)             { toast('Entrer un prix', 'error'); return; }
+    var labels = { consultation:'Consultation', lab:'Analyse', medication:'Médicament', external:'Service ext.' };
+    var data = { patientId:pid, patientName:pname, service:labels[cat]+': '+opt.text.split(' —')[0], amount:price*qty, type:cat };
+    if (cat==='consultation') data.consultationTypeId = opt.value;
+    if (cat==='lab')          data.analysisId         = opt.value;
+    if (cat==='medication')   { data.medicationId = opt.value; data.quantity = qty; }
+    try {
+        await apiCall(function(){ return API.addTransaction(data); });
+        toast(labels[cat]+' ajouté !', 'success');
+        await loadTicketTransactions(pid);
+    } catch(e) {}
+}
+
+async function tktAddCustom(btn) {
+    var pid   = btn.dataset.pid;
+    var pname = btn.dataset.pname;
+    var name  = document.getElementById('tkt-custom-name').value.trim();
+    var price = parseFloat(document.getElementById('tkt-custom-price').value)||0;
+    var qty   = parseInt(document.getElementById('tkt-custom-qty').value)||1;
+    if (!name)  { toast('Entrer le nom du service', 'error'); return; }
+    if (!price) { toast('Entrer le prix', 'error'); return; }
+    try {
+        await apiCall(function(){ return API.addTransaction({ patientId:pid, patientName:pname, service:name, amount:price*qty, type:'external' }); });
+        toast('"'+name+'" ajouté !', 'success');
+        document.getElementById('tkt-custom-name').value='';
+        document.getElementById('tkt-custom-price').value='';
+        document.getElementById('tkt-custom-qty').value='1';
+        await loadTicketTransactions(pid);
+    } catch(e) {}
 }
 
 async function loadTicketTransactions(patientId) {
@@ -1624,6 +1751,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('cashier-patient-id').textContent   = p.id;
             document.getElementById('cashier-patient-details').classList.remove('hidden');
             await loadServicesForPayment(p);
+            await loadPatientTransactionHistory(p.id);
         } catch(e) {}
     });
 
@@ -1682,6 +1810,50 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     });
 });
+
+async function loadPatientTransactionHistory(patientId) {
+    var hist = document.getElementById('cashier-patient-history');
+    if (!hist) {
+        hist = document.createElement('div');
+        hist.id = 'cashier-patient-history';
+        hist.style.marginTop = '16px';
+        var details = document.getElementById('cashier-patient-details');
+        if (details) details.appendChild(hist);
+    }
+    hist.innerHTML = '<div style="text-align:center;padding:12px;"><i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i></div>';
+    try {
+        var txs  = await API.getTransactions({ patientId: patientId });
+        var paid = txs.filter(function(t){ return t.status === 'paid'; });
+        var rate = state.exchangeRate || 130;
+        if (!paid.length) {
+            hist.innerHTML = '<div class="alert alert-info" style="margin-top:8px;font-size:.85rem;"><i class="fas fa-history"></i> Aucune transaction payée.</div>';
+            return;
+        }
+        var total = paid.reduce(function(s,t){ return s + parseFloat(t.amount); }, 0);
+        var typeIcon  = { consultation:'fa-stethoscope', lab:'fa-flask', medication:'fa-pills', external:'fa-clipboard-list' };
+        var typeColor = { consultation:'#1a6bca', lab:'#ffc107', medication:'#28a745', external:'#6f42c1' };
+        hist.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px;">' +
+            '<h5 style="margin:0;"><i class="fas fa-history" style="color:#6f42c1;"></i> Historique</h5>' +
+            '<span style="background:#d4edda;padding:4px 12px;border-radius:8px;font-size:.82rem;font-weight:600;">Total: ' + total.toLocaleString('fr-FR') + ' HTG</span>' +
+            '</div>' +
+            '<div class="table-container"><table><thead><tr><th>Date</th><th>Service</th><th>Montant</th><th>Méthode</th></tr></thead><tbody>' +
+            paid.slice(0,20).map(function(t) {
+                var amt = parseFloat(t.amount);
+                var ic  = typeIcon[t.type]  || 'fa-receipt';
+                var cl  = typeColor[t.type] || '#6c757d';
+                return '<tr><td style="font-size:.8rem;">'+(t.date||'-')+'</td>' +
+                    '<td><i class="fas '+ic+'" style="color:'+cl+';margin-right:4px;"></i>'+t.service+'</td>' +
+                    '<td><strong style="color:#28a745;">'+amt.toLocaleString('fr-FR')+' HTG</strong>' +
+                    '<br><small>≈$'+(amt/rate).toFixed(2)+'</small></td>' +
+                    '<td style="font-size:.8rem;">'+(t.payment_method||'-')+'</td></tr>';
+            }).join('') +
+            '</tbody></table></div>' +
+            (paid.length > 20 ? '<p class="text-muted" style="font-size:.8rem;text-align:center;">'+(paid.length-20)+' autres non affichées.</p>' : '');
+    } catch(e) {
+        hist.innerHTML = '<div class="alert alert-danger">Erreur</div>';
+    }
+}
 
 async function loadServicesForPayment(patient) {
     const txs = await API.getTransactions({ patientId: patient.id, status: 'unpaid' });
