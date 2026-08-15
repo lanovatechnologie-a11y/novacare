@@ -3750,8 +3750,8 @@ async function admitPatient() {
         document.getElementById('hosp-patient-found').style.display = 'none';
         loadHospitalizations('active');
         addLocalNotification('Nouvelle admission', patientName+' hospitalisé(e)', 'fas fa-bed', '#28a745');
-        notifyDepartment('nurse', 'Nouveau patient hospitalisé', patientName+' — '+(room||'')+(bed?' Lit '+bed:'')+' | Dr: '+(doctor||'N/A'), '#1a6bca');
-    } catch(e) {}
+        try { notifyDepartment('nurse', 'Nouveau patient hospitalisé', patientName+' — '+(room||'')+(bed?' Lit '+bed:'')+' | Dr: '+(doctor||'N/A'), '#1a6bca'); } catch(en) {}
+    } catch(e) { toast('Erreur admission: ' + e.message, 'error'); console.error('admitPatient:', e); }
 }
 
 async function loadHospitalizations(status) {
@@ -3798,6 +3798,7 @@ async function openHospDetail(hospId, patientName) {
     document.getElementById('admit-patient-card').style.display   = 'none';
     document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
     document.getElementById('hosp-detail-title').innerHTML = '<i class="fas fa-user-injured"></i> '+patientName;
+    // Charger médicaments
     var meds = state.medications && state.medications.length ? state.medications : await API.getMedications().catch(function(){return[];});
     state.medications = meds;
     var rxSel = document.getElementById('rx-medication');
@@ -3806,7 +3807,12 @@ async function openHospDetail(hospId, patientName) {
             meds.map(function(m){ return '<option value="'+m.id+'" data-price="'+m.price+'" data-stock="'+m.quantity+'">'+m.name+' (Stock:'+m.quantity+') — '+parseFloat(m.price).toLocaleString('fr-FR')+' HTG</option>'; }).join('');
     }
     await refreshHospDetail();
-    showHospTab('nursing');
+    // Remplir les selects de tâches
+    fillTaskSelects();
+    // Ouvrir sur l\'onglet tâches si médecin, sinon nursing
+    var role = state.currentRole;
+    if (role==='doctor'||role==='admin'||role==='sub_admin') showHospTab('tasks');
+    else showHospTab('nursing');
 }
 
 async function refreshHospDetail() {
@@ -3843,13 +3849,58 @@ function showHospTab(tab) {
         var a = btn.dataset.tab === tab;
         btn.style.color        = a ? 'var(--primary)' : 'var(--muted)';
         btn.style.borderBottom = a ? '3px solid var(--primary)' : '3px solid transparent';
+        btn.style.background   = a ? 'var(--primary-light)' : 'none';
     });
     var el = document.getElementById('hosp-tab-'+tab);
     if (el) el.style.display = 'block';
     if (tab==='nursing')            loadNursingNotes();
-    else if (tab==='prescriptions') loadPrescriptions();
+    else if (tab==='prescriptions') { loadPrescriptions(); loadHospOrders(); }
     else if (tab==='deposits')      loadDeposits();
     else if (tab==='services')      loadHospServices();
+}
+
+// ── ORDRES MÉDICAUX (prescriptions + instructions) ────────────
+async function loadHospOrders() {
+    // Afficher les prescriptions en attente pour l\'infirmière
+    // et leur statut pour le médecin
+    var role = state.currentRole;
+    var isNurse  = role === 'nurse'  || role === 'admin' || role === 'sub_admin';
+    var isDoctor = role === 'doctor' || role === 'admin' || role === 'sub_admin';
+
+    var statusSection = document.getElementById('rx-status-summary');
+    if (!statusSection) {
+        statusSection = document.createElement('div');
+        statusSection.id = 'rx-status-summary';
+        var presTab = document.getElementById('hosp-tab-prescriptions');
+        if (presTab) presTab.insertBefore(statusSection, presTab.firstChild);
+    }
+
+    if (!_currentHospId) return;
+    var rxs = await API.getHospPrescriptions(_currentHospId).catch(function(){return[];});
+    var pending = rxs.filter(function(r){ return r.status === 'pending'; });
+    var done    = rxs.filter(function(r){ return r.status === 'administered'; });
+    var skipped = rxs.filter(function(r){ return r.status === 'skipped'; });
+
+    statusSection.innerHTML =
+        '<div class="d-flex gap-10 flex-wrap mb-3">' +
+        '<div style="background:#fff3cd;padding:8px 14px;border-radius:8px;text-align:center;">' +
+        '<strong style="color:#856404;font-size:1.1rem;">'+pending.length+'</strong>' +
+        '<br><small style="color:#856404;">⏳ En attente</small></div>' +
+        '<div style="background:#d4edda;padding:8px 14px;border-radius:8px;text-align:center;">' +
+        '<strong style="color:#155724;font-size:1.1rem;">'+done.length+'</strong>' +
+        '<br><small style="color:#155724;">✅ Administré</small></div>' +
+        '<div style="background:#f8d7da;padding:8px 14px;border-radius:8px;text-align:center;">' +
+        '<strong style="color:#721c24;font-size:1.1rem;">'+skipped.length+'</strong>' +
+        '<br><small style="color:#721c24;">⛔ Sauté</small></div>' +
+        '</div>' +
+        (pending.length && isNurse ?
+            '<div class="alert alert-warning" style="font-size:.85rem;">' +
+            '<i class="fas fa-bell"></i> <strong>'+pending.length+' prescription(s)</strong> en attente d\'administration.' +
+            '</div>' : '') +
+        (pending.length && isDoctor && !isNurse ?
+            '<div class="alert alert-info" style="font-size:.85rem;">' +
+            '<i class="fas fa-clock"></i> <strong>'+pending.length+' prescription(s)</strong> pas encore administree(s).' +
+            '</div>' : '');
 }
 
 // ── SUIVI INFIRMIER ──────────────────────────────────────────
@@ -3948,7 +3999,7 @@ async function savePrescription() {
         loadPrescriptions();
         await refreshHospDetail();
         notifyDepartment('nurse', 'Nouvelle prescription', (_currentHospPatient.full_name||'Patient')+' — '+medName+' '+dosage+' '+freq+(note?' | '+note:''), '#6f42c1');
-    } catch(e) {}
+    } catch(e) { toast('Erreur prescription: ' + e.message, 'error'); }
 }
 
 async function loadPrescriptions() {
@@ -4052,6 +4103,232 @@ async function loadHospServices() {
 }
 
 // ── SORTIE ────────────────────────────────────────────────────
+
+// ── TÂCHES MÉDECIN → INFIRMIÈRE ──────────────────────────────
+function onTaskTypeChange() {
+    var type = document.getElementById('task-type') ? document.getElementById('task-type').value : '';
+    var show = function(id, v) { var el=document.getElementById(id); if(el) el.style.display=v?'':'none'; };
+    show('task-med-div',    type==='medication');
+    show('task-analysis-div', type==='analysis');
+    show('task-desc-div',   type==='care'||type==='other');
+    show('task-dosage-div', type==='medication');
+    show('task-freq-div',   type==='medication');
+    show('task-dur-div',    type==='medication');
+    show('task-route-div',  type==='medication');
+    show('task-qty-div',    type==='medication'||type==='analysis');
+    var amtEl = document.getElementById('task-amount');
+    if (amtEl) amtEl.value = '';
+}
+
+function onTaskMedSelect() {
+    var sel = document.getElementById('task-medication');
+    var opt = sel ? sel.options[sel.selectedIndex] : null;
+    if (opt && opt.dataset.price) {
+        var qty = parseInt((document.getElementById('task-qty')||{}).value)||1;
+        var amtEl = document.getElementById('task-amount');
+        if (amtEl) amtEl.value = (parseFloat(opt.dataset.price)*qty).toFixed(2);
+        updateTaskCost();
+    }
+}
+
+function onTaskAnalysisSelect() {
+    var sel = document.getElementById('task-analysis');
+    var opt = sel ? sel.options[sel.selectedIndex] : null;
+    if (opt && opt.dataset.price) {
+        var amtEl = document.getElementById('task-amount');
+        if (amtEl) amtEl.value = opt.dataset.price;
+        updateTaskCost();
+    }
+}
+
+function updateTaskCost() {
+    var qty    = parseInt((document.getElementById('task-qty')||{}).value)||1;
+    var medSel = document.getElementById('task-medication');
+    var opt    = medSel ? medSel.options[medSel.selectedIndex] : null;
+    if (opt && opt.dataset.price) {
+        var amtEl = document.getElementById('task-amount');
+        if (amtEl) amtEl.value = (parseFloat(opt.dataset.price)*qty).toFixed(2);
+    }
+    var amount = parseFloat((document.getElementById('task-amount')||{}).value)||0;
+    var prev   = document.getElementById('task-cost-preview');
+    if (prev && _currentHospPatient && amount > 0) {
+        var bal    = parseFloat(_currentHospPatient.balance||0);
+        var newBal = bal - amount;
+        prev.innerHTML = '<div class="d-flex gap-10 mt-1">' +
+            '<span class="badge badge-primary">Coût: '+amount.toLocaleString('fr-FR')+' HTG</span>' +
+            '<span class="badge '+(newBal<0?'badge-danger':'badge-success')+'">Solde après: '+newBal.toLocaleString('fr-FR')+' HTG'+(newBal<0?' (DETTE)':'')+'</span>' +
+            '</div>';
+    }
+}
+
+function fillTaskSelects() {
+    var medSel = document.getElementById('task-medication');
+    if (medSel) {
+        medSel.innerHTML = '<option value="">Sélectionner...</option>' +
+            (state.medications||[]).map(function(m){
+                return '<option value="'+m.id+'" data-price="'+m.price+'" data-name="'+m.name+'">'+m.name+' (Stock: '+m.quantity+') — '+parseFloat(m.price).toLocaleString('fr-FR')+' HTG</option>';
+            }).join('');
+    }
+    var anaSel = document.getElementById('task-analysis');
+    if (anaSel) {
+        anaSel.innerHTML = '<option value="">Sélectionner...</option>' +
+            (state.labAnalysisTypes||[]).filter(function(a){return a.active;}).map(function(a){
+                return '<option value="'+a.id+'" data-price="'+a.price+'" data-name="'+a.name+'">'+a.name+' — '+parseFloat(a.price).toLocaleString('fr-FR')+' HTG</option>';
+            }).join('');
+    }
+}
+
+async function saveHospTask() {
+    if (!_currentHospId || !_currentHospPatient) { toast('Aucun patient sélectionné', 'error'); return; }
+    var typeEl = document.getElementById('task-type');
+    var type   = typeEl ? typeEl.value : 'other';
+    var priority = (document.getElementById('task-priority')||{}).value || 'normal';
+    var amount   = parseFloat((document.getElementById('task-amount')||{}).value)||0;
+    var note     = (document.getElementById('task-note')||{}).value||'';
+    var data = {
+        hospitalizationId: _currentHospId,
+        patientId:  _currentHospPatient.patient_id,
+        taskType:   type,
+        priority:   priority,
+        note:       note,
+        amount:     amount,
+    };
+    if (type === 'medication') {
+        var medSel = document.getElementById('task-medication');
+        var medOpt = medSel ? medSel.options[medSel.selectedIndex] : null;
+        if (!medOpt || !medOpt.value) { toast('Sélectionner un médicament', 'error'); return; }
+        data.medicationId   = medOpt.value;
+        data.medicationName = medOpt.dataset.name;
+        data.dosage         = (document.getElementById('task-dosage')||{}).value||'';
+        data.frequency      = (document.getElementById('task-frequency')||{}).value||'';
+        data.duration       = (document.getElementById('task-duration')||{}).value||'';
+        data.route          = (document.getElementById('task-route')||{}).value||'Orale';
+        data.quantity       = parseInt((document.getElementById('task-qty')||{}).value)||1;
+        data.description    = 'Administrer '+data.medicationName+(data.dosage?' '+data.dosage:'')+(data.frequency?' '+data.frequency:'');
+    } else if (type === 'analysis') {
+        var anaSel = document.getElementById('task-analysis');
+        var anaOpt = anaSel ? anaSel.options[anaSel.selectedIndex] : null;
+        if (!anaOpt || !anaOpt.value) { toast('Sélectionner une analyse', 'error'); return; }
+        data.analysisId   = anaOpt.value;
+        data.analysisName = anaOpt.dataset.name;
+        data.description  = 'Réaliser: '+data.analysisName;
+    } else {
+        var descEl = document.getElementById('task-desc');
+        data.description = descEl ? descEl.value.trim() : '';
+        if (!data.description) { toast('La description est obligatoire', 'error'); return; }
+    }
+    try {
+        await apiCall(function(){ return API.addHospTask(data); });
+        var labels = { medication:'Médicament', analysis:'Analyse', care:'Soin', other:'Tâche' };
+        toast((labels[type]||'Tâche')+' ordonnée !', 'success');
+        ['task-dosage','task-duration','task-note','task-desc','task-amount'].forEach(function(id){
+            var el=document.getElementById(id); if(el) el.value='';
+        });
+        var qtyEl = document.getElementById('task-qty'); if(qtyEl) qtyEl.value='1';
+        var prev  = document.getElementById('task-cost-preview'); if(prev) prev.innerHTML='';
+        try { notifyDepartment('nurse', 'Nouvelle tâche médicale',
+            (_currentHospPatient.full_name||'Patient')+' — '+data.description+(priority==='urgent'?' 🔴 URGENT':''), '#dc3545'); } catch(en){}
+        await refreshHospDetail();
+        loadHospTasks();
+    } catch(e) {}
+}
+
+async function loadHospTasks() {
+    if (!_currentHospId) return;
+    var container = document.getElementById('hosp-tasks-list');
+    if (!container) return;
+    var role     = state.currentRole;
+    var isDoctor = role==='doctor'||role==='admin'||role==='sub_admin';
+    var isNurse  = role==='nurse'||role==='admin'||role==='sub_admin';
+
+    // Cacher le formulaire si pas médecin
+    var orderForm = document.getElementById('task-order-form');
+    if (orderForm) orderForm.style.display = isDoctor ? 'block' : 'none';
+
+    var tasks = await API.getHospTasks(_currentHospId).catch(function(){return[];});
+    if (!tasks.length) {
+        container.innerHTML = '<div class="alert alert-info"><i class="fas fa-tasks"></i> Aucune tâche ordonnée.</div>';
+        return;
+    }
+
+    var prioColors = { urgent:'#dc3545', normal:'#1a6bca', low:'#6c757d' };
+    var typeIcons  = { medication:'fa-pills', analysis:'fa-flask', care:'fa-hand-holding-medical', other:'fa-tasks' };
+    var stColors   = { pending:'#ffc107', done:'#28a745', skipped:'#dc3545' };
+    var stLabels   = { pending:'En attente', done:'Effectué', skipped:'Sauté' };
+
+    var pending  = tasks.filter(function(t){return t.status==='pending';});
+    var done     = tasks.filter(function(t){return t.status==='done';});
+    var skipped  = tasks.filter(function(t){return t.status==='skipped';});
+
+    function renderTask(t) {
+        var amt = parseFloat(t.amount||0);
+        return '<div class="card mb-2" style="border-left:4px solid '+(prioColors[t.priority]||'#1a6bca')+';">' +
+            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+            '<div style="flex:1;">' +
+            '<div class="d-flex align-center gap-10 mb-1">' +
+            '<i class="fas '+(typeIcons[t.task_type]||'fa-tasks')+'" style="color:'+(prioColors[t.priority]||'#1a6bca')+'"></i>' +
+            '<strong>'+t.description+'</strong>' +
+            (t.priority==='urgent'?'<span class="badge badge-danger">URGENT</span>':'') +
+            '</div>' +
+            (t.dosage||t.frequency||t.duration?
+                '<div style="font-size:.8rem;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;">' +
+                (t.dosage?'<span>💊 '+t.dosage+'</span>':'')+
+                (t.frequency?'<span>🕐 '+t.frequency+'</span>':'')+
+                (t.duration?'<span>📅 '+t.duration+'</span>':'')+
+                (t.route?'<span>💉 '+t.route+'</span>':'')+
+                '</div>':'') +
+            (t.note?'<p style="font-size:.8rem;background:#fff3cd;padding:4px 8px;border-radius:4px;margin-top:4px;">'+t.note+'</p>':'') +
+            '<small class="text-muted">Dr. '+(t.ordered_by||'-')+' — '+new Date(t.created_at).toLocaleString('fr-FR')+'</small>' +
+            (amt>0?'<br><small>Coût: <strong>'+amt.toLocaleString('fr-FR')+' HTG</strong></small>':'') +
+            (t.executed_by?'<br><small style="color:#28a745;">✅ Exécuté par '+t.executed_by+(t.executed_at?' le '+new Date(t.executed_at).toLocaleString('fr-FR'):'')+'</small>':'') +
+            (t.executed_note?'<br><small class="text-muted">Note: '+t.executed_note+'</small>':'') +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            (t.status==='pending' && isNurse ?
+                '<div style="display:flex;flex-direction:column;gap:6px;">' +
+                '<button class="btn btn-success btn-sm" data-tid="'+t.id+'" onclick="executeHospTask(this.dataset.tid,\'done\')"><i class="fas fa-check"></i> Fait</button>' +
+                '<button class="btn btn-secondary btn-sm" data-tid="'+t.id+'" onclick="executeHospTask(this.dataset.tid,\'skipped\')"><i class="fas fa-times"></i> Sauté</button>' +
+                '</div>'
+            : '<span class="badge" style="background:'+(stColors[t.status]||'#ffc107')+';color:'+(t.status==='pending'?'#212529':'#fff')+';padding:6px 10px;">'+(stLabels[t.status]||t.status)+'</span>') +
+            (isDoctor && t.status==='pending' ?
+                '<br><button class="btn btn-xs btn-danger mt-1" data-tid="'+t.id+'" onclick="cancelHospTask(this.dataset.tid)"><i class="fas fa-trash"></i></button>':'') +
+            '</div></div></div>';
+    }
+
+    var html = '';
+    if (pending.length)
+        html += '<h5 style="color:#dc3545;margin-bottom:8px;"><i class="fas fa-clock"></i> En attente ('+pending.length+')</h5>'+pending.map(renderTask).join('');
+    if (done.length)
+        html += '<h5 style="color:#28a745;margin:14px 0 8px;"><i class="fas fa-check-circle"></i> Effectués ('+done.length+')</h5>'+done.map(renderTask).join('');
+    if (skipped.length)
+        html += '<h5 style="color:#6c757d;margin:14px 0 8px;"><i class="fas fa-ban"></i> Sautés ('+skipped.length+')</h5>'+skipped.map(renderTask).join('');
+    container.innerHTML = html;
+}
+
+async function executeHospTask(taskId, status) {
+    var note = prompt(status==='done'?'Note (optionnel):':'Raison du saut (optionnel):')||'';
+    try {
+        await apiCall(function(){
+            return API.updateHospTask(taskId, { status:status, executedNote:note, executedAt:new Date().toISOString() });
+        });
+        toast(status==='done'?'Tâche effectuée !':'Tâche sautée', status==='done'?'success':'warning');
+        try { notifyDepartment('doctor', status==='done'?'Tâche effectuée':'Tâche sautée',
+            (_currentHospPatient.full_name||'Patient')+(note?' — '+note:''), status==='done'?'#28a745':'#dc3545'); } catch(en){}
+        loadHospTasks();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
+async function cancelHospTask(taskId) {
+    if (!confirm('Annuler cette tâche ?')) return;
+    try {
+        await apiCall(function(){ return API.deleteHospTask(taskId); });
+        toast('Tâche annulée', 'warning');
+        loadHospTasks();
+        await refreshHospDetail();
+    } catch(e) {}
+}
+
 async function dischargePatient() {
     if (!_currentHospId || !_currentHospPatient) return;
     var note    = document.getElementById('discharge-note').value.trim();

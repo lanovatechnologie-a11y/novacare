@@ -1,872 +1,1588 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clinique Spécialisée du Cap-Haïtien | CLISCAP</title>
-<meta name="description" content="La Clinique Spécialisée du Cap-Haïtien — soigner avec science, servir avec humanité. Consultations, urgences 24/24 et suivi médical à Carénage, Cap-Haïtien.">
-<link rel="icon" href="14.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --ink:#0F2019;
-    --navy:#0B3D2E;
-    --navy-soft:#145C46;
-    --blue:#1F6F5C;
-    --teal:#2E8B6E;
-    --teal-light:#DCEEE4;
-    --gold:#C98A2B;
-    --gold-light:#F6EBD8;
-    --cloud:#F6F4EE;
-    --paper:#FFFFFF;
-    --slate:#5B6459;
-    --line:#E4E2D8;
-    --radius:20px;
-    --maxw:1200px;
-    --shadow-lg:0 30px 60px -24px rgba(11,32,25,.28);
-    --shadow-md:0 18px 36px -20px rgba(11,32,25,.24);
-  }
-  *{box-sizing:border-box;}
-  html{scroll-behavior:smooth;}
-  body{
-    margin:0;
-    font-family:'Inter',sans-serif;
-    color:var(--ink);
-    background:var(--cloud);
-    -webkit-font-smoothing:antialiased;
-  }
-  img{max-width:100%;display:block;}
-  a{color:inherit;text-decoration:none;}
-  h1,h2,h3,h4{font-family:'Fraunces',serif;margin:0;line-height:1.05;font-weight:600;letter-spacing:-.01em;}
-  p{margin:0;line-height:1.7;color:var(--slate);}
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;}
-  @media(max-width:600px){.wrap{padding:0 20px;}}
-  .eyebrow{
-    display:inline-flex;align-items:center;gap:10px;
-    font-family:'Inter',sans-serif;font-weight:700;font-size:12.5px;
-    letter-spacing:.16em;text-transform:uppercase;color:var(--teal);
-    margin-bottom:16px;
-  }
-  .eyebrow::before{content:"";width:26px;height:2px;background:var(--gold);display:inline-block;}
-  section{padding:110px 0;position:relative;}
-  @media(max-width:720px){section{padding:64px 0;}}
-  :focus-visible{outline:3px solid var(--gold);outline-offset:3px;}
-  @media (prefers-reduced-motion: reduce){
-    *{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;scroll-behavior:auto !important;}
-  }
-  ::selection{background:var(--gold-light);color:var(--ink);}
-
-  .bg-dots{
-    background-image:radial-gradient(rgba(11,61,46,.14) 1.4px, transparent 1.4px);
-    background-size:22px 22px;
-  }
-  .divider{display:block;width:100%;line-height:0;}
-  .divider svg{width:100%;height:auto;display:block;}
-
-  /* ---------- BUTTONS ---------- */
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;gap:9px;
-    padding:15px 28px;border-radius:100px;font-weight:700;font-size:15px;
-    border:none;cursor:pointer;transition:transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, background .22s ease;
-    white-space:nowrap;
-  }
-  .btn:hover{transform:translateY(-3px);}
-  .btn-primary{background:var(--gold);color:#fff;box-shadow:0 14px 28px -10px rgba(201,138,43,.55);}
-  .btn-primary:hover{background:#b8791f;box-shadow:0 18px 34px -10px rgba(201,138,43,.65);}
-  .btn-outline{background:rgba(255,255,255,.08);color:var(--paper);border:1.5px solid rgba(255,255,255,.55);backdrop-filter:blur(6px);}
-  .btn-outline:hover{background:rgba(255,255,255,.16);}
-  .btn-navy{background:var(--navy);color:#fff;box-shadow:0 14px 28px -12px rgba(11,61,46,.5);}
-  .btn-navy:hover{background:var(--blue);}
-  .btn-ghost{background:var(--paper);color:var(--navy);border:1.5px solid var(--line);}
-  .btn-ghost:hover{background:var(--cloud);border-color:var(--teal);}
-
-  /* ---------- HEADER ---------- */
-  header{
-    position:sticky;top:0;z-index:100;
-    background:rgba(246,244,238,.86);backdrop-filter:blur(14px);
-    border-bottom:1px solid var(--line);
-  }
-  .nav{display:flex;align-items:center;justify-content:space-between;padding:15px 0;gap:20px;}
-  .brand{display:flex;align-items:center;gap:11px;font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:var(--navy);letter-spacing:-.01em;}
-  .brand img{height:36px;width:auto;border-radius:8px;}
-  .nav-links{display:flex;gap:8px;list-style:none;margin:0;padding:0;font-size:14px;font-weight:600;color:var(--ink);}
-  .nav-links a{position:relative;padding:9px 15px;border-radius:100px;transition:background .2s ease, color .2s ease;}
-  .nav-links a:hover{background:var(--teal-light);color:var(--navy);}
-  .nav-actions{display:flex;align-items:center;gap:10px;}
-  .burger{display:none;background:var(--paper);border:1px solid var(--line);border-radius:10px;width:44px;height:44px;align-items:center;justify-content:center;cursor:pointer;}
-  .burger svg{width:20px;height:20px;color:var(--navy);}
-  #mobileNav{display:none;flex-direction:column;gap:2px;padding:6px 20px 20px;background:var(--paper);border-bottom:1px solid var(--line);}
-  #mobileNav a{padding:13px 4px;font-weight:600;color:var(--navy);border-bottom:1px solid var(--line);font-size:15.5px;}
-  #mobileNav a:last-child{border-bottom:none;}
-  @media(max-width:900px){
-    .nav-links{display:none;}
-    .burger{display:flex;}
-    #mobileNav.open{display:flex;}
-  }
-  @media(max-width:520px){
-    .nav-actions .btn span.label{display:none;}
-    .nav-actions .btn{padding:12px 16px;}
-  }
-
-  /* ---------- HERO (full-bleed) ---------- */
-  .hero{
-    position:relative;overflow:hidden;min-height:88vh;display:flex;align-items:center;
-    color:#fff;padding:150px 0 130px;
-  }
-  .hero-bg{position:absolute;inset:0;z-index:0;}
-  .hero-bg img{width:100%;height:100%;object-fit:cover;}
-  .hero-bg::after{
-    content:"";position:absolute;inset:0;
-    background:
-      linear-gradient(90deg, rgba(9,26,20,.92) 0%, rgba(9,26,20,.72) 42%, rgba(9,26,20,.32) 75%, rgba(9,26,20,.55) 100%),
-      linear-gradient(0deg, rgba(9,26,20,.5) 0%, transparent 30%);
-  }
-  .hero .wrap{position:relative;z-index:1;}
-  .hero-inner{max-width:640px;}
-  .hero-eyebrow{color:var(--gold);}
-  .hero-eyebrow::before{background:var(--teal);}
-  .hero h1{font-size:clamp(38px,5.6vw,64px);color:#fff;}
-  .hero h1 em{font-style:italic;color:var(--gold);font-weight:500;}
-  .hero .lede{color:#DCE6DF;font-size:18px;max-width:520px;margin-top:22px;}
-  .hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:38px;}
-  .hero-badge{
-    position:absolute;right:0;bottom:-30px;z-index:2;background:rgba(255,255,255,.97);color:var(--ink);
-    border-radius:18px;padding:18px 22px;display:flex;align-items:center;gap:14px;
-    box-shadow:var(--shadow-lg);min-width:230px;
-  }
-  @media(max-width:960px){.hero-badge{position:static;margin-top:44px;box-shadow:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;backdrop-filter:blur(8px);}
-    .hero-badge .t{color:#DCE6DF !important;} .hero-badge .v{color:#fff !important;}}
-  .hero-badge svg{flex-shrink:0;}
-  .hero-badge .t{font-size:12px;color:var(--slate);font-weight:600;}
-  .hero-badge .v{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
-  .hero .divider{position:absolute;left:0;right:0;bottom:-2px;z-index:1;}
-
-  /* Marquee ribbon */
-  .marquee{background:var(--navy);overflow:hidden;padding:16px 0;position:relative;z-index:2;}
-  .marquee-track{display:flex;gap:44px;white-space:nowrap;width:max-content;animation:scroll-left 34s linear infinite;}
-  .marquee-track span{color:#fff;font-weight:700;font-size:14px;letter-spacing:.03em;display:inline-flex;align-items:center;gap:10px;}
-  .marquee-track span::after{content:"✦";color:var(--gold);margin-left:44px;}
-  @keyframes scroll-left{from{transform:translateX(0);}to{transform:translateX(-50%);}}
-
-  /* ---------- SCROLL REVEAL & LOAD-IN ---------- */
-  .reveal{opacity:0;transform:translateY(32px);transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1);}
-  .reveal.in-view{opacity:1;transform:translateY(0);}
-  .reveal-group.in-view .reveal-child{opacity:1;transform:translateY(0);}
-  .reveal-child{opacity:0;transform:translateY(22px);transition:opacity .65s cubic-bezier(.2,.7,.2,1), transform .65s cubic-bezier(.2,.7,.2,1);}
-  .hero-anim{opacity:0;transform:translateY(20px);transition:opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1);}
-  .hero-anim.in-view{opacity:1;transform:translateY(0);}
-  .float-y{animation:floaty 4.5s ease-in-out infinite;}
-  @keyframes floaty{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
-
-  /* ---------- TRUST / ABOUT ---------- */
-  .about{background:var(--paper);}
-  .about-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:72px;align-items:center;}
-  @media(max-width:900px){.about-grid{grid-template-columns:1fr;gap:40px;}}
-  .about-figure{position:relative;}
-  .about-figure .shape{position:absolute;inset:18px -18px -18px 18px;background:var(--teal-light);border-radius:var(--radius);z-index:0;}
-  .about-figure .ph{position:relative;z-index:1;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-md);}
-  .about-figure img{width:100%;height:100%;object-fit:cover;aspect-ratio:5/4;}
-  .about-figure .float-badge{
-    position:absolute;left:-24px;bottom:-24px;z-index:2;background:var(--navy);color:#fff;border-radius:16px;
-    padding:16px 20px;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:12px;
-  }
-  .about-figure .float-badge .v{font-family:'Fraunces',serif;font-size:22px;font-weight:600;}
-  .about-figure .float-badge .t{font-size:11.5px;color:#B7D0C4;text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
-  @media(max-width:520px){.about-figure .float-badge{left:10px;bottom:-18px;padding:12px 16px;}}
-  .about h2{font-size:clamp(28px,3.6vw,40px);max-width:540px;}
-  .about .lede{margin-top:18px;font-size:16.5px;max-width:540px;}
-  .feature-list{margin-top:36px;display:flex;flex-direction:column;}
-  .feature-item{display:flex;gap:18px;align-items:flex-start;padding:20px 0;border-top:1px solid var(--line);}
-  .feature-item:first-child{border-top:none;padding-top:0;}
-  .feature-ico{
-    width:46px;height:46px;border-radius:13px;background:var(--teal-light);color:var(--teal);
-    display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  }
-  .feature-item:nth-child(2) .feature-ico{background:var(--gold-light);color:var(--gold);}
-  .feature-item:nth-child(3) .feature-ico{background:#E3ECF5;color:#3A5B8C;}
-  .feature-item h4{font-size:16.5px;font-weight:700;font-family:'Inter',sans-serif;color:var(--ink);}
-  .feature-item p{font-size:14.5px;margin-top:4px;}
-
-  /* ---------- ENGAGEMENT / VALUES ---------- */
-  .engagement{background:var(--ink);color:#fff;overflow:hidden;}
-  .engagement::before{
-    content:"";position:absolute;top:-160px;right:-160px;width:460px;height:460px;border-radius:50%;
-    background:radial-gradient(circle,rgba(46,139,110,.3),transparent 70%);
-  }
-  .engagement-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:24px;align-items:flex-end;position:relative;}
-  .engagement h2{color:#fff;font-size:clamp(28px,3.6vw,40px);max-width:600px;}
-  .quote-block{margin-top:56px;position:relative;padding:8px 0 0 64px;}
-  .quote-block .mark{position:absolute;left:-8px;top:-38px;font-family:'Fraunces',serif;font-size:150px;color:rgba(255,255,255,.09);font-weight:700;line-height:1;user-select:none;}
-  .quote-block p.q{color:#E3E9E4;font-family:'Fraunces',serif;font-size:clamp(20px,2.6vw,28px);font-weight:500;line-height:1.5;font-style:italic;max-width:880px;position:relative;}
-  .quote-block p.src{margin-top:18px;font-family:'Inter',sans-serif;font-style:normal;font-size:14.5px;color:#8FA79A;letter-spacing:.02em;}
-  @media(max-width:600px){.quote-block{padding-left:0;}.quote-block .mark{display:none;}}
-  .value-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:56px;position:relative;}
-  @media(max-width:820px){.value-cards{grid-template-columns:1fr;}}
-  .value-card{
-    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);
-    padding:34px 28px;transition:transform .25s cubic-bezier(.2,.8,.2,1), background .25s ease, border-color .25s ease;
-    position:relative;overflow:hidden;
-  }
-  .value-card:hover{transform:translateY(-6px);background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25);}
-  .value-card .num{position:absolute;right:14px;top:2px;font-family:'Fraunces',serif;font-size:76px;font-weight:700;color:rgba(255,255,255,.06);line-height:1;}
-  .value-card .ico{width:48px;height:48px;border-radius:13px;background:rgba(201,138,43,.16);color:var(--gold);display:flex;align-items:center;justify-content:center;margin-bottom:22px;position:relative;}
-  .value-card h3{color:#fff;font-size:21px;position:relative;}
-  .value-card p{color:#AEC2B8;margin-top:10px;font-size:14.5px;position:relative;}
-
-  /* ---------- SERVICES ---------- */
-  .services{background:var(--cloud);}
-  .services-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:24px;align-items:flex-end;}
-  .services-head h2{font-size:clamp(28px,3.6vw,40px);max-width:540px;}
-  .services-head p{max-width:420px;font-size:15.5px;}
-  .service-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;}
-  .chip{
-    display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:100px;
-    background:var(--paper);border:1px solid var(--line);font-size:13.5px;font-weight:600;color:var(--navy);
-  }
-  .chip svg{color:var(--teal);}
-  .service-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:44px;}
-  @media(max-width:980px){.service-grid{grid-template-columns:repeat(2,1fr);}}
-  @media(max-width:560px){.service-grid{grid-template-columns:1fr;}}
-  .service-card{
-    background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:26px;
-    transition:box-shadow .25s ease, transform .25s ease, border-color .25s ease;position:relative;overflow:hidden;
-  }
-  .service-card::before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:linear-gradient(90deg,var(--teal),var(--gold));transform:scaleX(0);transform-origin:left;transition:transform .3s ease;}
-  .service-card:hover{box-shadow:var(--shadow-md);transform:translateY(-4px);border-color:transparent;}
-  .service-card:hover::before{transform:scaleX(1);}
-  .service-card .ico{width:46px;height:46px;border-radius:13px;background:var(--teal-light);color:var(--navy);display:flex;align-items:center;justify-content:center;margin-bottom:18px;}
-  .service-card h4{font-family:'Inter',sans-serif;font-weight:700;font-size:15.5px;color:var(--ink);}
-  .service-card p{font-size:13.5px;margin-top:6px;}
-  .service-feature{grid-column:span 2;background:var(--navy);color:#fff;position:relative;overflow:hidden;}
-  .service-feature img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.32;}
-  .service-feature::before{background:linear-gradient(90deg,var(--gold),var(--teal));}
-  .service-feature .content{position:relative;z-index:1;}
-  .service-feature .ico{background:rgba(255,255,255,.16);color:var(--gold);}
-  .service-feature h4{color:#fff;font-size:17.5px;}
-  .service-feature p{color:#D6E3DB;}
-  @media(max-width:560px){.service-feature{grid-column:span 1;}}
-
-  /* ---------- GALLERY ---------- */
-  .gallery{background:var(--paper);}
-  .gallery-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px;align-items:flex-end;}
-  .gallery-head h2{font-size:clamp(26px,3.2vw,36px);}
-  .gallery-grid{margin-top:44px;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:140px;gap:16px;}
-  .gallery-item{position:relative;border-radius:16px;overflow:hidden;}
-  .gallery-item img{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.2,.8,.2,1);}
-  .gallery-item:hover img{transform:scale(1.08);}
-  .gallery-item::after{content:attr(data-label);position:absolute;left:14px;bottom:12px;color:#fff;font-weight:700;font-size:13px;opacity:0;transition:opacity .3s ease;}
-  .gallery-item::before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(11,32,25,.65),transparent 55%);opacity:0;transition:opacity .3s ease;}
-  .gallery-item:hover::after, .gallery-item:hover::before{opacity:1;}
-  .gallery-grid .g1{grid-column:span 2;grid-row:span 2;}
-  .gallery-grid .g4{grid-column:span 2;}
-  @media(max-width:760px){
-    .gallery-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:120px;}
-    .gallery-grid .g1{grid-column:span 2;grid-row:span 2;}
-    .gallery-grid .g4{grid-column:span 2;}
-  }
-
-  /* ---------- LOCATION ---------- */
-  .location{background:var(--cloud);}
-  .location-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:0;border-radius:26px;overflow:hidden;box-shadow:var(--shadow-lg);}
-  @media(max-width:900px){.location-grid{grid-template-columns:1fr;}}
-  .location-info{background:var(--navy);color:#fff;padding:52px 46px;}
-  .location-info h2{color:#fff;font-size:clamp(26px,3vw,32px);}
-  .location-info > p{color:#CBDDD3;margin-top:14px;font-size:15.5px;}
-  .loc-rows{margin-top:34px;display:flex;flex-direction:column;gap:24px;}
-  .loc-row{display:flex;gap:16px;align-items:flex-start;}
-  .loc-row .ico{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .loc-row h4{font-family:'Inter',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#8FA79A;font-weight:700;}
-  .loc-row p, .loc-row a{color:#fff;font-size:15.5px;font-weight:600;margin-top:3px;}
-  .loc-row a:hover{color:var(--gold);}
-  .location-map{position:relative;min-height:360px;}
-  .location-map iframe{width:100%;height:100%;min-height:360px;border:0;display:block;filter:grayscale(.15) contrast(1.02);}
-
-  /* ---------- CONTACT / EMERGENCY ---------- */
-  .contact{background:var(--paper);}
-  .contact-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:60px;}
-  @media(max-width:940px){.contact-grid{grid-template-columns:1fr;gap:40px;}}
-  .contact h2{font-size:clamp(28px,3.6vw,38px);}
-  .contact .lede{margin-top:14px;font-size:15.5px;max-width:440px;}
-  .urgent-box{
-    margin-top:32px;border-radius:20px;padding:26px;background:linear-gradient(135deg,var(--gold-light),#F0DDB8);
-    border:1px solid #E4CB94;
-  }
-  .urgent-box .tag{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:13px;color:#7A5518;text-transform:uppercase;letter-spacing:.06em;}
-  .urgent-box p{margin-top:10px;font-size:14.5px;color:#5C4419;}
-  .urgent-box .btn{margin-top:18px;}
-
-  .contact-channels{margin-top:32px;display:flex;flex-direction:column;gap:14px;}
-  .channel{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--line);border-radius:16px;transition:border-color .2s ease, box-shadow .2s ease;}
-  .channel:hover{border-color:var(--teal);box-shadow:var(--shadow-md);}
-  .channel .ico{width:42px;height:42px;border-radius:11px;background:var(--cloud);color:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .channel .t{font-size:12.5px;color:var(--slate);font-weight:600;}
-  .channel .v{font-size:14.5px;font-weight:700;color:var(--ink);}
-
-  .form-card{background:var(--cloud);border:1px solid var(--line);border-radius:24px;padding:40px;}
-  @media(max-width:520px){.form-card{padding:26px;}}
-  .form-card h3{font-size:21px;}
-  .form-card > p{margin-top:8px;font-size:14px;}
-  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
-  @media(max-width:560px){.form-row{grid-template-columns:1fr;}}
-  .field{display:flex;flex-direction:column;gap:7px;}
-  .field.full{grid-column:1 / -1;}
-  label{font-size:13px;font-weight:700;color:var(--navy);}
-  input, select, textarea{
-    font-family:'Inter',sans-serif;font-size:14.5px;padding:14px 16px;border-radius:12px;
-    border:1.5px solid var(--line);background:#fff;color:var(--ink);width:100%;transition:border-color .2s ease, box-shadow .2s ease;
-  }
-  input:focus, select:focus, textarea:focus{border-color:var(--teal);outline:none;box-shadow:0 0 0 4px var(--teal-light);}
-  textarea{resize:vertical;min-height:100px;}
-  .urgency-toggle{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;}
-  .urgency-toggle input{position:absolute;opacity:0;width:0;height:0;}
-  .urgency-toggle label{
-    display:flex;align-items:center;gap:8px;padding:11px 18px;border-radius:100px;border:1.5px solid var(--line);
-    background:#fff;font-size:13.5px;font-weight:600;color:var(--navy);cursor:pointer;transition:.15s ease;
-  }
-  .urgency-toggle input:checked + label{background:var(--navy);border-color:var(--navy);color:#fff;}
-  .form-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px;}
-  .form-note{font-size:12.5px;color:var(--slate);margin-top:16px;}
-  #formStatus{margin-top:14px;font-size:13.5px;font-weight:600;display:none;}
-  #formStatus.show{display:block;}
-
-  /* ---------- FOOTER ---------- */
-  footer{background:var(--ink);color:#9AB0A3;padding:0 0 30px;}
-  footer .foot-top{padding:64px 0 0;}
-  .foot-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:44px;}
-  @media(max-width:820px){.foot-grid{grid-template-columns:1fr 1fr;}}
-  @media(max-width:520px){.foot-grid{grid-template-columns:1fr;}}
-  .foot-brand{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
-  .foot-brand img{height:38px;border-radius:8px;}
-  .foot-brand span{font-family:'Fraunces',serif;color:#fff;font-size:17px;font-weight:700;}
-  footer h5{color:#fff;font-size:12.5px;text-transform:uppercase;letter-spacing:.09em;margin-bottom:18px;font-weight:700;}
-  footer ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:14px;}
-  footer ul a:hover{color:#fff;}
-  .foot-bottom{margin-top:52px;padding-top:24px;border-top:1px solid rgba(255,255,255,.1);display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:12.5px;}
-
-  /* ---------- FLOATING WHATSAPP ---------- */
-  .fab{
-    position:fixed;right:22px;bottom:22px;z-index:200;
-    display:flex;align-items:center;gap:10px;background:#22C35E;color:#fff;
-    padding:15px 22px 15px 15px;border-radius:100px;box-shadow:0 16px 32px -10px rgba(34,195,94,.6);
-    font-weight:700;font-size:14px;
-  }
-  .fab .ring{position:absolute;inset:-6px;border-radius:100px;border:2px solid #22C35E;opacity:.6;animation:pulse 2.2s ease-out infinite;}
-  @keyframes pulse{0%{transform:scale(1);opacity:.6;}100%{transform:scale(1.25);opacity:0;}}
-  .fab span.fab-text{display:none;}
-  @media(min-width:640px){.fab span.fab-text{display:inline;}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Gestion Hospitalier</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<header>
-  <div class="wrap nav">
-    <a href="#top" class="brand"><img src="14.jpg" alt="Logo Clinique Spécialisée du Cap-Haïtien"><span>CLISCAP</span></a>
-    <ul class="nav-links">
-      <li><a href="#apropos">À propos</a></li>
-      <li><a href="#engagement">Engagement</a></li>
-      <li><a href="#services">Services</a></li>
-      <li><a href="#localisation">Localisation</a></li>
-      <li><a href="#contact">Contact</a></li>
-    </ul>
-    <div class="nav-actions">
-      <a class="btn btn-navy" href="https://wa.me/50932950401?text=Bonjour%2C%20je%20souhaite%20prendre%20rendez-vous%20%C3%A0%20la%20Clinique%20Sp%C3%A9cialis%C3%A9e%20du%20Cap-Ha%C3%AFtien." target="_blank" rel="noopener">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.13-2.9-7A9.86 9.86 0 0 0 12.04 2zm5.8 14.15c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.12-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.8-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.01-2.41.27-.29.58-.36.78-.36.2 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.52-.09.19-.14.31-.28.48-.14.16-.29.36-.42.48-.14.13-.28.28-.12.55.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.28.14.44.12.6-.07.16-.2.68-.79.87-1.06.18-.28.37-.23.62-.14.26.1 1.63.77 1.9.91.28.14.46.21.53.33.07.12.07.68-.17 1.36z"/></svg>
-        <span class="label">Rendez-vous</span>
-      </a>
-    </div>
-    <button class="burger" id="burgerBtn" aria-label="Ouvrir le menu" aria-expanded="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </button>
-  </div>
-  <nav id="mobileNav">
-    <a href="#apropos">À propos</a>
-    <a href="#engagement">Notre engagement</a>
-    <a href="#services">Services</a>
-    <a href="#localisation">Localisation</a>
-    <a href="#contact">Contact</a>
-  </nav>
-</header>
+<!-- ══════════════════════════════════════════════════
+     ÉCRAN DE CONNEXION
+═══════════════════════════════════════════════════ -->
+<div id="login-screen" class="login-container">
+    <div class="login-box">
+        <div class="text-center mb-3">
+            <img id="login-logo" src="" alt="Logo" class="certificate-logo" style="display:none; max-height:80px; margin-bottom:10px;">
+            <i class="fas fa-hospital-alt fa-3x" style="color:#1a6bca;" id="login-icon"></i>
+            <h2 class="login-hospital-title mt-2" id="hospital-name-login">NovaCare</h2>
+            <p class="login-hospital-sub">Système de Gestion Hospitalier</p>
+        </div>
+        <div class="login-divider"></div>
 
-<main id="top">
-
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-bg"><img src="1.jpg" alt="Équipe médicale de la Clinique Spécialisée du Cap-Haïtien"></div>
-    <div class="wrap">
-      <div class="hero-inner">
-        <p class="eyebrow hero-eyebrow hero-anim">CLISCAP · Cap-Haïtien, Haïti</p>
-        <h1 class="hero-anim" style="transition-delay:.08s;">Soigner avec science.<br><em>Servir</em> avec humanité.</h1>
-        <p class="lede hero-anim" style="transition-delay:.16s;">La Clinique Spécialisée du Cap-Haïtien est un établissement de santé fondé sur l'excellence, l'éthique et la proximité. Nous accompagnons chaque patient avec respect, écoute et professionnalisme.</p>
-        <div class="hero-cta hero-anim" style="transition-delay:.24s;">
-          <a class="btn btn-primary" href="https://wa.me/50932950401?text=Bonjour%2C%20j%27ai%20besoin%20d%27une%20consultation%20%C3%A0%20la%20CLISCAP." target="_blank" rel="noopener">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.13-2.9-7A9.86 9.86 0 0 0 12.04 2z"/></svg>
-            Prendre rendez-vous
-          </a>
-          <a class="btn btn-outline" href="#services">Voir nos services</a>
-        </div>
-      </div>
-      <div class="hero-badge float-y hero-anim" style="transition-delay:.32s;">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E8B6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        <div>
-          <div class="t">Urgence &amp; hospitalisation</div>
-          <div class="v">24 / 24</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider">
-      <svg viewBox="0 0 1440 60" preserveAspectRatio="none"><path d="M0,32 C360,80 1080,-20 1440,32 L1440,60 L0,60 Z" fill="#146349"></path></svg>
-    </div>
-  </section>
-
-  <div class="marquee">
-    <div class="marquee-track" id="marqueeTrack">
-      <span>Pédiatrie</span><span>Cardiologie</span><span>Gynécologie &amp; obstétrique</span><span>Orthopédie &amp; traumatologie</span><span>Urologie</span><span>Dentisterie</span><span>Laboratoire &amp; imagerie</span><span>Urgence 24/24</span>
-      <span>Pédiatrie</span><span>Cardiologie</span><span>Gynécologie &amp; obstétrique</span><span>Orthopédie &amp; traumatologie</span><span>Urologie</span><span>Dentisterie</span><span>Laboratoire &amp; imagerie</span><span>Urgence 24/24</span>
-    </div>
-  </div>
-
-  <!-- ABOUT / TRUST -->
-  <section class="about" id="apropos">
-    <div class="wrap about-grid">
-      <div class="about-figure reveal">
-        <div class="shape"></div>
-        <div class="ph"><img src="2.jpg" alt="Accueil et espace de soins de la clinique"></div>
-        <div class="float-badge">
-          <div class="v">16</div>
-          <div class="t">Spécialités<br>médicales</div>
-        </div>
-      </div>
-      <div>
-        <p class="eyebrow">Notre vocation</p>
-        <h2>Une expérience de soins organisée, sécuritaire et centrée sur vous.</h2>
-        <p class="lede">Nous croyons que les soins médicaux vont bien au-delà du diagnostic et du traitement. Ils comprennent également l'information, l'orientation, l'accompagnement et l'établissement d'une relation de confiance durable avec chaque patient.</p>
-        <div class="feature-list">
-          <div class="feature-item">
-            <div class="feature-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-            <div><h4>Collaboration clinique</h4><p>Une équipe engagée dans une approche interprofessionnelle.</p></div>
-          </div>
-          <div class="feature-item">
-            <div class="feature-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11V5l-8-3-8 3v6c0 6.5 8 11 8 11z"/></svg></div>
-            <div><h4>Soins sécuritaires</h4><p>Information claire, prévention et suivi rigoureux.</p></div>
-          </div>
-          <div class="feature-item">
-            <div class="feature-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
-            <div><h4>Approche humaine</h4><p>Respect de la dignité et écoute de chaque personne.</p></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ENGAGEMENT / VALUES -->
-  <section class="engagement" id="engagement">
-    <div class="wrap">
-      <div class="engagement-top reveal">
-        <div>
-          <p class="eyebrow">Engagement institutionnel</p>
-          <h2>Nous nous engageons à promouvoir une culture de service responsable et centrée sur la personne.</h2>
-        </div>
-        <img src="4.jpg" alt="Équipe de la clinique" style="width:220px;height:150px;object-fit:cover;border-radius:16px;flex-shrink:0;box-shadow:var(--shadow-md);">
-      </div>
-
-      <div class="quote-block reveal">
-        <span class="mark">&ldquo;</span>
-        <p class="q">Une culture de service responsable, structurée, accessible et centrée sur la personne, en harmonie avec les besoins de la population et avec le développement d'une médecine toujours plus humaine en Haïti.</p>
-        <p class="src">Document de présentation institutionnelle — Clinique Spécialisée du Cap-Haïtien</p>
-      </div>
-
-      <div class="value-cards reveal-group">
-        <div class="value-card reveal-child">
-          <span class="num">01</span>
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
-          <h3>Humanité</h3>
-          <p>Empathie, bienveillance et respect.</p>
-        </div>
-        <div class="value-card reveal-child">
-          <span class="num">02</span>
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5.25 3.75 9.74 9 11 5.25-1.26 9-5.75 9-11V7l-9-5z"/></svg></div>
-          <h3>Éthique</h3>
-          <p>Intégrité, confidentialité et responsabilité.</p>
-        </div>
-        <div class="value-card reveal-child">
-          <span class="num">03</span>
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.7 6.6L22 10l-5 4.9L18.2 22 12 18.6 5.8 22 7 14.9 2 10l7.3-1.4z"/></svg></div>
-          <h3>Excellence</h3>
-          <p>Amélioration continue de la qualité des soins.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SERVICES -->
-  <section class="services bg-dots" id="services">
-    <div class="wrap">
-      <div class="services-head reveal">
-        <div>
-          <p class="eyebrow">Prise en charge multidisciplinaire</p>
-          <h2>Nos principaux services</h2>
-        </div>
-        <p>Des consultations spécialisées aux examens diagnostiques, notre équipe vous accompagne à chaque étape de votre parcours de soins.</p>
-      </div>
-      <div class="service-chips reveal">
-        <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Rendez-vous sur WhatsApp</span>
-        <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Urgences 24/24</span>
-        <span class="chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Équipe interprofessionnelle</span>
-      </div>
-
-      <div class="service-grid reveal-group">
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="3"/><path d="M12 9c-4 0-6 2.5-6 6 0 3 2 6 6 6s6-3 6-6c0-3.5-2-6-6-6z"/></svg></div>
-          <h4>Pédiatrie</h4>
-          <p>Suivi et prise en charge médicale des nourrissons, enfants et adolescents.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 4.8a4 4 0 0 0 0 5.66l6.37 6.37a2 2 0 0 0 2.83 0l1.06-1.06a2 2 0 0 0 0-2.83L8.7 6.58a1.5 1.5 0 1 1 2.12-2.12l5.72 5.72a2 2 0 0 0 2.83 0 2 2 0 0 0 0-2.83l-3.2-3.2a6 6 0 0 0-8.49 0z"/></svg></div>
-          <h4>Médecine interne</h4>
-          <p>Évaluation globale, diagnostic et suivi des affections médicales de l'adulte.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"/><path d="M12 14v7M9 18h6"/></svg></div>
-          <h4>Gynécologie &amp; obstétrique</h4>
-          <p>Accompagnement de la santé de la femme et suivi de grossesse.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4l3.5 9a3 3 0 0 0 5.8-1L9 9V3z"/><path d="M9 9h6"/></svg></div>
-          <h4>Chirurgie générale</h4>
-          <p>Interventions programmées et prise en charge chirurgicale adaptée.</p>
+        <p style="font-size:.82rem;color:#6c757d;text-align:center;margin-bottom:10px;font-weight:600;">SÉLECTIONNER VOTRE RÔLE</p>
+        <div class="login-buttons">
+            <div class="login-role-btn active" data-role="admin"><i class="fas fa-user-shield"></i><p>Admin</p></div>
+            <div class="login-role-btn" data-role="sub_admin"><i class="fas fa-user-cog"></i><p>Sous-Admin</p></div>
+            <div class="login-role-btn" data-role="secretary"><i class="fas fa-user-tie"></i><p>Secrétariat</p></div>
+            <div class="login-role-btn" data-role="cashier"><i class="fas fa-cash-register"></i><p>Caisse</p></div>
+            <div class="login-role-btn" data-role="nurse"><i class="fas fa-user-nurse"></i><p>Infirmier</p></div>
+            <div class="login-role-btn" data-role="doctor"><i class="fas fa-user-md"></i><p>Médecin</p></div>
+            <div class="login-role-btn" data-role="lab"><i class="fas fa-flask"></i><p>Labo</p></div>
+            <div class="login-role-btn" data-role="pharmacy"><i class="fas fa-pills"></i><p>Pharmacie</p></div>
         </div>
 
-        <div class="service-card service-feature reveal-child">
-          <img src="6.jpg" alt="Consultation en cardiologie">
-          <div class="content">
-            <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
-            <h4>Cardiologie</h4>
-            <p>Consultations et examens pour l'évaluation de la santé cardiovasculaire.</p>
-          </div>
-        </div>
-
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.3 8.3 15.7 15.7"/></svg></div>
-          <h4>Orthopédie &amp; traumatologie</h4>
-          <p>Prise en charge des traumatismes et affections de l'appareil locomoteur.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v4M15 2v4M6 10h12M4 10v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/></svg></div>
-          <h4>Urologie</h4>
-          <p>Diagnostic et traitement des affections de l'appareil urinaire.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3c0 5-2 6-2 10a6 6 0 0 0 12 0c0-1.2-.3-2-.6-3"/><path d="M12 3c0 4 3 5 3 10"/></svg></div>
-          <h4>Dentisterie</h4>
-          <p>Consultations, prévention et soins destinés à la santé bucco-dentaire.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 9l6 6M20 21l-8-8"/><path d="M17 4l3 3-11 11-4-4z"/></svg></div>
-          <h4>Anesthésiologie</h4>
-          <p>Prise en charge anesthésique avant, pendant et après l'intervention.</p>
-        </div>
-
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3L15 8V2M9 2h6M9 14h6"/></svg></div>
-          <h4>Laboratoire &amp; imagerie</h4>
-          <p>Examens complémentaires pour soutenir le diagnostic et le suivi médical.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></div>
-          <h4>Radiographie &amp; sonographie</h4>
-          <p>Imagerie médicale précise au service du diagnostic.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 8 4-16 2 8h6"/></svg></div>
-          <h4>ECG &amp; échocardiographie</h4>
-          <p>Évaluation approfondie de la fonction cardiaque.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="16" rx="3"/><path d="M4 12h7"/></svg></div>
-          <h4>Pharmacie</h4>
-          <p>Dispensation et conseils pharmaceutiques sur place.</p>
-        </div>
-
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3a5.5 5.5 0 0 0-5.5 5.5c0 4.5 5.5 8.5 5.5 8.5V21M14.5 3a5.5 5.5 0 0 1 5.5 5.5c0 4.5-5.5 8.5-5.5 8.5"/></svg></div>
-          <h4>Psychologie</h4>
-          <p>Accompagnement psychologique et soutien émotionnel.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M5 8c0 4 3 5 7 5s7-1 7-5"/></svg></div>
-          <h4>Angiologie &amp; chirurgie vasculaire</h4>
-          <p>Prise en charge des affections veineuses et artérielles.</p>
-        </div>
-        <div class="service-card reveal-child">
-          <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l1.5-3L11 15l2-6 1.5 3H21"/></svg></div>
-          <h4>Urgence &amp; hospitalisation</h4>
-          <p>Accueil des urgences et hospitalisation, 24 heures sur 24.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- GALLERY -->
-  <section class="gallery">
-    <div class="wrap">
-      <div class="gallery-head reveal">
-        <div>
-          <p class="eyebrow">La clinique en images</p>
-          <h2>Notre établissement</h2>
-        </div>
-        <a class="btn btn-ghost" href="#localisation">Comment nous trouver</a>
-      </div>
-      <div class="gallery-grid reveal-group">
-        <div class="gallery-item g1 reveal-child" data-label="Équipe soignante"><img src="3.jpg" alt="Équipe soignante de la CLISCAP"></div>
-        <div class="gallery-item reveal-child" data-label="Consultation"><img src="5.jpg" alt="Espace de consultation"></div>
-        <div class="gallery-item reveal-child" data-label="Laboratoire"><img src="8.jpg" alt="Laboratoire et imagerie"></div>
-        <div class="gallery-item g4 reveal-child" data-label="Soins dentaires"><img src="9.jpg" alt="Salle de soins dentaires"></div>
-        <div class="gallery-item reveal-child" data-label="Intérieur"><img src="12.jpg" alt="Intérieur de la clinique"></div>
-        <div class="gallery-item reveal-child" data-label="Personnel"><img src="13.jpg" alt="Personnel de la clinique"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- LOCATION -->
-  <section class="location" id="localisation">
-    <div class="wrap">
-      <div class="location-grid reveal">
-        <div class="location-info">
-          <p class="eyebrow">Facilement accessible au Cap-Haïtien</p>
-          <h2>Nous sommes situés à Carénage.</h2>
-          <p>Retrouvez la Clinique Spécialisée du Cap-Haïtien à la Rue 26 B, Carénage. Pour préparer votre visite ou confirmer la disponibilité d'un service, contactez notre équipe.</p>
-          <div class="loc-rows">
-            <div class="loc-row">
-              <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-              <div><h4>Adresse</h4><p>Rue 26 B, Carénage, Cap-Haïtien, Haïti</p></div>
+        <form id="login-form">
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-user" style="color:#1a6bca;"></i> Nom d'utilisateur</label>
+                <input type="text" id="username" class="form-control" required autocomplete="username" placeholder="Votre identifiant">
             </div>
-            <div class="loc-row">
-              <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-              <div><h4>Téléphones</h4><p><a href="tel:+50932950401">+509 3295-0401</a> · <a href="tel:+50932950402">+509 3295-0402</a></p></div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-lock" style="color:#1a6bca;"></i> Mot de passe</label>
+                <div style="position:relative;">
+                    <input type="password" id="password" class="form-control" required autocomplete="current-password" placeholder="••••••••" style="padding-right:44px;">
+                    <button type="button" id="toggle-password" onclick="togglePasswordView()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6c757d;font-size:1rem;padding:0;">
+                        <i class="fas fa-eye" id="eye-icon"></i>
+                    </button>
+                </div>
             </div>
-            <div class="loc-row">
-              <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg></div>
-              <div><h4>Courriel</h4><p><a href="mailto:Cliscaphosp@gmail.com">Cliscaphosp@gmail.com</a></p></div>
-            </div>
-          </div>
-          <a class="btn btn-primary" style="margin-top:34px;" href="https://www.google.com/maps/search/?api=1&query=Rue+26+B+Car%C3%A9nage+Cap-Ha%C3%AFtien+Haiti" target="_blank" rel="noopener">Voir la carte</a>
-        </div>
-        <div class="location-map">
-          <iframe loading="lazy" title="Carte - Carénage, Cap-Haïtien" src="https://maps.google.com/maps?q=Car%C3%A9nage%2C%20Cap-Ha%C3%AFtien%2C%20Haiti&t=&z=15&ie=UTF8&iwloc=&output=embed"></iframe>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONTACT / EMERGENCY -->
-  <section class="contact" id="contact">
-    <div class="wrap contact-grid">
-      <div class="reveal">
-        <p class="eyebrow">Nous contacter</p>
-        <h2>Une urgence ? Une question ? Parlons-en.</h2>
-        <p class="lede">Notre secrétariat est disponible pour organiser votre rendez-vous, répondre à vos questions ou vous orienter en cas d'urgence.</p>
-
-        <div class="urgent-box">
-          <span class="tag">⚠ Urgence médicale</span>
-          <p>En cas d'urgence vitale, appelez-nous directement ou rendez-vous sans délai à la clinique. Notre service d'urgence est ouvert 24 heures sur 24.</p>
-          <a class="btn btn-navy" href="tel:+50932950401">Appeler l'urgence</a>
-        </div>
-
-        <div class="contact-channels">
-          <div class="channel">
-            <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-            <div><div class="t">Téléphone</div><div class="v">+509 3295-0401 / 0402</div></div>
-          </div>
-          <div class="channel">
-            <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.13-2.9-7A9.86 9.86 0 0 0 12.04 2z"/></svg></div>
-            <div><div class="t">WhatsApp</div><div class="v">+509 3295-0401</div></div>
-          </div>
-          <div class="channel">
-            <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg></div>
-            <div><div class="t">Courriel</div><div class="v">Cliscaphosp@gmail.com</div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-card reveal">
-        <h3>Écrivez à notre secrétariat</h3>
-        <p>Remplissez le formulaire — votre message sera préparé pour être envoyé directement sur notre WhatsApp.</p>
-        <form id="contactForm">
-          <div class="form-row">
-            <div class="field">
-              <label for="fname">Nom complet</label>
-              <input type="text" id="fname" name="fname" placeholder="Votre nom" required>
-            </div>
-            <div class="field">
-              <label for="fphone">Téléphone</label>
-              <input type="tel" id="fphone" name="fphone" placeholder="+509 ..." required>
-            </div>
-            <div class="field full">
-              <label>Nature de la demande</label>
-              <div class="urgency-toggle">
-                <input type="radio" id="tRdv" name="reqtype" value="Rendez-vous" checked><label for="tRdv">Rendez-vous</label>
-                <input type="radio" id="tInfo" name="reqtype" value="Renseignement"><label for="tInfo">Renseignement</label>
-                <input type="radio" id="tUrg" name="reqtype" value="Urgence"><label for="tUrg">🔴 Urgence</label>
-              </div>
-            </div>
-            <div class="field full">
-              <label for="fmsg">Message</label>
-              <textarea id="fmsg" name="fmsg" placeholder="Décrivez votre besoin ou le service souhaité..." required></textarea>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary" id="sendWa">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.13-2.9-7A9.86 9.86 0 0 0 12.04 2z"/></svg>
-              Envoyer via WhatsApp
+            <button type="submit" class="btn" style="width:100%;padding:13px;font-size:1rem;border-radius:10px;">
+                <i class="fas fa-sign-in-alt"></i> Se Connecter
             </button>
-            <button type="button" class="btn btn-ghost" id="sendMail">Envoyer par courriel</button>
-          </div>
-          <p id="formStatus"></p>
-          <p class="form-note">En cas d'urgence vitale, n'attendez pas une réponse en ligne : appelez directement le +509 3295-0401 ou rendez-vous à la clinique.</p>
         </form>
-      </div>
     </div>
-  </section>
+</div>
 
-</main>
+<!-- ══════════════════════════════════════════════════
+     APPLICATION PRINCIPALE
+═══════════════════════════════════════════════════ -->
+<div id="main-app" class="hidden">
+    <div class="container">
 
-<footer>
-  <div class="divider" style="transform:rotate(180deg);">
-    <svg viewBox="0 0 1440 60" preserveAspectRatio="none"><path d="M0,32 C360,80 1080,-20 1440,32 L1440,60 L0,60 Z" fill="var(--cloud)"></path></svg>
-  </div>
-  <div class="foot-top">
-    <div class="wrap">
-      <div class="foot-grid">
-        <div>
-          <div class="foot-brand"><img src="14.jpg" alt="Logo CLISCAP"><span>Clinique Spécialisée<br>du Cap-Haïtien</span></div>
-          <p style="color:#93A69C;font-size:14px;max-width:280px;">Soigner avec science. Servir avec humanité. Un établissement fondé sur l'excellence, l'éthique et la proximité.</p>
+        <!-- En-tête -->
+        <header class="header no-print">
+            <div class="logo">
+                <img id="header-logo" src="" alt="Logo" class="logo-img" style="display:none;">
+                <i class="fas fa-hospital-alt" id="header-icon" style="color:#fff;"></i>
+                <div>
+                    <h1 id="hospital-name-header">Hôpital Saint-Luc</h1>
+                    <p id="hospital-address-header">Système de Gestion</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <!-- Cloche de notifications -->
+                <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span id="notif-count-badge" class="notif-count-badge hidden">0</span>
+                </button>
+                <div class="user-info">
+                    <div>
+                        <p id="current-user-role" style="opacity:.75;font-size:.78rem;"></p>
+                        <strong id="current-username" style="font-size:.95rem;"></strong>
+                    </div>
+                    <button id="logout-btn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> <span class="logout-text">Déconnexion</span></button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Panneau de notifications -->
+        <div id="notif-panel" class="notif-panel no-print">
+            <div class="notif-header">
+                <h4><i class="fas fa-bell"></i> Notifications</h4>
+                <button id="mark-all-read-btn" class="btn btn-sm btn-outline" style="font-size:.75rem;padding:4px 10px;">Tout lire</button>
+            </div>
+            <div class="notif-list" id="notif-list">
+                <div class="notif-empty"><i class="fas fa-check-circle" style="font-size:1.5rem;color:#28a745;display:block;margin-bottom:6px;"></i>Aucune notification</div>
+            </div>
         </div>
-        <div>
-          <h5>Navigation</h5>
-          <ul>
-            <li><a href="#apropos">À propos</a></li>
-            <li><a href="#engagement">Notre engagement</a></li>
-            <li><a href="#services">Services</a></li>
-            <li><a href="#localisation">Localisation</a></li>
-          </ul>
-        </div>
-        <div>
-          <h5>Services</h5>
-          <ul>
-            <li><a href="#services">Pédiatrie</a></li>
-            <li><a href="#services">Cardiologie</a></li>
-            <li><a href="#services">Gynécologie &amp; obstétrique</a></li>
-            <li><a href="#services">Urgence 24/24</a></li>
-          </ul>
-        </div>
-        <div>
-          <h5>Contact</h5>
-          <ul>
-            <li>Rue 26 B, Carénage, Cap-Haïtien</li>
-            <li><a href="tel:+50932950401">+509 3295-0401</a></li>
-            <li><a href="mailto:Cliscaphosp@gmail.com">Cliscaphosp@gmail.com</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="foot-bottom">
-        <span>© <span id="year"></span> Clinique Spécialisée du Cap-Haïtien (CLISCAP). Tous droits réservés.</span>
-        <span>Document institutionnel conçu à des fins de communication et de représentation corporative.</span>
-      </div>
-    </div>
-  </div>
-</footer>
 
-<a class="fab" href="https://wa.me/50932950401?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide." target="_blank" rel="noopener" aria-label="Contacter sur WhatsApp">
-  <span class="ring"></span>
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.13-2.9-7A9.86 9.86 0 0 0 12.04 2zm5.8 14.15c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.12-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.8-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.01-2.41.27-.29.58-.36.78-.36.2 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.52-.09.19-.14.31-.28.48-.14.16-.29.36-.42.48-.14.13-.28.28-.12.55.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.28.14.44.12.6-.07.16-.2.68-.79.87-1.06.18-.28.37-.23.62-.14.26.1 1.63.77 1.9.91.28.14.46.21.53.33.07.12.07.68-.17 1.36z"/></svg>
-  <span class="fab-text">WhatsApp</span>
-</a>
+        <!-- Navigation par onglets -->
+        <nav class="nav-tabs no-print">
+            <div class="nav-tab active" data-target="dashboard"><i class="fas fa-tachometer-alt"></i> Accueil</div>
+            <div class="nav-tab" data-target="secretary"><i class="fas fa-user-tie"></i> Secrétariat</div>
+            <div class="nav-tab" data-target="cashier"><i class="fas fa-cash-register"></i> Caisse</div>
+            <div class="nav-tab" data-target="nurse"><i class="fas fa-user-nurse"></i> Infirmier</div>
+            <div class="nav-tab" data-target="doctor"><i class="fas fa-user-md"></i> Médecin</div>
+            <div class="nav-tab" data-target="laboratory"><i class="fas fa-flask"></i> Laboratoire</div>
+            <div class="nav-tab" data-target="pharmacy"><i class="fas fa-pills"></i> Pharmacie</div>
+            <div class="nav-tab nav-tab-with-badge" data-target="messaging">
+                <i class="fas fa-comments"></i> Messagerie
+                <span id="message-badge" class="notification-badge hidden">0</span>
+            </div>
+            <div class="nav-tab" data-target="reports"><i class="fas fa-file-alt"></i> Rapports</div>
+            <div class="nav-tab" data-target="administration"><i class="fas fa-chart-bar"></i> Administration</div>
+            <div class="nav-tab" data-target="hospitalization"><i class="fas fa-bed"></i> Hospitalisation</div>
+            <div class="nav-tab" data-target="suppliers"><i class="fas fa-truck"></i> Fournisseurs</div>
+            <div class="nav-tab" data-target="settings"><i class="fas fa-cog"></i> Paramètres</div>
+        </nav>
 
-<script>
-  document.getElementById('year').textContent = new Date().getFullYear();
+        <!-- ─── TABLEAU DE BORD ─────────────────────────── -->
+        <section id="dashboard" class="content active">
+            <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Tableau de Bord — <span id="dashboard-role">Administrateur</span></h2>
+            <div id="role-dashboard-content"></div>
+        </section>
 
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      document.querySelectorAll('.hero-anim').forEach(el => el.classList.add('in-view'));
-    }, 60);
-  });
+        <!-- ─── SECRÉTARIAT ────────────────────────────── -->
+        <section id="secretary" class="content">
+            <h2 class="section-title"><i class="fas fa-user-tie"></i> Secrétariat</h2>
 
-  const revealTargets = document.querySelectorAll('.reveal, .reveal-group');
-  if('IntersectionObserver' in window){
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if(entry.isIntersecting){
-          entry.target.classList.add('in-view');
-          io.unobserve(entry.target);
-        }
-      });
-    }, {threshold:0.15, rootMargin:'0px 0px -40px 0px'});
-    revealTargets.forEach(el => io.observe(el));
-  } else {
-    revealTargets.forEach(el => el.classList.add('in-view'));
-  }
+            <div class="card">
+                <h3><i class="fas fa-user-plus"></i> Nouveau Patient</h3>
+                <form id="patient-registration-form">
+                    <div class="d-flex gap-20" style="margin-bottom:15px;">
+                        <div style="flex:2">
+                            <label class="form-label">Nom complet *</label>
+                            <input type="text" id="patient-fullname" class="form-control" required>
+                        </div>
+                        <div style="flex:1">
+                            <label class="form-label">Date de naissance *</label>
+                            <input type="date" id="patient-birthdate" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-20" style="margin-bottom:15px;">
+                        <div style="flex:1">
+                            <label class="form-label">Adresse</label>
+                            <input type="text" id="patient-address" class="form-control">
+                        </div>
+                        <div style="flex:1">
+                            <label class="form-label">Téléphone *</label>
+                            <input type="tel" id="patient-phone" class="form-control" required>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:15px;">
+                        <label class="form-label">Personne responsable (si mineur)</label>
+                        <input type="text" id="patient-responsible" class="form-control">
+                    </div>
+                    <div class="d-flex gap-20" style="margin-bottom:20px;">
+                        <div style="flex:1">
+                            <label class="form-label">Type de patient</label>
+                            <div style="display:flex;gap:15px;flex-wrap:wrap;margin-top:8px;">
+                                <label><input type="radio" name="patient-type" id="patient-normal" value="normal" checked> Normal</label>
+                                <label><input type="radio" name="patient-type" id="patient-emergency" value="urgence"> Urgence</label>
+                                <label><input type="radio" name="patient-type" id="patient-pediatric" value="pediatrie"> Enfant</label>
+                                <label><input type="radio" name="patient-type" id="patient-external" value="externe"> Externe</label>
+                            </div>
+                            <div class="mt-2">
+                                <label><input type="checkbox" id="external-only"> Service externe uniquement</label>
+                            </div>
+                        </div>
+                        <div style="flex:1" id="consultation-type-container">
+                            <label class="form-label">Type de consultation *</label>
+                            <select id="consultation-type-secretary" class="form-control" required>
+                                <option value="">Sélectionner...</option>
+                            </select>
+                            <button type="button" id="modify-consultation-type-btn" class="btn btn-warning btn-sm mt-2 modify-consultation-btn hidden">
+                                <i class="fas fa-edit"></i> Modifier ce type
+                            </button>
+                        </div>
+                        <div style="flex:1" id="assigned-doctor-container">
+                            <label class="form-label">Médecin *</label>
+                            <select id="patient-assigned-doctor" class="form-control" required>
+                                <option value="">Sélectionner un médecin...</option>
+                            </select>
+                        </div>
+                    </div>
 
-  document.querySelectorAll('.reveal-group').forEach(group => {
-    group.querySelectorAll('.reveal-child').forEach((child, i) => {
-      child.style.transitionDelay = (i * 0.06) + 's';
-    });
-  });
+                    <div id="external-services-selection" class="hidden">
+                        <h4>Services externes souhaités</h4>
+                        <div id="external-services-options"></div>
+                        <button type="button" id="add-external-service-registration" class="btn btn-secondary btn-sm mt-2">
+                            <i class="fas fa-plus"></i> Ajouter service
+                        </button>
+                    </div>
 
-  const burger = document.getElementById('burgerBtn');
-  const mobileNav = document.getElementById('mobileNav');
-  burger.addEventListener('click', () => {
-    const open = mobileNav.classList.toggle('open');
-    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
-  mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-    mobileNav.classList.remove('open');
-    burger.setAttribute('aria-expanded', 'false');
-  }));
+                    <div id="consultation-modification-secretary" class="type-modification-panel hidden">
+                        <h4><i class="fas fa-edit"></i> Modification du type de consultation</h4>
+                        <div class="d-flex gap-15">
+                            <input type="text" id="modified-consultation-name" class="form-control" placeholder="Nom modifié">
+                            <input type="number" id="modified-consultation-price" class="form-control" placeholder="Prix (Gdes)" min="0">
+                            <button type="button" id="save-modified-consultation" class="btn btn-success">Enregistrer</button>
+                            <button type="button" id="cancel-consultation-modification" class="btn btn-secondary">Annuler</button>
+                        </div>
+                        <small class="text-muted">Cette modification s'applique uniquement au patient en cours</small>
+                    </div>
 
-  const WA_NUMBER = '50932950401';
-  const form = document.getElementById('contactForm');
-  const status = document.getElementById('formStatus');
+                    <div class="d-flex gap-15 flex-wrap">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer le dossier</button>
+                        <button type="button" id="generate-patient-id-card" class="btn btn-secondary"><i class="fas fa-id-card"></i> Carte patient</button>
+                        <button type="button" id="generate-medical-certificate" class="btn btn-info"><i class="fas fa-file-medical"></i> Certificat médical</button>
+                    </div>
+                </form>
+            </div>
 
-  function buildMessage(){
-    const name = document.getElementById('fname').value.trim();
-    const phone = document.getElementById('fphone').value.trim();
-    const type = document.querySelector('input[name="reqtype"]:checked').value;
-    const msg = document.getElementById('fmsg').value.trim();
-    return `Bonjour, je m'appelle ${name} (tél: ${phone}).\nType de demande: ${type}.\nMessage: ${msg}`;
-  }
+            <!-- Rendez-vous -->
+            <div class="card">
+                <h3><i class="fas fa-calendar-alt"></i> Gestion des Rendez-vous</h3>
+                <div class="d-flex gap-15" style="margin-bottom:15px;">
+                    <input type="text" id="appointment-patient-search" class="form-control" placeholder="ID patient">
+                    <button id="search-appointment-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+                <div id="appointment-patient-details" class="hidden">
+                    <h4>Patient: <span id="appointment-patient-name"></span></h4>
+                    <div class="form-group"><label class="form-label">Date</label><input type="date" id="appointment-date" class="form-control"></div>
+                    <div class="form-group"><label class="form-label">Heure</label><input type="time" id="appointment-time" class="form-control"></div>
+                    <div class="form-group"><label class="form-label">Motif</label><input type="text" id="appointment-reason" class="form-control" placeholder="Motif du rendez-vous"></div>
+                    <div class="form-group">
+                        <label class="form-label">Médecin</label>
+                        <select id="appointment-doctor" class="form-control"><option value="">Sélectionner un médecin</option></select>
+                    </div>
+                    <button id="schedule-appointment" class="btn btn-success"><i class="fas fa-calendar-plus"></i> Programmer</button>
+                </div>
+                <div class="mt-3"><h4>Rendez-vous programmés</h4><div id="appointments-list"></div></div>
+            </div>
 
-  function validate(){
-    if(!form.checkValidity()){
-      form.reportValidity();
-      return false;
-    }
-    return true;
-  }
+            <!-- Services externes -->
+            <div class="card">
+                <h3><i class="fas fa-file-invoice-dollar"></i> Facturation Services Externes</h3>
+                <div class="d-flex gap-15" style="margin-bottom:15px;">
+                    <input type="text" id="external-service-search" class="form-control" placeholder="ID patient ou nom">
+                    <button id="search-external-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+                <div id="external-services-container" class="hidden">
+                    <h4>Services pour <span id="external-patient-name"></span></h4>
+                    <div id="external-services-list"></div>
+                    <div class="mt-3">
+                        <h5>Ajouter un service</h5>
+                        <div class="d-flex gap-10">
+                            <select id="external-service-select" class="form-control"><option value="">Choisir un service</option></select>
+                            <input type="number" id="new-external-service-price" class="form-control" placeholder="Prix (Gdes)" min="0">
+                            <button id="add-external-service" class="btn btn-success"><i class="fas fa-plus"></i> Ajouter</button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button id="generate-external-invoice" class="btn btn-warning"><i class="fas fa-file-invoice"></i> Générer facture</button>
+                    </div>
+                </div>
+            </div>
 
-  document.getElementById('sendWa').addEventListener('click', (e) => {
-    e.preventDefault();
-    if(!validate()) return;
-    const text = encodeURIComponent(buildMessage());
-    window.open(`https://wa.me/${WA_NUMBER}?text=${text}`, '_blank');
-    status.textContent = 'Votre message est prêt dans WhatsApp — il ne reste qu\'à l\'envoyer.';
-    status.style.color = '#2E8B6E';
-    status.classList.add('show');
-  });
+            <!-- Liste patients du jour -->
+            <div class="card">
+                <h3><i class="fas fa-list"></i> Patients enregistrés aujourd'hui</h3>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>ID</th><th>Nom</th><th>Téléphone</th><th>Type</th><th>Consultation</th><th>Actions</th></tr></thead>
+                        <tbody id="today-patients-list"></tbody>
+                    </table>
+                </div>
+            </div>
 
-  document.getElementById('sendMail').addEventListener('click', () => {
-    if(!validate()) return;
-    const subject = encodeURIComponent('Demande - Clinique Spécialisée du Cap-Haïtien');
-    const body = encodeURIComponent(buildMessage());
-    window.location.href = `mailto:Cliscaphosp@gmail.com?subject=${subject}&body=${body}`;
-    status.textContent = 'Votre logiciel de courriel va s\'ouvrir avec le message préparé.';
-    status.style.color = '#1F6F5C';
-    status.classList.add('show');
-  });
+            <!-- Carte patient (printable) -->
+            <div id="patient-card-container" class="hidden printable">
+                <div class="patient-card">
+                    <div class="patient-card-header">
+                        <img id="card-logo" src="" alt="Logo" style="max-width:70px;margin:0 auto 8px;display:none;">
+                        <h3 id="card-hospital-name">Hôpital Saint-Luc</h3>
+                        <p id="card-hospital-address">Port-au-Prince, Haïti</p>
+                    </div>
+                    <div class="patient-photo"><i class="fas fa-user fa-3x" style="color:#aaa;"></i></div>
+                    <div class="text-center">
+                        <h4 id="card-patient-name"></h4>
+                        <p><strong>ID:</strong> <span id="card-patient-id"></span></p>
+                        <p><strong>Date Naissance:</strong> <span id="card-patient-dob"></span></p>
+                        <p><strong>Téléphone:</strong> <span id="card-patient-phone"></span></p>
+                        <p><strong>Émise le:</strong> <span id="card-issue-date"></span></p>
+                        <div style="margin-top:10px;"><span id="card-patient-type" class="emergency-patient-tag">STANDARD</span></div>
+                    </div>
+                </div>
+            </div>
 
-  form.addEventListener('submit', (e) => e.preventDefault());
-</script>
+            <!-- Certificat médical printable -->
+            <div id="medical-certificate-container" class="hidden printable">
+                <div class="medical-certificate-container">
+                    <div class="certificate-header">
+                        <img id="certificate-logo" src="" alt="Logo" class="certificate-logo" style="display:none;">
+                        <h2 id="certificate-hospital-name">Hôpital Saint-Luc</h2>
+                        <p id="certificate-hospital-address">Port-au-Prince, Haïti</p>
+                        <h3 style="margin-top:20px; color:#1a6bca;">CERTIFICAT MÉDICAL</h3>
+                    </div>
+                    <div class="certificate-body">
+                        <p>Je soussigné(e), médecin à l'<strong id="certificate-hospital-inline">Hôpital Saint-Luc</strong>, certifie avoir examiné :</p>
+                        <p style="margin:20px 0; font-size:1.1rem;"><strong id="certificate-patient-name">-</strong>, né(e) le <strong id="certificate-patient-dob">-</strong></p>
+                        <p>J'atteste que son état de santé nécessite :</p>
+                        <div style="margin:20px 0;">
+                            <p><input type="radio" name="rest-type" value="repos"> Un repos total</p>
+                            <p><input type="radio" name="rest-type" value="determine"> Un repos de <input type="number" id="rest-days" value="7" style="width:60px;"> jours</p>
+                        </div>
+                        <p>Le présent certificat est délivré à la demande de l'intéressé(e) pour faire valoir ce que de droit.</p>
+                    </div>
+                    <div class="certificate-footer">
+                        <div style="text-align:right;">
+                            <p>Fait à Port-au-Prince, le <span id="certificate-date"></span></p>
+                            <div class="signature-area">
+                                <p>Le Médecin Responsable,</p>
+                                <p style="margin-top:50px;">___________________________</p>
+                                <p>Dr. <span id="certificate-doctor">Médecin</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
+        <!-- ─── CAISSE ──────────────────────────────────── -->
+        <section id="cashier" class="content">
+            <h2 class="section-title"><i class="fas fa-cash-register"></i> Caisse</h2>
+
+            <!-- Sélecteur de devise -->
+            <div class="exchange-banner">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Taux de change : <strong id="exchange-rate-display">130 HTG = 1 USD</strong></span>
+                <div style="margin-left:auto;" class="currency-switcher">
+                    <button class="currency-btn active" id="currency-gdes" data-currency="HTG">Gourdes (HTG)</button>
+                    <button class="currency-btn" id="currency-usd" data-currency="USD">Dollars (USD)</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="cashier-patient-search" class="form-control" placeholder="ID patient ou nom">
+                    <button id="search-cashier-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+            </div>
+
+            <!-- Recherche de reçu -->
+            <div class="card">
+                <h3><i class="fas fa-receipt"></i> Rechercher un reçu</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="receipt-search-input" class="form-control" placeholder="N° de reçu (REC-00042) ou ID patient (PAT0001)" onkeyup="if(event.key==='Enter')searchReceipt()">
+                    <button class="btn" onclick="searchReceipt()"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+                <div id="receipt-search-result" class="mt-3"></div>
+            </div>
+
+            <!-- Registre de tous les reçus générés -->
+            <div class="card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-list-alt"></i> Reçus générés</h3>
+                    <div class="d-flex gap-10" style="flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-primary" onclick="loadAllReceipts('today')">Aujourd'hui</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadAllReceipts('')">Tous</button>
+                    </div>
+                </div>
+                <div id="all-receipts-list" class="mt-2"></div>
+            </div>
+
+            <div id="cashier-patient-details" class="hidden">
+                <div class="card">
+                    <h3><i class="fas fa-user"></i> <span id="cashier-patient-name"></span> <small class="text-muted">(#<span id="cashier-patient-id"></span>)</small></h3>
+                    <div class="mt-3">
+                        <h4>Services à payer</h4>
+                        <div id="services-to-pay-list"></div>
+                        <div class="cashier-total">
+                            <div class="total-both">
+                                <div class="total-currency">
+                                    <span>Gourdes</span>
+                                    <strong><span id="total-to-pay">0.00</span> HTG</strong>
+                                </div>
+                                <div style="color:#bbb;font-size:1.2rem;">≈</div>
+                                <div class="total-currency">
+                                    <span>Dollars</span>
+                                    <strong id="total-to-pay-usd">0.00 USD</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="change-money-container">
+                        <h4 style="margin-bottom:10px;"><i class="fas fa-calculator"></i> Calcul de monnaie</h4>
+                        <div class="d-flex gap-15 align-center flex-wrap">
+                            <label style="font-weight:600;white-space:nowrap;">Montant donné:</label>
+                            <input type="number" id="amount-given" class="form-control" style="width:160px;" placeholder="0.00" min="0">
+                            <select id="payment-currency-select" class="form-control" style="width:120px;">
+                                <option value="HTG">HTG (Gdes)</option>
+                                <option value="USD">USD ($)</option>
+                            </select>
+                            <div class="change-money-result" id="change-result" style="min-width:180px;">Monnaie: 0.00</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <h4>Moyen de paiement</h4>
+                        <div class="payment-method-selector">
+                            <div class="payment-method active" data-method="cash"><i class="fas fa-money-bill-wave"></i><p>Espèces</p></div>
+                            <div class="payment-method" data-method="moncash"><i class="fas fa-mobile-alt"></i><p>MonCash</p></div>
+                            <div class="payment-method" data-method="natcash"><i class="fas fa-wallet"></i><p>NatCash</p></div>
+                            <div class="payment-method" data-method="card"><i class="fas fa-credit-card"></i><p>Carte</p></div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-between flex-wrap gap-15 mt-3">
+                        <button id="mark-as-paid" class="btn btn-success"><i class="fas fa-check-circle"></i> Valider le paiement</button>
+                        <button id="print-invoice" class="btn btn-warning"><i class="fas fa-print"></i> Imprimer facture</button>
+                        <button id="print-receipt" class="btn btn-info"><i class="fas fa-receipt"></i> Reçu</button>
+                    </div>
+                </div>
+
+                <!-- Facture printable -->
+                <div id="invoice-container" class="hidden printable">
+                    <div class="print-receipt">
+                        <div class="text-center">
+                            <img id="invoice-logo" src="" alt="Logo" style="max-width:80px;margin:0 auto 10px;display:none;">
+                            <h3 id="invoice-hospital-name">Hôpital Saint-Luc</h3>
+                            <p id="invoice-hospital-address">Port-au-Prince, Haïti</p>
+                            <p id="invoice-hospital-phone">Tél: (509) 1234-5678</p>
+                        </div>
+                        <hr>
+                        <div>
+                            <p><strong>Patient:</strong> <span id="invoice-patient-name"></span></p>
+                            <p><strong>ID:</strong> <span id="invoice-patient-id"></span></p>
+                            <p><strong>Date:</strong> <span id="invoice-date"></span> — <span id="invoice-time"></span></p>
+                            <p><strong>Facture:</strong> #<span id="invoice-number"></span></p>
+                        </div>
+                        <hr>
+                        <div id="invoice-services-list"></div>
+                        <hr>
+                        <div class="receipt-item"><span><strong>TOTAL HTG:</strong></span><span><strong><span id="invoice-total-amount">0</span> Gdes</strong></span></div>
+                        <div class="receipt-item"><span><strong>TOTAL USD:</strong></span><span><strong id="invoice-total-usd">0.00 $</strong></span></div>
+                        <div class="receipt-item"><span>Montant donné:</span><span id="invoice-amount-given">0</span></div>
+                        <div class="receipt-item"><span>Monnaie rendue:</span><span id="invoice-change">0</span></div>
+                        <div class="receipt-item"><span>Paiement:</span><span id="invoice-payment-method">Espèces</span></div>
+                        <hr>
+                        <div class="text-center"><p>Merci pour votre confiance!</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rapports caisse -->
+            <div class="card mt-3">
+                <h3><i class="fas fa-chart-bar"></i> Mes Rapports</h3>
+                <div class="d-flex gap-10 flex-wrap mb-3">
+                    <button class="btn btn-sm btn-primary" onclick="loadCashierReports('today')"><i class="fas fa-calendar-day"></i> Aujourd'hui</button>
+                    <button class="btn btn-sm btn-secondary" onclick="loadCashierReports('week')"><i class="fas fa-calendar-week"></i> Cette semaine</button>
+                    <div class="d-flex gap-10 align-center">
+                        <input type="date" id="report-from-date" class="form-control" style="width:150px;">
+                        <span>→</span>
+                        <input type="date" id="report-to-date" class="form-control" style="width:150px;">
+                        <button class="btn btn-sm btn-info" onclick="loadCashierReports('custom')"><i class="fas fa-search"></i> Voir</button>
+                    </div>
+                </div>
+                <div id="cashier-report-result"></div>
+            </div>
+
+            <!-- Section remboursements -->
+            <div class="card mt-3">
+                <h3><i class="fas fa-undo-alt" style="color:#dc3545;"></i> Remboursement / Retour</h3>
+                <p class="text-muted" style="font-size:.85rem;margin-bottom:12px;">Rechercher la transaction à rembourser ou échanger.</p>
+                <div class="d-flex gap-15 mb-3">
+                    <input type="text" id="refund-patient-search" class="form-control" placeholder="ID patient ou nom...">
+                    <button class="btn btn-secondary" onclick="loadPatientTransactionsForRefund()">
+                        <i class="fas fa-search"></i> Chercher
+                    </button>
+                </div>
+                <div id="refund-transactions-list"></div>
+            </div>
+
+            <div id="external-medications-container" class="hidden card mt-3">
+                <h3><i class="fas fa-exclamation-triangle"></i> Médicaments à acheter ailleurs</h3>
+                <div id="external-medications-list"></div>
+                <button id="print-external-meds" class="btn btn-warning mt-2"><i class="fas fa-print"></i> Imprimer la liste</button>
+            </div>
+        </section>
+
+        <!-- ─── INFIRMIER ───────────────────────────────── -->
+        <section id="nurse" class="content">
+            <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier — Signes Vitaux</h2>
+
+            <!-- Patients hospitalisés -->
+            <div class="card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
+                </div>
+                <div class="d-flex gap-15 mt-2">
+                    <input type="text" id="nurse-hosp-search" class="form-control" placeholder="Rechercher par nom, ID ou chambre..." oninput="filterNurseHospList()">
+                </div>
+                <div id="nurse-hosp-list" class="mt-2"></div>
+            </div>
+
+            <div class="card mt-3">
+                <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="nurse-patient-search" class="form-control" placeholder="ID patient ou nom">
+                    <button id="search-nurse-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+            </div>
+            <div id="nurse-patient-details" class="hidden">
+                <div class="card">
+                    <h3>Patient: <span id="nurse-patient-name"></span> <small class="text-muted">(#<span id="nurse-patient-id"></span>)</small></h3>
+                    <p><strong>Statut paiement:</strong> <span id="nurse-payment-status" class="patient-status-badge status-unpaid">Non payé</span></p>
+                    <div class="vitals-form mt-3">
+                        <h4><i class="fas fa-heartbeat"></i> Saisir les Signes Vitaux</h4>
+                        <form id="vitals-form">
+                            <div id="vitals-inputs-container" class="vitals-grid"></div>
+                            <button type="submit" class="btn btn-success mt-3"><i class="fas fa-save"></i> Enregistrer</button>
+                        </form>
+                    </div>
+                    <div class="mt-3"><h4>Historique</h4><div id="vitals-history"></div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── MÉDECIN ─────────────────────────────────── -->
+        <section id="doctor" class="content">
+            <h2 class="section-title"><i class="fas fa-user-md"></i> Médecin — Consultation</h2>
+            <div class="card">
+                <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="doctor-patient-search" class="form-control" placeholder="ID patient ou nom">
+                    <button id="search-doctor-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+            </div>
+            <div id="doctor-patient-details" class="hidden">
+                <div class="card">
+                    <h3>Patient: <span id="doctor-patient-name"></span> <small class="text-muted">(#<span id="doctor-patient-id"></span>)</small>
+                        <button class="btn btn-sm" style="background:#6f42c1;color:#fff;margin-left:10px;" id="doctor-hospitalize-btn" onclick="quickHospitalize()">
+                            <i class="fas fa-bed"></i> Hospitaliser ce patient
+                        </button>
+                    </h3>
+                    <div class="d-flex gap-20" style="margin-bottom:16px;flex-wrap:wrap;">
+                        <div style="flex:1"><p><strong>Âge:</strong> <span id="doctor-patient-age"></span> ans</p><p><strong>Téléphone:</strong> <span id="doctor-patient-phone"></span></p></div>
+                        <div style="flex:1"><p><strong>Type:</strong> <span id="doctor-patient-type"></span></p><p><strong>Statut:</strong> <span id="doctor-payment-status" class="patient-status-badge"></span></p></div>
+                    </div>
+
+                    <div id="current-consultation-display" class="consultation-display">
+                        <h4><i class="fas fa-stethoscope"></i> Consultation enregistrée</h4>
+                        <div id="current-consultation-info"></div>
+                        <div id="consultation-modification-section" class="hidden mt-3">
+                            <h5>Modifier la consultation</h5>
+                            <div class="d-flex gap-10">
+                                <select id="doctor-consultation-type" class="form-control"><option value="">Sélectionner un type</option></select>
+                                <button id="update-consultation-type" class="btn btn-warning">Modifier</button>
+                            </div>
+                            <small class="text-muted">Si le nouveau type est plus cher, le patient devra retourner à la caisse</small>
+                        </div>
+                    </div>
+
+                    <!-- Résultats analyses labo -->
+                    <div class="card mt-3" id="doctor-lab-results-card" style="border-left-color:#17a2b8;">
+                        <h3><i class="fas fa-flask" style="color:#17a2b8;"></i> Résultats d'Analyses</h3>
+                        <div id="doctor-lab-results"></div>
+                    </div>
+
+                    <div id="doctor-patient-vitals" class="vitals-form mt-3">
+                        <h4><i class="fas fa-heartbeat"></i> Signes Vitaux Récents</h4>
+                        <div id="current-vitals-display"></div>
+                        <button id="edit-vitals-btn" class="btn btn-warning btn-sm mt-2"><i class="fas fa-edit"></i> Modifier</button>
+                    </div>
+
+                    <div class="doctor-modification-form hidden mt-3" id="doctor-vitals-modification">
+                        <h4><i class="fas fa-edit"></i> Modification des signes vitaux</h4>
+                        <form id="vitals-modification-form">
+                            <div id="vitals-modification-inputs"></div>
+                            <button type="submit" class="btn btn-success mt-2"><i class="fas fa-save"></i> Enregistrer</button>
+                            <button type="button" id="cancel-vitals-modification" class="btn btn-secondary mt-2 ms-2">Annuler</button>
+                        </form>
+                    </div>
+
+                    <div class="mt-3">
+                        <h4><i class="fas fa-stethoscope"></i> Nouvelle consultation</h4>
+                        <form id="consultation-form">
+                            <div class="form-group">
+                                <label class="form-label">Diagnostic</label>
+                                <textarea id="consultation-diagnosis" class="form-control" rows="3" placeholder="Entrez le diagnostic..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label"><i class="fas fa-sticky-note" style="color:#ffc107;"></i> Note supplémentaire pour le patient</label>
+                                <textarea id="consultation-extra-note" class="form-control" rows="2" placeholder="Conseils, recommandations, instructions spéciales..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Analyses demandées
+                                    <button type="button" id="modify-analyses-btn" class="btn btn-warning btn-sm modify-analysis-btn"><i class="fas fa-edit"></i> Modifier</button>
+                                </label>
+                                <div id="lab-analyses-selection"></div>
+                                <div id="lab-modification-panel" class="type-modification-panel hidden">
+                                    <h4><i class="fas fa-edit"></i> Modifier une analyse</h4>
+                                    <div class="d-flex gap-15">
+                                        <input type="text" id="modified-analysis-name" class="form-control" placeholder="Nom modifié">
+                                        <input type="number" id="modified-analysis-price" class="form-control" placeholder="Prix (Gdes)" min="0">
+                                        <button type="button" id="save-modified-analysis" class="btn btn-success">Enregistrer</button>
+                                        <button type="button" id="cancel-analysis-modification" class="btn btn-secondary">Annuler</button>
+                                    </div>
+                                </div>
+                                <div class="add-form-grid" style="margin-top:12px;background:#fff8e1;border-color:#ffc107;">
+                                    <div>
+                                        <label class="form-label"><i class="fas fa-plus-circle" style="color:#ffc107;"></i> Analyse hors liste</label>
+                                        <input type="text" id="custom-analysis-name" class="form-control" placeholder="Nom de l'analyse">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Prix (Gdes)</label>
+                                        <input type="number" id="custom-analysis-price" class="form-control" placeholder="0.00" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Prescription médicaments</label>
+                                <div style="position:relative;">
+                                    <input type="text" id="medication-search" class="form-control" placeholder="Rechercher un médicament...">
+                                    <div id="medication-suggestions" class="hidden" style="position:absolute;background:#fff;border:1px solid #e2ecf8;border-radius:8px;width:100%;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.12);"></div>
+                                </div>
+                                <div id="stock-warnings" class="mt-2"></div>
+                                <table class="medication-prescription-table mt-2">
+                                    <thead><tr><th>Médicament</th><th>Posologie</th><th>Quantité</th><th>Stock</th><th>Action</th></tr></thead>
+                                    <tbody id="prescription-medications-list"></tbody>
+                                </table>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Suivi</label>
+                                <div class="d-flex gap-15">
+                                    <input type="date" id="followup-date" class="form-control">
+                                    <input type="time" id="followup-time" class="form-control">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer la consultation</button>
+                        </form>
+                    </div>
+
+                    <div class="mt-3">
+                        <h4><i class="fas fa-calendar-alt"></i> Mes Rendez-vous</h4>
+                        <div id="doctor-appointments-list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── LABORATOIRE ─────────────────────────────── -->
+        <section id="laboratory" class="content">
+            <h2 class="section-title"><i class="fas fa-flask"></i> Laboratoire</h2>
+            <div class="card">
+                <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="lab-patient-search" class="form-control" placeholder="ID patient ou nom">
+                    <button id="search-lab-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+            </div>
+            <div id="lab-patient-details" class="hidden">
+                <div class="card">
+                    <h3>Patient: <span id="lab-patient-name"></span> <small class="text-muted">(#<span id="lab-patient-id"></span>)</small></h3>
+                    <p><strong>Statut paiement:</strong> <span id="lab-payment-status" class="patient-status-badge"></span></p>
+                    <div class="mt-3" id="lab-analyses-list"></div>
+                </div>
+            </div>
+            <div class="card mt-3">
+                <h3><i class="fas fa-clock"></i> Analyses en attente</h3>
+                <div id="pending-analyses-list"></div>
+            </div>
+        </section>
+
+        <!-- ─── PHARMACIE ───────────────────────────────── -->
+        <section id="pharmacy" class="content">
+            <h2 class="section-title"><i class="fas fa-pills"></i> Pharmacie</h2>
+            <div class="card">
+                <h3><i class="fas fa-search"></i> Rechercher Patient</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="pharmacy-patient-search" class="form-control" placeholder="ID patient ou nom">
+                    <button id="search-pharmacy-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+            </div>
+            <div id="pharmacy-patient-details" class="hidden">
+                <div class="card">
+                    <h3>Patient: <span id="pharmacy-patient-name"></span> <small class="text-muted">(#<span id="pharmacy-patient-id"></span>)</small></h3>
+                    <p><strong>Statut:</strong> <span id="pharmacy-payment-status" class="patient-status-badge"></span></p>
+                    <div id="pharmacy-prescriptions-list" class="mt-3"></div>
+                    <button id="deliver-medications" class="btn btn-success mt-3" disabled><i class="fas fa-pills"></i> Délivrer tous les médicaments</button>
+                </div>
+            </div>
+
+            <!-- Prescriptions des patients hospitalisés -->
+            <div class="card mt-3">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-bed"></i> Prescriptions — Patients hospitalisés</h3>
+                    <div class="d-flex gap-10" style="flex-wrap:wrap;">
+                        <input type="text" id="pharm-hosp-search" class="form-control" style="max-width:220px;" placeholder="Rechercher nom, ID, médicament..." oninput="filterPharmacyHospPrescriptions()">
+                        <button class="btn btn-sm btn-primary" onclick="setPharmHospFilter('pending')">À délivrer</button>
+                        <button class="btn btn-sm btn-secondary" onclick="setPharmHospFilter('')">Toutes</button>
+                    </div>
+                </div>
+                <p class="text-muted" style="font-size:.85rem;">Ces médicaments sont prescrits directement dans le dossier d'hospitalisation par le médecin ; le stock est déjà déduit à la prescription.</p>
+                <div id="pharm-hosp-list" class="mt-2"></div>
+            </div>
+            <div class="card mt-3">
+                <h3><i class="fas fa-warehouse"></i> Stock Médicaments</h3>
+                <p class="text-muted" style="font-size:.85rem;margin-bottom:10px;"><i class="fas fa-info-circle"></i> L'ajout de médicaments est réservé à l'administrateur (section Paramètres).</p>
+                <div class="table-container"><div id="medication-stock-list"></div></div>
+            </div>
+        </section>
+
+        <!-- ─── MESSAGERIE ──────────────────────────────── -->
+        <section id="messaging" class="content">
+            <h2 class="section-title"><i class="fas fa-comments"></i> Messagerie Interne</h2>
+            <div class="messaging-container">
+                <div>
+                    <div class="d-flex justify-between align-center mb-2">
+                        <h4>Conversations</h4>
+                        <button id="compose-message" class="btn btn-sm btn-success"><i class="fas fa-pen"></i> Nouveau</button>
+                    </div>
+                    <div class="conversation-list" id="conversation-list"></div>
+                </div>
+                <div id="message-panel">
+                    <div id="compose-panel" class="hidden">
+                        <h4 style="margin-bottom:14px;"><i class="fas fa-pen" style="color:var(--primary);"></i> Nouveau message</h4>
+                        <div class="form-group">
+                            <label class="form-label">Destinataire</label>
+                            <select id="message-recipient" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Sujet</label>
+                            <input type="text" id="message-subject" class="form-control" placeholder="Objet du message">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Message</label>
+                            <textarea id="message-content" class="form-control" rows="5" placeholder="Votre message..."></textarea>
+                        </div>
+                        <div class="d-flex gap-10">
+                            <button id="send-message" class="btn btn-success"><i class="fas fa-paper-plane"></i> Envoyer</button>
+                            <button id="cancel-compose" class="btn btn-secondary">Annuler</button>
+                        </div>
+                    </div>
+                    <div id="chat-panel">
+                        <div class="chat-messages" id="chat-messages">
+                            <div style="text-align:center;padding:40px;color:#bbb;">
+                                <i class="fas fa-comments" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+                                Sélectionner une conversation
+                            </div>
+                        </div>
+                        <div class="chat-input-container">
+                            <input type="text" id="chat-input" class="form-control" placeholder="Écrire un message...">
+                            <button id="send-chat" class="btn btn-success"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── ADMINISTRATION ──────────────────────────── -->
+        <section id="administration" class="content">
+            <h2 class="section-title"><i class="fas fa-chart-bar"></i> Administration</h2>
+
+            <!-- Sélecteur de devise pour rapports -->
+            <div class="exchange-banner mb-3">
+                <i class="fas fa-file-alt"></i>
+                <span>Rapports en :</span>
+                <div class="currency-switcher" style="margin-left:10px;">
+                    <button class="currency-btn active" id="report-currency-gdes" data-currency="HTG">Gourdes</button>
+                    <button class="currency-btn" id="report-currency-usd" data-currency="USD">Dollars USD</button>
+                </div>
+            </div>
+
+            <div class="card admin-search-section">
+                <h3><i class="fas fa-search"></i> Rechercher un Patient</h3>
+                <div class="d-flex gap-15">
+                    <input type="text" id="admin-patient-search" class="form-control" placeholder="ID ou nom du patient">
+                    <button id="search-admin-patient" class="btn"><i class="fas fa-search"></i> Rechercher</button>
+                </div>
+                <div id="admin-patient-result" class="hidden mt-3"></div>
+            </div>
+
+            <div class="admin-stats-grid" id="admin-stats-grid">
+                <div class="admin-stat-card">
+                    <h3><i class="fas fa-money-bill-wave"></i> Revenus Totaux</h3>
+                    <h2 id="admin-total-revenue">0 HTG</h2>
+                    <p id="admin-total-revenue-usd" style="color:#2e7d32;font-weight:600;font-size:.9rem;"></p>
+                    <div class="chart-bar-container mt-2">
+                        <div class="chart-bar-label"><span>Payés</span><span id="paid-percentage">0%</span></div>
+                        <div class="chart-bar-bg"><div id="paid-chart-bar" class="chart-bar-fill" style="width:0%"></div></div>
+                    </div>
+                    <div class="chart-bar-container">
+                        <div class="chart-bar-label"><span>Non payés</span><span id="unpaid-percentage">0%</span></div>
+                        <div class="chart-bar-bg"><div id="unpaid-chart-bar" class="chart-bar-fill" style="width:0%;background:#dc3545"></div></div>
+                    </div>
+                </div>
+                <div class="admin-stat-card">
+                    <h3><i class="fas fa-chart-pie"></i> Répartition des Services</h3>
+                    <div id="services-pie-chart" class="mt-2" style="height:150px;position:relative;display:flex;align-items:center;justify-content:center;">
+                        <div id="pie-chart-visual" style="width:120px;height:120px;border-radius:50%;background:conic-gradient(#1a6bca 0% 25%, #28a745 25% 50%, #ffc107 50% 75%, #17a2b8 75% 100%);"></div>
+                    </div>
+                    <div class="mt-2" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+                        <div><span class="badge badge-primary">Consultations</span> <span id="consultations-percentage">0%</span></div>
+                        <div><span class="badge badge-success">Analyses</span> <span id="analyses-percentage">0%</span></div>
+                        <div><span class="badge badge-warning">Médicaments</span> <span id="medications-percentage">0%</span></div>
+                        <div><span class="badge" style="background:var(--info-light);color:var(--info);">Externes</span> <span id="external-percentage">0%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <h3><i class="fas fa-history"></i> Transactions Récentes</h3>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Date/Heure</th><th>Patient</th><th>Service</th><th>Montant (HTG)</th><th>Montant (USD)</th><th>Méthode</th><th>Agent</th><th>Statut</th><th>Action</th></tr></thead>
+                        <tbody id="recent-transactions-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="transaction-details-modal" class="transaction-details-modal hidden">
+                <div class="transaction-details-content">
+                    <h3>Détails de la transaction</h3>
+                    <div id="transaction-details-content"></div>
+                    <div class="mt-3 d-flex gap-10">
+                        <button id="close-transaction-details" class="btn btn-secondary">Fermer</button>
+                        <button id="edit-transaction" class="btn btn-warning">Modifier</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── HOSPITALISATION ─────────────────────── -->
+        <section id="hospitalization" class="content">
+            <h2 class="section-title"><i class="fas fa-bed"></i> Hospitalisation</h2>
+
+            <!-- Admettre un patient -->
+            <div class="card" id="admit-patient-card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-plus-circle" style="color:#28a745;"></i> Admettre un patient</h3>
+                    <button class="btn btn-success btn-sm" onclick="toggleAdmitForm()"><i class="fas fa-plus"></i> Nouvelle admission</button>
+                </div>
+                <div id="admit-form" style="display:none;">
+                    <div class="add-form-grid" style="margin-top:12px;">
+                        <div style="grid-column:1/-1">
+                            <label class="form-label">Rechercher le patient *</label>
+                            <div class="d-flex gap-10">
+                                <input type="text" id="hosp-patient-search" class="form-control" placeholder="ID ou nom du patient">
+                                <button class="btn btn-primary" onclick="searchPatientForHosp()"><i class="fas fa-search"></i></button>
+                            </div>
+                            <div id="hosp-patient-found" style="display:none;" class="mt-2"></div>
+                        </div>
+                        <div><label class="form-label">Chambre</label><input type="text" id="hosp-room" class="form-control" placeholder="Ex: Chambre 3"></div>
+                        <div><label class="form-label">Lit</label><input type="text" id="hosp-bed" class="form-control" placeholder="Ex: Lit A"></div>
+                        <div style="grid-column:1/-1"><label class="form-label">Motif d'admission *</label>
+                            <textarea id="hosp-reason" class="form-control" rows="2" placeholder="Raison de l'hospitalisation..."></textarea></div>
+                        <div><label class="form-label">Médecin responsable</label>
+                            <select id="hosp-doctor" class="form-control"></select></div>
+                        <div><label class="form-label"><i class="fas fa-money-bill-wave" style="color:#28a745;"></i> Dépôt initial (HTG)</label>
+                            <input type="number" id="hosp-deposit" class="form-control" placeholder="0.00" min="0"></div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-success" style="width:100%;" onclick="admitPatient()">
+                                <i class="fas fa-bed"></i> Admettre</button></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liste des patients hospitalisés -->
+            <div class="card mt-3">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
+                    <div class="d-flex gap-10" style="flex-wrap:wrap;">
+                        <input type="text" id="hosp-list-search" class="form-control" style="max-width:220px;" placeholder="Rechercher nom, ID, chambre..." oninput="filterHospitalizationsList()">
+                        <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')">Actifs</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
+                    </div>
+                </div>
+                <div id="hospitalizations-list" class="mt-2"></div>
+            </div>
+
+            <!-- Détail d'une hospitalisation -->
+            <div id="hosp-detail-section" style="display:none;" class="mt-3">
+                <div class="card">
+                    <div class="settings-section-header">
+                        <h3 id="hosp-detail-title"><i class="fas fa-user-injured"></i> Dossier patient</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="closeHospDetail()"><i class="fas fa-arrow-left"></i> Retour</button>
+                    </div>
+
+                    <!-- Résumé financier -->
+                    <div id="hosp-financial-summary" class="mb-3"></div>
+
+                    <!-- Tabs internes -->
+                    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;overflow-x:auto;">
+                        <button class="hosp-tab-btn active" onclick="showHospTab('nursing')" data-tab="nursing" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;"><i class="fas fa-user-nurse"></i> Suivi infirmier</button>
+                        <button class="hosp-tab-btn" onclick="showHospTab('prescriptions')" data-tab="prescriptions" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-prescription"></i> Prescriptions</button>
+                        <button class="hosp-tab-btn" onclick="showHospTab('deposits')" data-tab="deposits" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-money-bill-wave"></i> Dépôts</button>
+                        <button class="hosp-tab-btn" onclick="showHospTab('services')" data-tab="services" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-clipboard-list"></i> Services</button>
+                    </div>
+
+                    <!-- Tâches médecin → infirmière -->
+                    <div id="hosp-tab-tasks" class="hosp-tab-content">
+                        <!-- Formulaire médecin -->
+                        <div id="task-order-form" class="card" style="background:#f0f4ff;">
+                            <h4><i class="fas fa-tasks" style="color:#1a6bca;"></i> Ordonner une tâche</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Type *</label>
+                                    <select id="task-type" class="form-control" onchange="onTaskTypeChange()">
+                                        <option value="medication">💊 Médicament</option>
+                                        <option value="analysis">🧪 Analyse</option>
+                                        <option value="care">🩺 Soin</option>
+                                        <option value="other">📋 Autre</option>
+                                    </select>
+                                </div>
+                                <div id="task-med-div"><label class="form-label">Médicament</label>
+                                    <select id="task-medication" class="form-control" onchange="onTaskMedSelect()">
+                                        <option value="">Sélectionner...</option>
+                                    </select>
+                                </div>
+                                <div id="task-analysis-div" style="display:none;"><label class="form-label">Analyse</label>
+                                    <select id="task-analysis" class="form-control" onchange="onTaskAnalysisSelect()">
+                                        <option value="">Sélectionner...</option>
+                                    </select>
+                                </div>
+                                <div id="task-desc-div" style="display:none;grid-column:1/-1;"><label class="form-label">Description *</label>
+                                    <input type="text" id="task-desc" class="form-control" placeholder="Décrire la tâche...">
+                                </div>
+                                <div id="task-dosage-div"><label class="form-label">Dosage</label>
+                                    <input type="text" id="task-dosage" class="form-control" placeholder="Ex: 500mg"></div>
+                                <div id="task-freq-div"><label class="form-label">Fréquence</label>
+                                    <select id="task-frequency" class="form-control">
+                                        <option value="1x/jour">1x/jour</option>
+                                        <option value="2x/jour">2x/jour</option>
+                                        <option value="3x/jour">3x/jour</option>
+                                        <option value="Toutes les 6h">Toutes les 6h</option>
+                                        <option value="Toutes les 8h">Toutes les 8h</option>
+                                        <option value="Toutes les 12h">Toutes les 12h</option>
+                                    </select>
+                                </div>
+                                <div id="task-dur-div"><label class="form-label">Durée</label>
+                                    <input type="text" id="task-duration" class="form-control" placeholder="Ex: 5 jours"></div>
+                                <div id="task-route-div"><label class="form-label">Voie</label>
+                                    <select id="task-route" class="form-control">
+                                        <option value="Orale">Orale</option>
+                                        <option value="IV">Injectable IV</option>
+                                        <option value="IM">Injectable IM</option>
+                                        <option value="Topique">Topique</option>
+                                    </select>
+                                </div>
+                                <div id="task-qty-div"><label class="form-label">Quantité</label>
+                                    <input type="number" id="task-qty" class="form-control" value="1" min="1" oninput="updateTaskCost()"></div>
+                                <div><label class="form-label">Coût (HTG)</label>
+                                    <input type="number" id="task-amount" class="form-control" placeholder="0.00" min="0"></div>
+                                <div><label class="form-label">Priorité</label>
+                                    <select id="task-priority" class="form-control">
+                                        <option value="normal">Normal</option>
+                                        <option value="urgent">🔴 Urgent</option>
+                                        <option value="low">⬇️ Faible</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column:1/-1"><label class="form-label">Note pour l'infirmière</label>
+                                    <textarea id="task-note" class="form-control" rows="2" placeholder="Instructions spéciales..."></textarea></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-primary" style="width:100%;" onclick="saveHospTask()">
+                                        <i class="fas fa-paper-plane"></i> Ordonner</button></div>
+                            </div>
+                            <div id="task-cost-preview" class="mt-2"></div>
+                        </div>
+                        <div id="hosp-tasks-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Suivi infirmier -->
+                    <div id="hosp-tab-nursing" class="hosp-tab-content">
+                        <div class="card" style="background:#f0fff4;">
+                            <h4><i class="fas fa-heartbeat" style="color:#dc3545;"></i> Enregistrer un suivi</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Température (°C)</label><input type="number" id="nur-temp" class="form-control" placeholder="37.0" step="0.1"></div>
+                                <div><label class="form-label">Tension artérielle</label><input type="text" id="nur-bp" class="form-control" placeholder="120/80"></div>
+                                <div><label class="form-label">Pouls (bpm)</label><input type="number" id="nur-pulse" class="form-control" placeholder="72"></div>
+                                <div><label class="form-label">Saturation O2 (%)</label><input type="number" id="nur-o2" class="form-control" placeholder="98"></div>
+                                <div><label class="form-label">Poids (kg)</label><input type="number" id="nur-weight" class="form-control" placeholder="70" step="0.1"></div>
+                                <div><label class="form-label">État général</label>
+                                    <select id="nur-state" class="form-control">
+                                        <option value="">Sélectionner...</option>
+                                        <option value="Bon">Bon</option>
+                                        <option value="Stable">Stable</option>
+                                        <option value="Moyen">Moyen</option>
+                                        <option value="Critique">Critique</option>
+                                        <option value="Amélioré">Amélioré</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column:1/-1"><label class="form-label">Notes infirmières</label>
+                                    <textarea id="nur-notes" class="form-control" rows="2" placeholder="Observations, soins effectués..."></textarea></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-success" style="width:100%;" onclick="saveNursingNote()">
+                                        <i class="fas fa-save"></i> Enregistrer</button></div>
+                            </div>
+                        </div>
+                        <div id="nursing-notes-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Prescriptions -->
+                    <div id="hosp-tab-prescriptions" class="hosp-tab-content" style="display:none;">
+                        <div class="card" style="background:#f0f4ff;">
+                            <h4><i class="fas fa-prescription" style="color:#6f42c1;"></i> Nouvelle prescription</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Médicament *</label>
+                                    <select id="rx-medication" class="form-control" onchange="onRxMedSelect()">
+                                        <option value="">Sélectionner...</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Ou saisir le nom</label>
+                                    <input type="text" id="rx-med-name" class="form-control" placeholder="Médicament hors stock"></div>
+                                <div><label class="form-label">Dosage *</label>
+                                    <input type="text" id="rx-dosage" class="form-control" placeholder="Ex: 500mg, 2 comprimés"></div>
+                                <div><label class="form-label">Fréquence *</label>
+                                    <select id="rx-frequency" class="form-control">
+                                        <option value="1x/jour">1x par jour</option>
+                                        <option value="2x/jour">2x par jour</option>
+                                        <option value="3x/jour">3x par jour</option>
+                                        <option value="4x/jour">4x par jour</option>
+                                        <option value="Toutes les 4h">Toutes les 4h</option>
+                                        <option value="Toutes les 6h">Toutes les 6h</option>
+                                        <option value="Toutes les 8h">Toutes les 8h</option>
+                                        <option value="Toutes les 12h">Toutes les 12h</option>
+                                        <option value="Au besoin">Au besoin</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Durée</label>
+                                    <input type="text" id="rx-duration" class="form-control" placeholder="Ex: 5 jours, 1 semaine"></div>
+                                <div><label class="form-label">Voie d'administration</label>
+                                    <select id="rx-route" class="form-control">
+                                        <option value="Orale">Orale</option>
+                                        <option value="Injectable IV">Injectable IV</option>
+                                        <option value="Injectable IM">Injectable IM</option>
+                                        <option value="Sous-cutanée">Sous-cutanée</option>
+                                        <option value="Topique">Topique</option>
+                                        <option value="Rectale">Rectale</option>
+                                    </select>
+                                </div>
+                                <div><label class="form-label">Quantité à délivrer</label>
+                                    <input type="number" id="rx-qty" class="form-control" placeholder="1" min="1" value="1" oninput="updateRxCostPreview()"></div>
+                                <div><label class="form-label">Prix/unité (HTG)</label>
+                                    <input type="number" id="rx-price" class="form-control" placeholder="0.00" min="0" oninput="updateRxCostPreview()"></div>
+                                <div style="grid-column:1/-1"><label class="form-label">Indications / Instructions spéciales pour l'infirmière</label>
+                                    <textarea id="rx-note" class="form-control" rows="2" placeholder="Ex: Administrer lentement, surveiller la tension, à jeun, etc."></textarea></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-primary" style="width:100%;" onclick="savePrescription()">
+                                        <i class="fas fa-prescription"></i> Prescrire</button></div>
+                            </div>
+                            <div id="rx-cost-preview" class="mt-2"></div>
+                        </div>
+                        <div id="prescriptions-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Dépôts -->
+                    <div id="hosp-tab-deposits" class="hosp-tab-content" style="display:none;">
+                        <div class="card" style="background:#f0fff4;">
+                            <h4><i class="fas fa-money-bill-wave" style="color:#28a745;"></i> Ajouter un dépôt</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Montant (HTG) *</label>
+                                    <input type="number" id="dep-amount" class="form-control" placeholder="0.00" min="0"></div>
+                                <div><label class="form-label">Note</label>
+                                    <input type="text" id="dep-note" class="form-control" placeholder="Ex: Versement famille..."></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-success" style="width:100%;" onclick="addDeposit()">
+                                        <i class="fas fa-plus"></i> Ajouter</button></div>
+                            </div>
+                        </div>
+                        <div id="deposits-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Services supplémentaires -->
+                    <div id="hosp-tab-services" class="hosp-tab-content" style="display:none;">
+                        <div class="card" style="background:#fff8f0;">
+                            <h4><i class="fas fa-clipboard-list" style="color:#ff9800;"></i> Ajouter un service</h4>
+                            <div class="add-form-grid" style="margin-top:10px;">
+                                <div><label class="form-label">Service *</label>
+                                    <input type="text" id="svc-name" class="form-control" placeholder="Ex: Radio, Analyse spéciale..."></div>
+                                <div><label class="form-label">Montant (HTG) *</label>
+                                    <input type="number" id="svc-amount" class="form-control" placeholder="0.00" min="0"></div>
+                                <div><label class="form-label">Note</label>
+                                    <input type="text" id="svc-note" class="form-control" placeholder="Note optionnelle"></div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <button class="btn btn-warning" style="width:100%;color:#212529;" onclick="addHospService()">
+                                        <i class="fas fa-plus"></i> Ajouter</button></div>
+                            </div>
+                        </div>
+                        <div id="hosp-services-list" class="mt-3"></div>
+                    </div>
+
+                    <!-- Sortie du patient -->
+                    <div class="card mt-3" style="border-left-color:#dc3545;">
+                        <h4><i class="fas fa-sign-out-alt" style="color:#dc3545;"></i> Sortie du patient</h4>
+                        <div class="add-form-grid">
+                            <div><label class="form-label">Note de sortie</label>
+                                <textarea id="discharge-note" class="form-control" rows="2" placeholder="Résumé de séjour, instructions de sortie..."></textarea></div>
+                            <div style="display:flex;align-items:flex-end;">
+                                <button class="btn btn-danger" style="width:100%;" onclick="dischargePatient()">
+                                    <i class="fas fa-sign-out-alt"></i> Sortie du patient</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── FOURNISSEURS ───────────────────────────── -->
+        <section id="suppliers" class="content">
+            <h2 class="section-title"><i class="fas fa-truck"></i> Gestion des Fournisseurs</h2>
+
+            <!-- Liste fournisseurs -->
+            <div class="card">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-building"></i> Fournisseurs</h3>
+                    <button class="btn btn-success btn-sm" onclick="toggleSupplierForm()">
+                        <i class="fas fa-plus"></i> Nouveau fournisseur
+                    </button>
+                </div>
+                <div id="supplier-add-form" style="display:none;" class="add-form-grid" style="margin-top:12px;">
+                    <div><label class="form-label">Nom *</label><input type="text" id="sup-name" class="form-control" placeholder="Nom du fournisseur"></div>
+                    <div><label class="form-label">Téléphone</label><input type="text" id="sup-phone" class="form-control" placeholder="Téléphone"></div>
+                    <div><label class="form-label">Email</label><input type="email" id="sup-email" class="form-control" placeholder="Email"></div>
+                    <div><label class="form-label">Adresse</label><input type="text" id="sup-address" class="form-control" placeholder="Adresse"></div>
+                    <div><label class="form-label">Note</label><input type="text" id="sup-note" class="form-control" placeholder="Note"></div>
+                    <div style="display:flex;align-items:flex-end;gap:8px;">
+                        <button class="btn btn-success" onclick="saveNewSupplier()"><i class="fas fa-save"></i> Enregistrer</button>
+                        <button class="btn btn-secondary" onclick="toggleSupplierForm()">Annuler</button>
+                    </div>
+                </div>
+                <div id="suppliers-list" class="mt-3"></div>
+            </div>
+
+            <!-- Achats / Dettes -->
+            <div class="card" id="supplier-detail-card" style="display:none;">
+                <div class="settings-section-header">
+                    <h3><i class="fas fa-shopping-cart"></i> Achats — <span id="selected-supplier-name"></span></h3>
+                    <button class="btn btn-secondary btn-sm" onclick="closeSupplierDetail()">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </button>
+                </div>
+
+                <!-- Résumé dette -->
+                <div id="supplier-debt-summary" class="mb-3"></div>
+
+                <!-- Nouvel achat -->
+                <div class="card" style="background:#f8f9fa;margin-bottom:16px;">
+                    <h4><i class="fas fa-plus-circle" style="color:var(--success);"></i> Enregistrer un achat</h4>
+                    <div class="add-form-grid" style="margin-top:12px;">
+                        <div style="grid-column:1/-1"><label class="form-label">Description *</label>
+                            <input type="text" id="pur-desc" class="form-control" placeholder="Ex: Amoxicilline 500mg x 200, Seringues..."></div>
+                        <div>
+                            <label class="form-label"><i class="fas fa-pills" style="color:#28a745;"></i> Médicament concerné</label>
+                            <select id="pur-medication" class="form-control" onchange="onMedicationSelect()">
+                                <option value="">Aucun / Autre article</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label"><i class="fas fa-boxes" style="color:#1a6bca;"></i> Quantité reçue</label>
+                            <input type="number" id="pur-qty" class="form-control" placeholder="0" min="0" id="pur-qty">
+                            <small id="pur-stock-info" class="text-muted" style="margin-top:4px;display:block;"></small>
+                        </div>
+                        <div><label class="form-label">Montant total (HTG) *</label>
+                            <input type="number" id="pur-total" class="form-control" placeholder="0.00" min="0" oninput="updatePurchaseBalance()"></div>
+                        <div><label class="form-label">Montant payé maintenant (HTG)</label>
+                            <input type="number" id="pur-paid" class="form-control" placeholder="0.00" min="0" oninput="updatePurchaseBalance()"></div>
+                        <div>
+                            <label class="form-label">Type de paiement</label>
+                            <select id="pur-type" class="form-control">
+                                <option value="cash">Cash (paiement total)</option>
+                                <option value="credit">À crédit (rien payé)</option>
+                                <option value="partial">Paiement partiel</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">Note</label>
+                            <input type="text" id="pur-note" class="form-control" placeholder="Note optionnelle"></div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-success" style="width:100%;" onclick="savePurchase()">
+                                <i class="fas fa-save"></i> Enregistrer l'achat
+                            </button>
+                        </div>
+                    </div>
+                    <div id="purchase-balance-preview" class="mt-2"></div>
+                </div>
+
+                <!-- Liste des achats -->
+                <h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Historique des achats</h4>
+                <div id="supplier-purchases-list"></div>
+            </div>
+        </section>
+
+        <!-- ─── PARAMÈTRES ──────────────────────────────── -->
+
+        <!-- ─── RAPPORTS ──────────────────────────────── -->
+        <section id="reports" class="content">
+            <h2 class="section-title"><i class="fas fa-file-alt"></i> Rapports &amp; Statistiques</h2>
+            <div class="card mb-3">
+                <h3><i class="fas fa-filter" style="color:#1a6bca;"></i> Filtres</h3>
+                <div class="add-form-grid" style="margin-top:12px;">
+                    <div><label class="form-label">Date d&#233;but</label>
+                        <input type="date" id="rpt-from" class="form-control"></div>
+                    <div><label class="form-label">Date fin</label>
+                        <input type="date" id="rpt-to" class="form-control"></div>
+                    <div><label class="form-label">Agent / Utilisateur</label>
+                        <select id="rpt-agent" class="form-control">
+                            <option value="">Tous les agents</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button class="btn btn-primary" style="width:100%;" onclick="generateReports()">
+                            <i class="fas fa-search"></i> G&#233;n&#233;rer</button>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;background:#fff;border-radius:8px 8px 0 0;">
+                <button class="rpt-tab-btn active" data-rpt="transactions"    onclick="showRptTab('transactions')"    style="padding:10px 14px;border:none;background:var(--primary-light);font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;font-size:.82rem;"><i class="fas fa-receipt"></i> Transactions</button>
+                <button class="rpt-tab-btn" data-rpt="patients"      onclick="showRptTab('patients')"      style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:.82rem;"><i class="fas fa-users"></i> Patients</button>
+                <button class="rpt-tab-btn" data-rpt="medications"   onclick="showRptTab('medications')"   style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:.82rem;"><i class="fas fa-pills"></i> M&#233;dicaments</button>
+                <button class="rpt-tab-btn" data-rpt="suppliers"     onclick="showRptTab('suppliers')"     style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:.82rem;"><i class="fas fa-truck"></i> Fournisseurs</button>
+                <button class="rpt-tab-btn" data-rpt="users"         onclick="showRptTab('users')"         style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:.82rem;"><i class="fas fa-user-tie"></i> Utilisateurs</button>
+                <button class="rpt-tab-btn" data-rpt="hospitalization" onclick="showRptTab('hospitalization')" style="padding:10px 14px;border:none;background:none;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-size:.82rem;"><i class="fas fa-bed"></i> Hospitalisation</button>
+            </div>
+            <div id="rpt-tab-transactions"    class="rpt-tab-content"></div>
+            <div id="rpt-tab-patients"        class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-medications"     class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-suppliers"       class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-users"           class="rpt-tab-content" style="display:none;"></div>
+            <div id="rpt-tab-hospitalization" class="rpt-tab-content" style="display:none;"></div>
+        </section>
+
+        <section id="settings" class="content">
+            <h2 class="section-title"><i class="fas fa-cog"></i> Paramètres du Système</h2>
+
+            <!-- Infos hôpital -->
+            <div class="card">
+                <h3><i class="fas fa-hospital"></i> Informations de l'Hôpital</h3>
+                <div class="add-form-grid" style="margin-top:10px;">
+                    <div class="form-group"><label class="form-label">Nom de l'Hôpital</label><input type="text" id="hospital-name" class="form-control" value="Hôpital Saint-Luc"></div>
+                    <div class="form-group"><label class="form-label">Adresse</label><input type="text" id="hospital-address" class="form-control" value="Port-au-Prince, Haïti"></div>
+                    <div class="form-group"><label class="form-label">Téléphone</label><input type="text" id="hospital-phone" class="form-control" value="(509) 1234-5678"></div>
+                    <div class="form-group"><label class="form-label">Logo</label>
+                        <input type="file" id="hospital-logo" class="form-control" accept="image/*">
+                        <img id="logo-preview" src="" alt="Logo" class="logo-preview" style="display:none;margin-top:8px;">
+                    </div>
+                </div>
+                <button type="button" id="save-hospital-info-btn" class="btn btn-success mt-3"><i class="fas fa-save"></i> Enregistrer</button>
+            </div>
+
+            <!-- Taux de change -->
+            <div class="card">
+                <h3><i class="fas fa-dollar-sign"></i> Taux de Change (HTG / USD)</h3>
+                <p class="text-muted" style="margin-bottom:14px;">Définissez le taux utilisé pour les conversions dans l'application.</p>
+                <div class="add-form-grid" style="margin-top:0;">
+                    <div>
+                        <label class="form-label">Taux (HTG pour 1 USD)</label>
+                        <input type="number" id="exchange-rate-input" class="form-control" value="130" min="1" step="0.01">
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button id="save-exchange-rate-btn" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer le taux</button>
+                    </div>
+                    <div style="grid-column:1/-1;" id="exchange-preview" class="exchange-banner" style="margin-top:8px;margin-bottom:0;">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Taux actuel : <strong>130 HTG = 1 USD</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode Extra -->
+            <div class="card">
+                <h3><i class="fas fa-percentage"></i> Mode Extra</h3>
+                <p class="text-muted" style="margin-bottom:14px;">
+                    Lorsque le Mode Extra est activé, un pourcentage est automatiquement ajouté au prix des médicaments,
+                    des analyses, des services externes et des consultations, pour tous les utilisateurs (sauf l'administration).
+                </p>
+                <div class="add-form-grid" style="margin-top:0;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" id="extra-mode-toggle" style="width:20px;height:20px;">
+                        <label class="form-label" style="margin:0;" for="extra-mode-toggle">Activer le Mode Extra</label>
+                    </div>
+                    <div>
+                        <label class="form-label">Pourcentage de majoration (%)</label>
+                        <input type="number" id="extra-mode-percentage" class="form-control" value="0" min="0" step="0.01">
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button id="save-extra-mode-btn" class="btn btn-success"><i class="fas fa-save"></i> Enregistrer</button>
+                    </div>
+                    <div style="grid-column:1/-1;" id="extra-mode-preview" class="exchange-banner" style="margin-top:8px;margin-bottom:0;">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="extra-mode-status-text">Mode Extra désactivé.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Médicaments (admin seulement) -->
+            <div class="card" id="admin-medications-card">
+                <h3><i class="fas fa-pills"></i> Gestion des Médicaments <span class="badge badge-warning" style="font-size:.75rem;">Admin seulement</span></h3>
+                <div class="table-container mt-2">
+                    <table>
+                        <thead><tr><th>Médicament</th><th>Forme</th><th>Prix</th><th>Qté</th><th>Alerte</th><th>Emplacement</th><th>Étagère</th><th>Actions</th></tr></thead>
+                        <tbody id="medications-settings-list"></tbody>
+                    </table>
+                </div>
+                <div class="add-form-grid" style="margin-top:16px;">
+                    <div><label class="form-label">Nom commercial *</label><input type="text" id="new-medication-name" class="form-control" placeholder="Ex: Amoxicilline 500mg"></div>
+                    <div><label class="form-label">Nom générique</label><input type="text" id="new-medication-generic" class="form-control" placeholder="Nom générique"></div>
+                    <div><label class="form-label">Forme *</label>
+                        <select id="new-medication-form" class="form-control">
+                            <option value="">Choisir...</option>
+                            <option value="Comprimé">Comprimé</option>
+                            <option value="Capsule">Capsule</option>
+                            <option value="Sirop">Sirop</option>
+                            <option value="Injection">Injection</option>
+                            <option value="Crème">Crème</option>
+                            <option value="Pommade">Pommade</option>
+                            <option value="Suppositoire">Suppositoire</option>
+                        </select>
+                    </div>
+                    <div><label class="form-label">Unité *</label><input type="text" id="new-medication-unit" class="form-control" placeholder="comprimés, ml…"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-medication-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div><label class="form-label">Quantité *</label><input type="number" id="new-medication-quantity" class="form-control" placeholder="0" min="0"></div>
+                    <div><label class="form-label">Seuil alerte *</label><input type="number" id="new-medication-alert" class="form-control" placeholder="10" min="0"></div>
+                    <div><label class="form-label"><i class="fas fa-map-marker-alt" style="color:#1a6bca;"></i> Espace</label>
+                        <select id="new-medication-espace" class="form-control">
+                            <option value="">Sélectionner...</option>
+                            <option value="Espace 1">Espace 1</option>
+                            <option value="Espace 2">Espace 2</option>
+                            <option value="Espace 3">Espace 3</option>
+                            <option value="Espace 4">Espace 4</option>
+                            <option value="Espace 5">Espace 5</option>
+                        </select>
+                    </div>
+                    <div><label class="form-label"><i class="fas fa-layer-group" style="color:#6f42c1;"></i> Étagère</label>
+                        <select id="new-medication-etagere" class="form-control">
+                            <option value="">Sélectionner...</option>
+                            <option value="Étagère 1">Étagère 1</option>
+                            <option value="Étagère 2">Étagère 2</option>
+                            <option value="Étagère 3">Étagère 3</option>
+                            <option value="Étagère 4">Étagère 4</option>
+                            <option value="Étagère 5">Étagère 5</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-medication-settings" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Types de consultation -->
+            <div class="card">
+                <h3><i class="fas fa-stethoscope"></i> Types de Consultation</h3>
+                <div id="consultation-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom *</label><input type="text" id="new-consultation-type-name" class="form-control" placeholder="Ex: Consultation générale"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-consultation-type-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div style="grid-column:span 2"><label class="form-label">Description</label><textarea id="new-consultation-type-description" class="form-control" placeholder="Description du type de consultation" rows="2"></textarea></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-consultation-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signes vitaux -->
+            <div class="card">
+                <h3><i class="fas fa-heartbeat"></i> Types de Signes Vitaux</h3>
+                <div id="vitals-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom *</label><input type="text" id="new-vital-name" class="form-control" placeholder="Ex: Tension artérielle"></div>
+                    <div><label class="form-label">Unité *</label><input type="text" id="new-vital-unit" class="form-control" placeholder="Ex: mmHg, °C, bpm"></div>
+                    <div><label class="form-label">Valeur min *</label><input type="number" id="new-vital-min" class="form-control" placeholder="0"></div>
+                    <div><label class="form-label">Valeur max *</label><input type="number" id="new-vital-max" class="form-control" placeholder="200"></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-vital-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analyses de laboratoire -->
+            <div class="card">
+                <h3><i class="fas fa-flask"></i> Analyses de Laboratoire</h3>
+                <div id="lab-analyses-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom de l'analyse *</label><input type="text" id="new-lab-analysis-name" class="form-control" placeholder="Ex: Numération formule sanguine"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-lab-analysis-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div><label class="form-label">Type de résultat</label>
+                        <select id="new-lab-analysis-type" class="form-control">
+                            <option value="text">Résultat texte</option>
+                            <option value="image">Résultat image</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-lab-analysis-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services externes -->
+            <div class="card">
+                <h3><i class="fas fa-external-link-alt"></i> Services Externes</h3>
+                <div id="external-services-types-list"></div>
+                <div class="add-form-grid">
+                    <div><label class="form-label">Nom du service *</label><input type="text" id="new-external-service-type-name" class="form-control" placeholder="Ex: Radiologie"></div>
+                    <div><label class="form-label">Prix (Gdes) *</label><input type="number" id="new-external-service-type-price" class="form-control" placeholder="0.00" min="0"></div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <button type="button" id="add-external-service-type" class="btn btn-success" style="width:100%;"><i class="fas fa-plus"></i> Ajouter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comptes Patients -->
+            <div class="card" id="patient-accounts-card">
+                <h3><i class="fas fa-user-lock" style="color:#17a2b8;"></i> Comptes Espace Patient
+                    <span class="badge badge-info" style="font-size:.75rem;margin-left:8px;">Admin seulement</span>
+                </h3>
+                <p class="text-muted" style="margin-bottom:14px;font-size:.85rem;">
+                    Créez ou modifiez les mots de passe des patients pour qu'ils accèdent à leur espace sur <strong>/patient.html</strong>
+                </p>
+
+                <!-- Recherche rapide -->
+                <div class="d-flex gap-15 mb-3">
+                    <input type="text" id="pac-search" class="form-control" placeholder="Rechercher un patient par ID ou nom...">
+                    <button class="btn btn-primary" onclick="searchPatientForAccount()">
+                        <i class="fas fa-search"></i> Chercher
+                    </button>
+                </div>
+
+                <!-- Résultat recherche -->
+                <div id="pac-result" style="display:none;" class="card" style="background:#f8f9fa;margin-bottom:16px;">
+                    <div id="pac-patient-info"></div>
+                    <div class="add-form-grid" style="margin-top:12px;">
+                        <div>
+                            <label class="form-label"><i class="fas fa-key" style="color:#28a745;"></i> Nouveau mot de passe</label>
+                            <div class="pass-wrap" style="position:relative;">
+                                <input type="password" id="pac-pwd" class="form-control" placeholder="Minimum 4 caractères" style="padding-right:44px;">
+                                <button type="button" onclick="togglePacPwd()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6c757d;">
+                                    <i class="fas fa-eye" id="pac-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">Confirmer le mot de passe</label>
+                            <input type="password" id="pac-pwd2" class="form-control" placeholder="Répéter le mot de passe">
+                        </div>
+                        <div style="display:flex;align-items:flex-end;gap:8px;">
+                            <button class="btn btn-success" onclick="createPatientAccountFromSettings()">
+                                <i class="fas fa-save"></i> Créer / Mettre à jour
+                            </button>
+                            <button class="btn btn-danger" onclick="revokePatientAccountFromSettings()">
+                                <i class="fas fa-ban"></i> Révoquer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liste tous les patients avec statut compte -->
+                <h4 style="margin-bottom:10px;"><i class="fas fa-list"></i> Tous les patients</h4>
+                <div id="pac-all-patients-list">
+                    <button class="btn btn-secondary btn-sm" onclick="loadAllPatientsAccounts()">
+                        <i class="fas fa-sync"></i> Charger la liste
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gestion des utilisateurs -->
+            <div class="card">
+                <h3><i class="fas fa-users"></i> Gestion des Utilisateurs</h3>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Nom</th><th>Rôle</th><th>Identifiant</th><th>Actif</th><th>Permissions</th><th>Actions</th></tr></thead>
+                        <tbody id="users-list"></tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <h4 style="margin-bottom:12px;"><i class="fas fa-user-plus"></i> Ajouter un utilisateur</h4>
+                    <div class="add-form-grid">
+                        <div><label class="form-label">Nom complet *</label><input type="text" id="new-user-name" class="form-control" placeholder="Prénom et Nom"></div>
+                        <div><label class="form-label">Rôle *</label>
+                            <select id="new-user-role" class="form-control">
+                                <option value="">Sélectionner rôle</option>
+                                <option value="sub_admin">Sous-Administrateur</option>
+                                <option value="secretary">Secrétariat</option>
+                                <option value="cashier">Caisse</option>
+                                <option value="nurse">Infirmier</option>
+                                <option value="doctor">Médecin</option>
+                                <option value="lab">Laboratoire</option>
+                                <option value="pharmacy">Pharmacie</option>
+                            <option value="multi">Multi-Rôle</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">Identifiant *</label><input type="text" id="new-user-username" class="form-control" placeholder="login"></div>
+                        <div><label class="form-label">Mot de passe *</label><input type="password" id="new-user-password" class="form-control" placeholder="••••••••"></div>
+                        <div id="multi-roles-container" style="display:none;grid-column:1/-1;">
+                            <label class="form-label"><i class="fas fa-layer-group" style="color:#6f42c1;"></i> Rôles combinés (sélectionner au moins 2)</label>
+                            <div class="permissions-grid" style="margin-top:8px;">
+                                <div class="permission-item"><input type="checkbox" id="mr-secretary" value="secretary"><label for="mr-secretary"><i class="fas fa-user-tie" style="color:var(--primary);"></i> Secrétariat</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-cashier" value="cashier"><label for="mr-cashier"><i class="fas fa-cash-register" style="color:var(--success);"></i> Caisse</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-nurse" value="nurse"><label for="mr-nurse"><i class="fas fa-user-nurse" style="color:#17a2b8;"></i> Infirmier</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-doctor" value="doctor"><label for="mr-doctor"><i class="fas fa-user-md" style="color:#6f42c1;"></i> Médecin</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-lab" value="lab"><label for="mr-lab"><i class="fas fa-flask" style="color:var(--warning);"></i> Laboratoire</label></div>
+                                <div class="permission-item"><input type="checkbox" id="mr-pharmacy" value="pharmacy"><label for="mr-pharmacy"><i class="fas fa-pills" style="color:var(--danger);"></i> Pharmacie</label></div>
+                            </div>
+                            <div class="alert alert-info mt-2" style="font-size:.82rem;">
+                                <i class="fas fa-info-circle"></i> L'utilisateur pourra sélectionner l'un de ces rôles à la connexion pour accéder aux sections correspondantes.
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button type="button" id="add-user" class="btn btn-success" style="width:100%;"><i class="fas fa-user-plus"></i> Créer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Permissions sous-admin (visible seulement pour admin) -->
+            <div class="card" id="sub-admin-permissions-card">
+                <h3><i class="fas fa-shield-alt"></i> Permissions des Sous-Administrateurs</h3>
+                <p class="text-muted" style="margin-bottom:14px;">Définissez les sections et fonctionnalités accessibles aux sous-administrateurs.</p>
+                <div class="permissions-grid" id="sub-admin-permissions-grid">
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-secretary" checked>
+                        <label for="perm-secretary"><i class="fas fa-user-tie" style="color:var(--primary);"></i> Secrétariat</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-cashier" checked>
+                        <label for="perm-cashier"><i class="fas fa-cash-register" style="color:var(--success);"></i> Caisse</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-nurse" checked>
+                        <label for="perm-nurse"><i class="fas fa-user-nurse" style="color:#17a2b8;"></i> Infirmier</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-doctor" checked>
+                        <label for="perm-doctor"><i class="fas fa-user-md" style="color:#6f42c1;"></i> Médecin</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-laboratory" checked>
+                        <label for="perm-laboratory"><i class="fas fa-flask" style="color:var(--warning);"></i> Laboratoire</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-pharmacy" checked>
+                        <label for="perm-pharmacy"><i class="fas fa-pills" style="color:var(--danger);"></i> Pharmacie</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-messaging" checked>
+                        <label for="perm-messaging"><i class="fas fa-comments" style="color:var(--info);"></i> Messagerie</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-administration" checked>
+                        <label for="perm-administration"><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Administration</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-settings">
+                        <label for="perm-settings"><i class="fas fa-cog" style="color:var(--secondary);"></i> Paramètres</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-users">
+                        <label for="perm-users"><i class="fas fa-users" style="color:var(--primary);"></i> Gestion utilisateurs</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm-exchange-rate">
+                        <label for="perm-exchange-rate"><i class="fas fa-dollar-sign" style="color:var(--success);"></i> Modifier taux de change</label>
+                    </div>
+                </div>
+                <button id="save-sub-admin-permissions" class="btn btn-success mt-3"><i class="fas fa-save"></i> Enregistrer les permissions</button>
+            </div>
+
+        </section>
+
+    </div><!-- /container -->
+</div><!-- /main-app -->
+
+<!-- Bouton déconnexion fixe (visible sur mobile) -->
+<button id="logout-fab" onclick="document.getElementById('logout-btn').click()"
+    style="position:fixed;bottom:20px;right:20px;z-index:8000;
+           width:52px;height:52px;border-radius:50%;
+           background:linear-gradient(135deg,#dc3545,#c82333);
+           color:#fff;border:none;cursor:pointer;
+           box-shadow:0 4px 16px rgba(220,53,69,0.45);
+           display:none;align-items:center;justify-content:center;
+           font-size:1.1rem;transition:all .25s ease;"
+    title="Déconnexion">
+    <i class="fas fa-sign-out-alt"></i>
+</button>
+
+<!-- Spinner de chargement -->
+<div id="spinner-overlay" class="spinner-overlay hidden">
+    <div class="spinner"></div>
+</div>
+
+<!-- Toast notifications container -->
+<div id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
