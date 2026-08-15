@@ -3798,6 +3798,7 @@ async function openHospDetail(hospId, patientName) {
     document.getElementById('admit-patient-card').style.display   = 'none';
     document.getElementById('hospitalizations-list').closest('.card').style.display = 'none';
     document.getElementById('hosp-detail-title').innerHTML = '<i class="fas fa-user-injured"></i> '+patientName;
+
     // Charger médicaments
     var meds = state.medications && state.medications.length ? state.medications : await API.getMedications().catch(function(){return[];});
     state.medications = meds;
@@ -3806,13 +3807,18 @@ async function openHospDetail(hospId, patientName) {
         rxSel.innerHTML = '<option value="">Sélectionner...</option>' +
             meds.map(function(m){ return '<option value="'+m.id+'" data-price="'+m.price+'" data-stock="'+m.quantity+'">'+m.name+' (Stock:'+m.quantity+') — '+parseFloat(m.price).toLocaleString('fr-FR')+' HTG</option>'; }).join('');
     }
+
     await refreshHospDetail();
-    // Remplir les selects de tâches
     fillTaskSelects();
-    // Ouvrir sur l\'onglet tâches si médecin, sinon nursing
+
+    // Afficher/cacher formulaire selon rôle
     var role = state.currentRole;
-    if (role==='doctor'||role==='admin'||role==='sub_admin') showHospTab('tasks');
-    else showHospTab('nursing');
+    var isDoctor = role==='doctor'||role==='admin'||role==='sub_admin';
+    var orderForm = document.getElementById('task-order-form');
+    if (orderForm) orderForm.style.display = isDoctor ? 'block' : 'none';
+
+    // Médecin et infirmière ouvrent sur Tâches
+    showHospTab('tasks');
 }
 
 async function refreshHospDetail() {
@@ -4241,7 +4247,7 @@ async function loadHospTasks() {
     var isDoctor = role==='doctor'||role==='admin'||role==='sub_admin';
     var isNurse  = role==='nurse'||role==='admin'||role==='sub_admin';
 
-    // Cacher le formulaire si pas médecin
+    // Afficher/cacher le formulaire selon rôle
     var orderForm = document.getElementById('task-order-form');
     if (orderForm) orderForm.style.display = isDoctor ? 'block' : 'none';
 
@@ -4253,8 +4259,8 @@ async function loadHospTasks() {
 
     var prioColors = { urgent:'#dc3545', normal:'#1a6bca', low:'#6c757d' };
     var typeIcons  = { medication:'fa-pills', analysis:'fa-flask', care:'fa-hand-holding-medical', other:'fa-tasks' };
-    var stColors   = { pending:'#ffc107', done:'#28a745', skipped:'#dc3545' };
-    var stLabels   = { pending:'En attente', done:'Effectué', skipped:'Sauté' };
+    var stColors   = { pending:'#ffc107', done:'#28a745', skipped:'#dc3545', problem:'#fd7e14' };
+    var stLabels   = { pending:'En attente', done:'Effectué', skipped:'Sauté', problem:'Problème' };
 
     var pending  = tasks.filter(function(t){return t.status==='pending';});
     var done     = tasks.filter(function(t){return t.status==='done';});
@@ -4287,6 +4293,7 @@ async function loadHospTasks() {
             (t.status==='pending' && isNurse ?
                 '<div style="display:flex;flex-direction:column;gap:6px;">' +
                 '<button class="btn btn-success btn-sm" data-tid="'+t.id+'" onclick="executeHospTask(this.dataset.tid,\'done\')"><i class="fas fa-check"></i> Fait</button>' +
+                '<button class="btn btn-warning btn-sm" data-tid="'+t.id+'" onclick="executeHospTask(this.dataset.tid,\'problem\')"><i class="fas fa-exclamation-triangle"></i> Problème</button>' +
                 '<button class="btn btn-secondary btn-sm" data-tid="'+t.id+'" onclick="executeHospTask(this.dataset.tid,\'skipped\')"><i class="fas fa-times"></i> Sauté</button>' +
                 '</div>'
             : '<span class="badge" style="background:'+(stColors[t.status]||'#ffc107')+';color:'+(t.status==='pending'?'#212529':'#fff')+';padding:6px 10px;">'+(stLabels[t.status]||t.status)+'</span>') +
@@ -4306,13 +4313,15 @@ async function loadHospTasks() {
 }
 
 async function executeHospTask(taskId, status) {
-    var note = prompt(status==='done'?'Note (optionnel):':'Raison du saut (optionnel):')||'';
+    var prompts = { done:'Note (optionnel):', problem:'Décrire le problème *:', skipped:'Raison du saut (optionnel):' };
+    var note = prompt(prompts[status]||'Note:')||'';
+    if (status==='problem' && !note) { toast('Décrire le problème est obligatoire', 'error'); return; }
     try {
         await apiCall(function(){
             return API.updateHospTask(taskId, { status:status, executedNote:note, executedAt:new Date().toISOString() });
         });
         toast(status==='done'?'Tâche effectuée !':'Tâche sautée', status==='done'?'success':'warning');
-        try { notifyDepartment('doctor', status==='done'?'Tâche effectuée':'Tâche sautée',
+        try { notifyDepartment('doctor', status==='done'?'Tâche effectuée':status==='problem'?'Problème signalé':'Tâche sautée',
             (_currentHospPatient.full_name||'Patient')+(note?' — '+note:''), status==='done'?'#28a745':'#dc3545'); } catch(en){}
         loadHospTasks();
         await refreshHospDetail();
