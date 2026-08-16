@@ -862,11 +862,17 @@
             <div class="card mt-3">
                 <div class="settings-section-header">
                     <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
-                    <div class="d-flex gap-10" style="flex-wrap:wrap;">
-                        <input type="text" id="hosp-list-search" class="form-control" style="max-width:220px;" placeholder="Rechercher nom, ID, chambre..." oninput="filterHospitalizationsList()">
-                        <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')">Actifs</button>
-                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
-                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
+                    <div class="d-flex gap-10" style="flex-wrap:wrap;align-items:center;">
+                        <div class="d-flex gap-10" style="flex:1;min-width:200px;">
+                            <input type="text" id="hosp-list-search" class="form-control" placeholder="Rechercher nom, ID, chambre..." oninput="filterHospitalizationsList()">
+                            <button class="btn btn-sm btn-secondary" onclick="filterHospitalizationsList()" title="Rechercher"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div class="d-flex gap-10">
+                            <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')"><i class="fas fa-hospital-user"></i> Actifs</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
+                            <button class="btn btn-sm btn-info" onclick="loadHospitalizations(window._hospCurrentStatus||'active')" title="Actualiser"><i class="fas fa-sync"></i></button>
+                        </div>
                     </div>
                 </div>
                 <div id="hospitalizations-list" class="mt-2"></div>

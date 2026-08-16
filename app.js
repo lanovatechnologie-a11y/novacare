@@ -1864,7 +1864,7 @@ async function loadServicesForPayment(patient) {
         let amount = parseFloat(t.amount);
         if (patient.sponsored && patient.discount_percentage > 0) amount *= (1 - patient.discount_percentage / 100);
         total += amount;
-        state.selectedServices.push({ ...t, finalAmount: amount });
+        state.selectedServices.push({ ...t, finalAmount: amount, unitPrice: parseFloat(t.amount) / (parseInt(t.quantity)||1) });
         html += `<div class="service-item">
             <div>
                 <input type="checkbox" class="service-checkbox" data-id="${t.id}" checked style="width:16px;height:16px;margin-right:8px;accent-color:var(--primary);">
@@ -1888,7 +1888,7 @@ async function loadServicesForPayment(patient) {
             const id = this.dataset.id;
             if (this.checked) {
                 const t = txs.find(x => x.id === id);
-                if (t) { let a = parseFloat(t.amount); if (patient.sponsored) a *= (1-patient.discount_percentage/100); state.selectedServices.push({...t,finalAmount:a}); }
+                if (t) { let a = parseFloat(t.amount); if (patient.sponsored) a *= (1-patient.discount_percentage/100); state.selectedServices.push({...t,finalAmount:a, unitPrice: parseFloat(t.amount)/(parseInt(t.quantity)||1)}); }
             } else {
                 state.selectedServices = state.selectedServices.filter(x => x.id !== id);
             }
@@ -1916,9 +1916,36 @@ function generateInvoice(totalHTG, givenHTG, payCurrency, method) {
     document.getElementById('invoice-change').textContent        = `${change.toFixed(2)} HTG ≈ $${htgToUsd(change)}`;
     document.getElementById('invoice-payment-method').textContent = method;
     document.getElementById('invoice-number').textContent         = 'INV-' + Date.now();
-    document.getElementById('invoice-services-list').innerHTML    = state.selectedServices.map(s =>
-        `<div class="receipt-item"><span>${s.service}</span><span>${s.finalAmount.toFixed(2)} HTG</span></div>`
-    ).join('');
+    // Détail complet de chaque service
+    var typeLabels = { consultation:'Consultation', lab:'Analyse', medication:'Médicament', external:'Service ext.', '':'Service' };
+    var typeIcons  = { consultation:'🩺', lab:'🧪', medication:'💊', external:'📋', '':'🔹' };
+    var services = state.selectedServices;
+    var html = '';
+    var subtotals = {};
+    services.forEach(function(s) {
+        var type  = s.type || '';
+        var icon  = typeIcons[type]  || '🔹';
+        var label = typeLabels[type] || 'Service';
+        var qty   = s.quantity || 1;
+        var unit  = s.unitPrice || s.finalAmount || 0;
+        var total = s.finalAmount || (unit * qty);
+        if (!subtotals[label]) subtotals[label] = 0;
+        subtotals[label] += total;
+        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.9rem;border-bottom:1px dotted #eee;">' +
+            '<span style="flex:1;">' + icon + ' ' + s.service +
+            (qty > 1 ? ' <small style="color:#6c757d;">x' + qty + ' @ ' + parseFloat(unit).toLocaleString('fr-FR') + ' HTG</small>' : '') +
+            '</span>' +
+            '<span style="font-weight:600;white-space:nowrap;margin-left:8px;">' + parseFloat(total).toLocaleString('fr-FR') + ' HTG</span>' +
+            '</div>';
+    });
+    // Sous-totaux par catégorie
+    html += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #ccc;">';
+    Object.entries(subtotals).forEach(function(e) {
+        html += '<div style="display:flex;justify-content:space-between;font-size:.82rem;color:#6c757d;padding:2px 0;">' +
+            '<span>Sous-total ' + e[0] + '</span><span>' + parseFloat(e[1]).toLocaleString('fr-FR') + ' HTG</span></div>';
+    });
+    html += '</div>';
+    document.getElementById('invoice-services-list').innerHTML = html;
     document.getElementById('invoice-container').classList.remove('hidden');
 }
 
@@ -3706,10 +3733,24 @@ async function loadDoctorsForHosp() {
 
 function filterHospitalizationsList() {
     var q = (document.getElementById('hosp-list-search')||{}).value||'';
-    q = q.toLowerCase();
-    document.querySelectorAll('#hospitalizations-list .hosp-card').forEach(function(card) {
+    q = q.toLowerCase().trim();
+    var cards = document.querySelectorAll('#hospitalizations-list .hosp-card');
+    if (!cards.length) return; // pas encore chargé
+    cards.forEach(function(card) {
         card.style.display = (!q || card.textContent.toLowerCase().includes(q)) ? '' : 'none';
     });
+    // Afficher message si rien trouvé
+    var visible = Array.from(cards).filter(function(c){ return c.style.display !== 'none'; });
+    var noRes = document.getElementById('hosp-no-results');
+    if (!noRes) {
+        noRes = document.createElement('div');
+        noRes.id = 'hosp-no-results';
+        noRes.className = 'alert alert-info mt-2';
+        var list = document.getElementById('hospitalizations-list');
+        if (list) list.after(noRes);
+    }
+    noRes.style.display = (q && !visible.length) ? 'block' : 'none';
+    noRes.textContent = 'Aucun patient trouvé pour "' + q + '"';
 }
 
 async function searchPatientForHosp() {
@@ -3757,6 +3798,8 @@ async function admitPatient() {
 async function loadHospitalizations(status) {
     var container = document.getElementById('hospitalizations-list');
     if (!container) return;
+    // Mémoriser le statut actuel
+    window._hospCurrentStatus = status;
     container.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
     try {
         var params = {};
@@ -3764,8 +3807,14 @@ async function loadHospitalizations(status) {
         var hosps = await API.getHospitalizations(params);
         if (!hosps.length) {
             container.innerHTML = '<div class="alert alert-info"><i class="fas fa-bed"></i> Aucune hospitalisation '+(status==='active'?'en cours':'')+'.</div>';
+            // Vider le filtre
+            var searchEl = document.getElementById('hosp-list-search');
+            if (searchEl) searchEl.value = '';
             return;
         }
+        // Réinitialiser le filtre de recherche
+        var noRes = document.getElementById('hosp-no-results');
+        if (noRes) noRes.style.display = 'none';
         var stateColors = { active:'#28a745', discharged:'#6c757d' };
         var stateLabels = { active:'Hospitalisé', discharged:'Sorti' };
         container.innerHTML = hosps.map(function(h) {
