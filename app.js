@@ -3181,6 +3181,74 @@ function setupAdminSearch() {
     document.getElementById('search-admin-patient')?.addEventListener('click', searchAdminPatient);
 }
 
+
+// ─── IMPRESSION FACTURE JOURNALIÈRE ──────────────────────────
+function printDayInvoice(dayTxs, date, patientName, patientId) {
+    var rate     = state.exchangeRate || 130;
+    var settings = state.settings || {};
+    var hospName = settings.name     || document.getElementById('hospital-name-header').textContent || 'NovaCare';
+    var hospAddr = settings.address  || '';
+    var hospPhone= settings.phone    || '';
+    var paid     = dayTxs.filter(function(t){return t.status==='paid';});
+    var unpaid   = dayTxs.filter(function(t){return t.status==='unpaid';});
+    var total    = dayTxs.reduce(function(s,t){return s+parseFloat(t.amount);},0);
+    var totalPaid= paid.reduce(function(s,t){return s+parseFloat(t.amount);},0);
+    var typeIcons= { consultation:'🩺', lab:'🧪', medication:'💊', external:'📋' };
+
+    var rows = dayTxs.map(function(t) {
+        var amt = parseFloat(t.amount);
+        return '<tr style="border-bottom:1px solid #eee;">' +
+            '<td style="padding:6px 4px;">' + (typeIcons[t.type]||'🔹') + ' ' + t.service + '</td>' +
+            '<td style="padding:6px 4px;text-align:right;">' + amt.toLocaleString('fr-FR') + ' HTG</td>' +
+            '<td style="padding:6px 4px;text-align:right;">$' + (amt/rate).toFixed(2) + '</td>' +
+            '<td style="padding:6px 4px;text-align:center;">' + (t.status==='paid'?'✅ Payé':'⏳ Non payé') + '</td>' +
+            '</tr>';
+    }).join('');
+
+    var win = window.open('','_blank','width=400,height=600');
+    win.document.write(
+        '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+        '<title>Facture ' + date + ' — ' + patientName + '</title>' +
+        '<style>' +
+        'body{font-family:Arial,sans-serif;max-width:380px;margin:0 auto;padding:16px;font-size:13px;}' +
+        'h1{font-size:1.1rem;text-align:center;margin:0;}' +
+        '.center{text-align:center;} .right{text-align:right;}' +
+        'table{width:100%;border-collapse:collapse;}' +
+        'th{background:#f0f4ff;padding:6px 4px;text-align:left;font-size:12px;}' +
+        '.total-row{font-weight:bold;border-top:2px solid #333;background:#f8f9fa;}' +
+        '.divider{border:none;border-top:1px dashed #999;margin:10px 0;}' +
+        '@media print{button{display:none;}}' +
+        '</style></head><body>' +
+        '<div class="center">' +
+        '<h1>' + hospName + '</h1>' +
+        (hospAddr  ? '<p style="margin:2px 0;font-size:11px;">' + hospAddr  + '</p>' : '') +
+        (hospPhone ? '<p style="margin:2px 0;font-size:11px;">Tél: ' + hospPhone + '</p>' : '') +
+        '</div>' +
+        '<hr class="divider">' +
+        '<p style="margin:4px 0;"><strong>Patient:</strong> ' + patientName + ' <small>(#' + patientId + ')</small></p>' +
+        '<p style="margin:4px 0;"><strong>Date:</strong> ' + date + '</p>' +
+        '<p style="margin:4px 0;"><strong>Imprimé le:</strong> ' + new Date().toLocaleString('fr-FR') + '</p>' +
+        '<hr class="divider">' +
+        '<table><thead><tr>' +
+        '<th>Service</th><th class="right">HTG</th><th class="right">USD</th><th class="center">Statut</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody>' +
+        '<tfoot>' +
+        '<tr class="total-row"><td colspan="2"><strong>Total journée</strong></td>' +
+        '<td colspan="2" class="right"><strong>' + total.toLocaleString('fr-FR') + ' HTG — $' + (total/rate).toFixed(2) + '</strong></td></tr>' +
+        (totalPaid > 0 ? '<tr><td colspan="2" style="color:#155724;">✅ Payé</td><td colspan="2" class="right" style="color:#155724;">' + totalPaid.toLocaleString('fr-FR') + ' HTG</td></tr>' : '') +
+        (unpaid.length > 0 ? '<tr><td colspan="2" style="color:#721c24;">⏳ Non payé</td><td colspan="2" class="right" style="color:#721c24;">' + unpaid.reduce(function(s,t){return s+parseFloat(t.amount);},0).toLocaleString('fr-FR') + ' HTG</td></tr>' : '') +
+        '</tfoot></table>' +
+        '<hr class="divider">' +
+        '<p class="center" style="font-size:11px;color:#6c757d;">Merci de votre confiance</p>' +
+        '<div class="center" style="margin-top:16px;">' +
+        '<button onclick="window.print()" style="background:#1a6bca;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:14px;cursor:pointer;">' +
+        '🖨️ Imprimer</button>' +
+        '</div>' +
+        '</body></html>'
+    );
+    win.document.close();
+}
+
 async function searchAdminPatient() {
     const search = document.getElementById('admin-patient-search').value.trim();
     if (!search) return;
@@ -3840,7 +3908,7 @@ function renderNurseHospList(hosps) {
             '</div></div>' +
             '<div class="d-flex gap-10 mt-2">' +
             '<button class="btn btn-primary btn-sm" data-hid="' + h.id + '" data-hname="' + h.full_name + '" onclick="openHospDetailFromNurse(this.dataset.hid, this.dataset.hname)">' +
-            '<i class="fas fa-tasks"></i> Voir tâches & dossier</button>' +
+            '<i class="fas fa-tasks"></i> Tâches à effectuer</button>' +
             '</div></div>';
     }).join('');
 }
@@ -3936,13 +4004,26 @@ async function openHospDetail(hospId, patientName) {
     await refreshHospDetail();
     fillTaskSelects();
 
-    // Afficher/cacher formulaire selon rôle
-    var role = state.currentRole;
-    var isDoctor = role==='doctor'||role==='admin'||role==='sub_admin';
-    var orderForm = document.getElementById('task-order-form');
-    if (orderForm) orderForm.style.display = isDoctor ? 'block' : 'none';
+    var role2 = state.currentRole;
+    var isDr   = role2==='doctor'||role2==='admin'||role2==='sub_admin';
+    var isNrs  = role2==='nurse';
 
-    // Médecin et infirmière ouvrent sur Tâches
+    // Formulaire d\'ordres — médecin/admin seulement
+    var orderForm = document.getElementById('task-order-form');
+    if (orderForm) orderForm.style.display = isDr ? 'block' : 'none';
+
+    // Bouton admission — cacher pour infirmière
+    var admitBtn2 = document.getElementById('btn-nouvelle-admission');
+    if (admitBtn2) admitBtn2.style.display = isNrs ? 'none' : '';
+
+    // Tabs prescription — cacher pour infirmière (l\'infirmière ne prescrit pas)
+    document.querySelectorAll('.hosp-tab-btn').forEach(function(btn){
+        if (btn.dataset.tab === 'prescriptions') {
+            btn.style.display = isDr ? '' : 'none';
+        }
+    });
+
+    // Ouvrir sur Tâches par défaut pour tout le monde
     showHospTab('tasks');
 }
 
@@ -4378,7 +4459,10 @@ async function loadHospTasks() {
 
     var tasks = await API.getHospTasks(_currentHospId).catch(function(){return[];});
     if (!tasks.length) {
-        container.innerHTML = '<div class="alert alert-info"><i class="fas fa-tasks"></i> Aucune tâche ordonnée.</div>';
+        var emptyMsg = isNurse
+            ? '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Aucune tâche en attente — tout est à jour !</div>'
+            : '<div class="alert alert-info"><i class="fas fa-tasks"></i> Aucune tâche ordonnée. Utilisez le formulaire ci-dessus pour donner des indications à l\'infirmière.</div>';
+        container.innerHTML = emptyMsg;
         return;
     }
 
