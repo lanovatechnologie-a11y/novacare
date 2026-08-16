@@ -488,8 +488,14 @@
                 <div class="settings-section-header">
                     <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
                 </div>
-                <div class="d-flex gap-15 mt-2">
+                <div class="d-flex gap-10 mt-2">
                     <input type="text" id="nurse-hosp-search" class="form-control" placeholder="Rechercher par nom, ID ou chambre..." oninput="filterNurseHospList()">
+                    <button class="btn btn-primary" onclick="loadNurseHospList()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadNurseHospList()" title="Actualiser">
+                        <i class="fas fa-sync"></i>
+                    </button>
                 </div>
                 <div id="nurse-hosp-list" class="mt-2"></div>
             </div>

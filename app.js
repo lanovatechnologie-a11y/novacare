@@ -511,6 +511,7 @@ function setupNavigation() {
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
             else if (target === 'messaging')      { loadConversations(); checkUnreadMessages(); }
             else if (target === 'doctor')         loadDoctorAppointments();
+            else if (target === 'nurse')            loadNurseHospList();
             else if (target === 'hospitalization') { loadHospitalizations('active'); loadDoctorsForHosp(); }
             else if (target === 'suppliers')      loadSuppliers();
             else if (target === 'settings')       { updateSettingsDisplay(); updateMedicationsSettingsList(); loadSubAdminPermissionsUI(); }
@@ -3793,6 +3794,81 @@ async function admitPatient() {
         addLocalNotification('Nouvelle admission', patientName+' hospitalisé(e)', 'fas fa-bed', '#28a745');
         try { notifyDepartment('nurse', 'Nouveau patient hospitalisé', patientName+' — '+(room||'')+(bed?' Lit '+bed:'')+' | Dr: '+(doctor||'N/A'), '#1a6bca'); } catch(en) {}
     } catch(e) { toast('Erreur admission: ' + e.message, 'error'); console.error('admitPatient:', e); }
+}
+
+
+// ─── INFIRMIÈRE: PATIENTS HOSPITALISÉS ───────────────────────
+async function loadNurseHospList() {
+    var container = document.getElementById('nurse-hosp-list');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
+    try {
+        var hosps = await API.getHospitalizations({ status: 'active' });
+        if (!hosps.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-bed"></i> Aucun patient hospitalisé en ce moment.</div>';
+            return;
+        }
+        window._nurseHospData = hosps;
+        renderNurseHospList(hosps);
+    } catch(e) {
+        container.innerHTML = '<div class="alert alert-danger">Erreur chargement: ' + e.message + '</div>';
+    }
+}
+
+function renderNurseHospList(hosps) {
+    var container = document.getElementById('nurse-hosp-list');
+    if (!container) return;
+    container.innerHTML = hosps.map(function(h) {
+        var balance = parseFloat(h.balance || 0);
+        var isDebt  = balance < 0;
+        var days    = Math.max(0, Math.floor((new Date() - new Date(h.admission_date)) / (1000*60*60*24)));
+        return '<div class="card mb-2" style="border-left:4px solid #28a745;padding:12px;">' +
+            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+            '<div>' +
+            '<h4 style="margin-bottom:4px;"><i class="fas fa-user-injured" style="color:#1a6bca;margin-right:6px;"></i>' + h.full_name + '</h4>' +
+            '<small class="text-muted">' +
+            (h.room ? '<i class="fas fa-door-open"></i> ' + h.room + (h.bed ? ' / Lit ' + h.bed : '') + ' &nbsp;|&nbsp; ' : '') +
+            '<i class="fas fa-calendar"></i> ' + days + ' jour(s)' +
+            (h.doctor ? ' &nbsp;|&nbsp; <i class="fas fa-user-md"></i> Dr. ' + h.doctor : '') +
+            '</small>' +
+            '<br><small style="color:var(--muted);">' + (h.admission_reason || '') + '</small>' +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            '<span style="color:' + (isDebt ? '#dc3545' : '#28a745') + ';font-weight:600;font-size:.9rem;">' +
+            (isDebt ? '⚠️ Dette: ' + Math.abs(balance).toLocaleString('fr-FR') : '✅ Solde: ' + balance.toLocaleString('fr-FR')) + ' HTG' +
+            '</span>' +
+            '</div></div>' +
+            '<div class="d-flex gap-10 mt-2">' +
+            '<button class="btn btn-primary btn-sm" data-hid="' + h.id + '" data-hname="' + h.full_name + '" onclick="openHospDetailFromNurse(this.dataset.hid, this.dataset.hname)">' +
+            '<i class="fas fa-tasks"></i> Voir tâches & dossier</button>' +
+            '</div></div>';
+    }).join('');
+}
+
+function filterNurseHospList() {
+    var q = (document.getElementById('nurse-hosp-search') || {}).value || '';
+    q = q.toLowerCase().trim();
+    if (!window._nurseHospData) { loadNurseHospList(); return; }
+    if (!q) { renderNurseHospList(window._nurseHospData); return; }
+    var filtered = window._nurseHospData.filter(function(h) {
+        return h.full_name.toLowerCase().includes(q) ||
+               (h.room || '').toLowerCase().includes(q) ||
+               (h.patient_id || '').toLowerCase().includes(q) ||
+               (h.doctor || '').toLowerCase().includes(q);
+    });
+    renderNurseHospList(filtered);
+    if (!filtered.length) {
+        var container = document.getElementById('nurse-hosp-list');
+        if (container) container.innerHTML += '<div class="alert alert-info mt-2">Aucun résultat pour "' + q + '".</div>';
+    }
+}
+
+function openHospDetailFromNurse(hospId, patientName) {
+    // Aller dans la section hospitalisation et ouvrir le dossier
+    showSection('hospitalization');
+    setTimeout(function() {
+        openHospDetail(hospId, patientName);
+    }, 300);
 }
 
 async function loadHospitalizations(status) {
