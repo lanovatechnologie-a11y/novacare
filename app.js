@@ -506,6 +506,7 @@ function setupNavigation() {
             document.getElementById(target).classList.add('active');
 
             if      (target === 'dashboard')      updateRoleDashboard();
+            else if (target === 'nurse')       loadNurseTasks();
             else if (target === 'secretary')      { updateTodayPatientsList(); updateConsultationTypesSelect(); loadAppointmentsList(); }
             else if (target === 'administration') updateAdminStats();
             else if (target === 'pharmacy')       updateMedicationStockDisplay();
@@ -542,12 +543,12 @@ function setupRoleBasedNavigation() {
         if (perms.settings)         allowed.push('settings');
     } else {
         const roleAccess = {
-            secretary: ['dashboard','secretary','messaging'],
-            cashier:   ['dashboard','cashier','messaging'],
-            nurse:     ['dashboard','nurse','messaging'],
+            secretary: ['dashboard','secretary','messaging','hospitalization'],
+            cashier:   ['dashboard','cashier','messaging','hospitalization'],
+            nurse:     ['dashboard','nurse','messaging','hospitalization'],
             doctor:    ['dashboard','doctor','messaging','hospitalization'],
-            lab:       ['dashboard','laboratory','messaging'],
-            pharmacy:  ['dashboard','pharmacy','messaging'],
+            lab:       ['dashboard','laboratory','messaging','hospitalization'],
+            pharmacy:  ['dashboard','pharmacy','messaging','hospitalization'],
         };
 
         // Compte multi-rôle : union des sections de tous ses rôles
@@ -2981,82 +2982,6 @@ function setupAdminSearch() {
     document.getElementById('search-admin-patient')?.addEventListener('click', searchAdminPatient);
 }
 
-
-// ─── IMPRESSION FACTURE JOURNALIÈRE ──────────────────────────
-function printDayInvoice(dayTxsJson, date, patientName, patientId) {
-    var dayTxs   = typeof dayTxsJson === 'string' ? JSON.parse(dayTxsJson) : dayTxsJson;
-    var rate     = state.exchangeRate || 130;
-    var settings = state.settings || {};
-    var hospName = settings.name || document.getElementById('hospital-name-header').textContent || 'NovaCare';
-    var hospAddr = settings.address || '';
-    var hospPhone= settings.phone   || '';
-    var paid     = dayTxs.filter(function(t){return t.status==='paid';});
-    var unpaid   = dayTxs.filter(function(t){return t.status==='unpaid';});
-    var total    = dayTxs.reduce(function(s,t){return s+parseFloat(t.amount);},0);
-    var totalPaid= paid.reduce(function(s,t){return s+parseFloat(t.amount);},0);
-    var totalUnpaid = unpaid.reduce(function(s,t){return s+parseFloat(t.amount);},0);
-    var typeIcons= { consultation:'🩺', lab:'🧪', medication:'💊', external:'📋' };
-
-    var rows = dayTxs.map(function(t) {
-        var amt = parseFloat(t.amount);
-        return '<tr style="border-bottom:1px solid #eee;">' +
-            '<td style="padding:6px 4px;">' + (typeIcons[t.type]||'🔹') + ' ' + t.service + '</td>' +
-            '<td style="padding:6px 4px;text-align:right;">' + amt.toLocaleString('fr-FR') + ' HTG</td>' +
-            '<td style="padding:6px 4px;text-align:right;">$' + (amt/rate).toFixed(2) + '</td>' +
-            '<td style="padding:6px 4px;text-align:center;">' + (t.status==='paid'?'✅':'⏳') + '</td>' +
-            '</tr>';
-    }).join('');
-
-    var win = window.open('','_blank','width=420,height=650');
-    if (!win) { toast('Autoriser les popups pour imprimer', 'error'); return; }
-    win.document.write(
-        '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-        '<title>Facture ' + date + '</title>' +
-        '<style>' +
-        'body{font-family:Arial,sans-serif;max-width:380px;margin:0 auto;padding:16px;font-size:13px;color:#212529;}' +
-        'h1{font-size:1.1rem;text-align:center;margin:0 0 4px;}' +
-        '.center{text-align:center;}.right{text-align:right;}' +
-        'table{width:100%;border-collapse:collapse;}' +
-        'th{background:#f0f4ff;padding:6px 4px;text-align:left;font-size:12px;border-bottom:2px solid #dee2e6;}' +
-        '.total-row td{font-weight:bold;border-top:2px solid #333;padding:6px 4px;background:#f8f9fa;}' +
-        'hr{border:none;border-top:1px dashed #999;margin:10px 0;}' +
-        '.badge-paid{background:#d4edda;color:#155724;padding:2px 8px;border-radius:10px;font-size:12px;}' +
-        '.badge-unpaid{background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:10px;font-size:12px;}' +
-        '@media print{.no-print{display:none;}}' +
-        '</style></head><body>' +
-        '<div class="center">' +
-        '<h1>' + hospName + '</h1>' +
-        (hospAddr  ? '<div style="font-size:11px;color:#6c757d;">' + hospAddr  + '</div>' : '') +
-        (hospPhone ? '<div style="font-size:11px;color:#6c757d;">Tél: ' + hospPhone + '</div>' : '') +
-        '</div>' +
-        '<hr>' +
-        '<table style="margin-bottom:8px;"><tbody>' +
-        '<tr><td><strong>Patient:</strong></td><td>' + patientName + ' <small style="color:#6c757d;">#' + patientId + '</small></td></tr>' +
-        '<tr><td><strong>Date:</strong></td><td>' + date + '</td></tr>' +
-        '<tr><td><strong>Imprimé:</strong></td><td>' + new Date().toLocaleString('fr-FR') + '</td></tr>' +
-        '</tbody></table>' +
-        '<hr>' +
-        '<table><thead><tr>' +
-        '<th>Service</th><th class="right">HTG</th><th class="right">USD</th><th class="center">St.</th>' +
-        '</tr></thead><tbody>' + rows + '</tbody>' +
-        '<tfoot>' +
-        '<tr class="total-row"><td><strong>TOTAL</strong></td>' +
-        '<td class="right"><strong>' + total.toLocaleString('fr-FR') + ' HTG</strong></td>' +
-        '<td class="right"><strong>$' + (total/rate).toFixed(2) + '</strong></td><td></td></tr>' +
-        '</tfoot></table>' +
-        '<hr>' +
-        (totalPaid > 0 ? '<div style="display:flex;justify-content:space-between;margin:4px 0;"><span class="badge-paid">✅ Payé</span><strong>' + totalPaid.toLocaleString('fr-FR') + ' HTG</strong></div>' : '') +
-        (totalUnpaid > 0 ? '<div style="display:flex;justify-content:space-between;margin:4px 0;"><span class="badge-unpaid">⏳ Non payé</span><strong>' + totalUnpaid.toLocaleString('fr-FR') + ' HTG</strong></div>' : '') +
-        '<hr>' +
-        '<p class="center" style="font-size:11px;color:#6c757d;margin:8px 0;">Merci de votre confiance</p>' +
-        '<div class="center no-print" style="margin-top:16px;">' +
-        '<button onclick="window.print();window.close();" style="background:#1a6bca;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold;">' +
-        '🖨️ Imprimer</button></div>' +
-        '</body></html>'
-    );
-    win.document.close();
-}
-
 async function searchAdminPatient() {
     const search = document.getElementById('admin-patient-search').value.trim();
     if (!search) return;
@@ -5164,3 +5089,168 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPatientTypeChange();
     setupAdminSearch();
 });
+
+
+// ═══════════════════════════════════════════════════════════════
+//  INFIRMIÈRE — TÂCHES ET PATIENTS HOSPITALISÉS
+// ═══════════════════════════════════════════════════════════════
+
+async function loadNurseTasks() {
+    var container = document.getElementById('nurse-tasks-container');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
+    try {
+        var hosps = await API.getHospitalizations({ status: 'active' });
+        if (!hosps.length) {
+            container.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Aucun patient hospitalisé actuellement.</div>';
+            return;
+        }
+        var allTasks = [];
+        for (var i = 0; i < hosps.length; i++) {
+            var h = hosps[i];
+            var tasks = await API.getHospTasks(h.id).catch(function(){ return []; });
+            tasks.forEach(function(t) {
+                t._patientName = h.full_name;
+                t._room        = h.room || '';
+                t._bed         = h.bed  || '';
+                t._hospId      = h.id;
+            });
+            allTasks = allTasks.concat(tasks);
+        }
+        var pending = allTasks.filter(function(t){ return t.status === 'pending'; });
+        var done    = allTasks.filter(function(t){ return t.status !== 'pending'; });
+
+        if (!allTasks.length) {
+            container.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Aucune tâche en attente.</div>';
+            return;
+        }
+
+        var prioColors = { urgent: '#dc3545', normal: '#1a6bca', low: '#6c757d' };
+        var typeIcons  = { medication: '💊', analysis: '🧪', care: '🩺', other: '📋' };
+
+        function renderTask(t) {
+            var amt = parseFloat(t.amount || 0);
+            var isPending = t.status === 'pending';
+            return '<div class="card mb-2" style="border-left:4px solid ' + (prioColors[t.priority] || '#1a6bca') + ';padding:12px;">' +
+                '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+                '<div style="flex:1;">' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+                '<strong>' + (typeIcons[t.task_type] || '📋') + ' ' + t.description + '</strong>' +
+                (t.priority === 'urgent' ? '<span class="badge badge-danger">URGENT</span>' : '') +
+                '</div>' +
+                '<div style="font-size:.82rem;color:#6c757d;margin-bottom:4px;">' +
+                '<i class="fas fa-user-injured" style="color:#1a6bca;"></i> <strong>' + t._patientName + '</strong>' +
+                (t._room ? ' — ' + t._room + (t._bed ? ' Lit ' + t._bed : '') : '') +
+                '</div>' +
+                (t.dosage || t.frequency || t.duration ?
+                    '<div style="font-size:.8rem;color:#6c757d;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
+                    (t.dosage    ? '<span>💊 ' + t.dosage    + '</span>' : '') +
+                    (t.frequency ? '<span>🕐 ' + t.frequency + '</span>' : '') +
+                    (t.duration  ? '<span>📅 ' + t.duration  + '</span>' : '') +
+                    (t.route     ? '<span>💉 ' + t.route     + '</span>' : '') +
+                    '</div>' : '') +
+                (t.note ? '<div style="background:#fff3cd;padding:4px 8px;border-radius:4px;font-size:.8rem;margin-bottom:4px;"><i class="fas fa-info-circle"></i> ' + t.note + '</div>' : '') +
+                '<small style="color:#6c757d;">Dr. ' + (t.ordered_by || '-') + ' — ' + new Date(t.created_at).toLocaleString('fr-FR') + '</small>' +
+                (amt > 0 ? '<br><small>Coût: <strong>' + amt.toLocaleString('fr-FR') + ' HTG</strong></small>' : '') +
+                (t.executed_by ? '<br><small style="color:#28a745;">✅ Par ' + t.executed_by + '</small>' : '') +
+                '</div>' +
+                (isPending ?
+                    '<div style="display:flex;flex-direction:column;gap:6px;min-width:90px;">' +
+                    '<button class="btn btn-success btn-sm" data-tid="' + t.id + '" onclick="nurseExecuteTask(this.dataset.tid,\'done\')"><i class="fas fa-check"></i> Fait</button>' +
+                    '<button class="btn btn-warning btn-sm" data-tid="' + t.id + '" onclick="nurseExecuteTask(this.dataset.tid,\'problem\')" style="color:#212529;"><i class="fas fa-exclamation-triangle"></i> Problème</button>' +
+                    '<button class="btn btn-secondary btn-sm" data-tid="' + t.id + '" onclick="nurseExecuteTask(this.dataset.tid,\'skipped\')"><i class="fas fa-times"></i> Sauté</button>' +
+                    '</div>'
+                :
+                    '<span class="badge" style="background:' + (t.status === 'done' ? '#28a745' : t.status === 'problem' ? '#fd7e14' : '#6c757d') + ';color:#fff;padding:6px 10px;">' +
+                    (t.status === 'done' ? '✅ Fait' : t.status === 'problem' ? '⚠️ Problème' : '⛔ Sauté') + '</span>'
+                ) +
+                '</div></div>';
+        }
+
+        var html = '';
+        if (pending.length) {
+            html += '<div class="alert alert-warning" style="margin-bottom:12px;"><i class="fas fa-clock"></i> <strong>' + pending.length + ' tâche(s) en attente</strong></div>';
+            html += pending.map(renderTask).join('');
+        }
+        if (done.length) {
+            html += '<h5 style="color:#28a745;margin:16px 0 8px;"><i class="fas fa-check-circle"></i> Effectuées (' + done.length + ')</h5>';
+            html += done.map(renderTask).join('');
+        }
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Erreur: ' + e.message + '</div>';
+    }
+}
+
+async function nurseExecuteTask(taskId, status) {
+    var msgs = { done: 'Note (optionnel):', problem: 'Décrire le problème *:', skipped: 'Raison (optionnel):' };
+    var note = prompt(msgs[status] || 'Note:') || '';
+    if (status === 'problem' && !note) { toast('Décrire le problème est obligatoire', 'error'); return; }
+    try {
+        await apiCall(function() {
+            return API.updateHospTask(taskId, { status: status, executedNote: note, executedAt: new Date().toISOString() });
+        });
+        var msgs2 = { done: 'Tâche marquée Faite !', problem: 'Problème signalé !', skipped: 'Tâche sautée' };
+        toast(msgs2[status] || 'Mis à jour', status === 'done' ? 'success' : 'warning');
+        try { notifyDepartment('doctor',
+            status === 'done' ? 'Tâche effectuée' : status === 'problem' ? 'Problème signalé' : 'Tâche sautée',
+            note || '', status === 'done' ? '#28a745' : '#dc3545');
+        } catch(en) {}
+        loadNurseTasks();
+    } catch(e) {}
+}
+
+async function loadNurseHospList() {
+    var container = document.getElementById('nurse-hosp-list');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary);"></i></div>';
+    try {
+        var hosps = await API.getHospitalizations({ status: 'active' });
+        window._nurseHospData = hosps;
+        if (!hosps.length) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-bed"></i> Aucun patient hospitalisé.</div>';
+            return;
+        }
+        renderNurseHospList(hosps);
+    } catch(e) {
+        container.innerHTML = '<div class="alert alert-danger">Erreur: ' + e.message + '</div>';
+    }
+}
+
+function renderNurseHospList(hosps) {
+    var container = document.getElementById('nurse-hosp-list');
+    if (!container) return;
+    if (!hosps.length) {
+        container.innerHTML = '<div class="alert alert-info">Aucun résultat.</div>';
+        return;
+    }
+    container.innerHTML = hosps.map(function(h) {
+        var bal   = parseFloat(h.balance || 0);
+        var days  = Math.max(0, Math.floor((new Date() - new Date(h.admission_date)) / (1000 * 60 * 60 * 24)));
+        return '<div class="card mb-2" style="border-left:4px solid #28a745;padding:12px;">' +
+            '<div class="d-flex justify-between align-center flex-wrap gap-10">' +
+            '<div>' +
+            '<h4 style="margin-bottom:4px;"><i class="fas fa-user-injured" style="color:#1a6bca;margin-right:6px;"></i>' + h.full_name + '</h4>' +
+            '<small style="color:#6c757d;">' +
+            (h.room ? h.room + (h.bed ? ' / Lit ' + h.bed : '') + ' | ' : '') +
+            days + ' jour(s)' + (h.doctor ? ' | Dr. ' + h.doctor : '') +
+            '</small></div>' +
+            '<span style="color:' + (bal < 0 ? '#dc3545' : '#28a745') + ';font-weight:600;">' +
+            (bal < 0 ? 'Dette: ' + Math.abs(bal).toLocaleString('fr-FR') : 'Solde: ' + bal.toLocaleString('fr-FR')) + ' HTG</span>' +
+            '</div></div>';
+    }).join('');
+}
+
+function filterNurseHospList() {
+    var q = (document.getElementById('nurse-hosp-search') || {}).value || '';
+    q = q.toLowerCase().trim();
+    if (!window._nurseHospData) { loadNurseHospList(); return; }
+    var filtered = window._nurseHospData.filter(function(h) {
+        return !q ||
+            h.full_name.toLowerCase().includes(q) ||
+            (h.room || '').toLowerCase().includes(q) ||
+            (h.patient_id || '').toLowerCase().includes(q);
+    });
+    renderNurseHospList(filtered);
+}
+
