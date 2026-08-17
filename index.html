@@ -481,21 +481,28 @@
 
         <!-- ─── INFIRMIER ───────────────────────────────── -->
         <section id="nurse" class="content">
-            <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier — Signes Vitaux</h2>
+            <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier</h2>
+
+            <!-- Tâches à effectuer pour les patients hospitalisés -->
+            <div class="card mb-3" style="border-left-color:#dc3545;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3><i class="fas fa-tasks" style="color:#dc3545;"></i> Tâches à effectuer</h3>
+                    <button class="btn btn-sm btn-primary" onclick="loadNurseTasks()"><i class="fas fa-sync"></i> Actualiser</button>
+                </div>
+                <div id="nurse-tasks-container" class="mt-2">
+                    <div class="text-muted" style="padding:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+                </div>
+            </div>
+
+            <h3 style="margin:16px 0 8px;"><i class="fas fa-heartbeat" style="color:#1a6bca;"></i> Signes Vitaux</h3>
 
             <!-- Patients hospitalisés -->
             <div class="card">
                 <div class="settings-section-header">
                     <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
                 </div>
-                <div class="d-flex gap-10 mt-2">
+                <div class="d-flex gap-15 mt-2">
                     <input type="text" id="nurse-hosp-search" class="form-control" placeholder="Rechercher par nom, ID ou chambre..." oninput="filterNurseHospList()">
-                    <button class="btn btn-primary" onclick="loadNurseHospList()">
-                        <i class="fas fa-search"></i>
-                    </button>
-                    <button class="btn btn-secondary" onclick="loadNurseHospList()" title="Actualiser">
-                        <i class="fas fa-sync"></i>
-                    </button>
                 </div>
                 <div id="nurse-hosp-list" class="mt-2"></div>
             </div>
@@ -868,17 +875,11 @@
             <div class="card mt-3">
                 <div class="settings-section-header">
                     <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
-                    <div class="d-flex gap-10" style="flex-wrap:wrap;align-items:center;">
-                        <div class="d-flex gap-10" style="flex:1;min-width:200px;">
-                            <input type="text" id="hosp-list-search" class="form-control" placeholder="Rechercher nom, ID, chambre..." oninput="filterHospitalizationsList()">
-                            <button class="btn btn-sm btn-secondary" onclick="filterHospitalizationsList()" title="Rechercher"><i class="fas fa-search"></i></button>
-                        </div>
-                        <div class="d-flex gap-10">
-                            <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')"><i class="fas fa-hospital-user"></i> Actifs</button>
-                            <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
-                            <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
-                            <button class="btn btn-sm btn-info" onclick="loadHospitalizations(window._hospCurrentStatus||'active')" title="Actualiser"><i class="fas fa-sync"></i></button>
-                        </div>
+                    <div class="d-flex gap-10" style="flex-wrap:wrap;">
+                        <input type="text" id="hosp-list-search" class="form-control" style="max-width:220px;" placeholder="Rechercher nom, ID, chambre..." oninput="filterHospitalizationsList()">
+                        <button class="btn btn-sm btn-primary" onclick="loadHospitalizations('active')">Actifs</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('discharged')">Sortis</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadHospitalizations('')">Tous</button>
                     </div>
                 </div>
                 <div id="hospitalizations-list" class="mt-2"></div>
@@ -897,89 +898,10 @@
 
                     <!-- Tabs internes -->
                     <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;overflow-x:auto;">
-                        <button class="hosp-tab-btn" onclick="showHospTab('tasks')" data-tab="tasks" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-tasks"></i> Tâches</button>
-                        <button class="hosp-tab-btn active" onclick="showHospTab('nursing')" data-tab="nursing" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;"><i class="fas fa-user-nurse"></i> Suivi</button>
+                        <button class="hosp-tab-btn active" onclick="showHospTab('nursing')" data-tab="nursing" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);cursor:pointer;white-space:nowrap;"><i class="fas fa-user-nurse"></i> Suivi infirmier</button>
                         <button class="hosp-tab-btn" onclick="showHospTab('prescriptions')" data-tab="prescriptions" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-prescription"></i> Prescriptions</button>
                         <button class="hosp-tab-btn" onclick="showHospTab('deposits')" data-tab="deposits" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-money-bill-wave"></i> Dépôts</button>
                         <button class="hosp-tab-btn" onclick="showHospTab('services')" data-tab="services" style="padding:10px 16px;border:none;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;"><i class="fas fa-clipboard-list"></i> Services</button>
-                    </div>
-
-                    <!-- Tâches médecin → infirmière -->
-                    <div id="hosp-tab-tasks" class="hosp-tab-content" style="display:none;">
-                        <!-- Formulaire médecin: visible seulement pour médecin/admin -->
-                        <div id="task-order-form" class="card" style="background:#f0f4ff;display:none;">
-                            <h4><i class="fas fa-tasks" style="color:#1a6bca;"></i> Nouvelle tâche / Indication</h4>
-                            <div class="add-form-grid" style="margin-top:10px;">
-                                <div><label class="form-label">Type *</label>
-                                    <select id="task-type" class="form-control" onchange="onTaskTypeChange()">
-                                        <option value="medication">💊 Médicament</option>
-                                        <option value="analysis">🧪 Analyse</option>
-                                        <option value="care">🩺 Soin infirmier</option>
-                                        <option value="other">📋 Autre indication</option>
-                                    </select>
-                                </div>
-                                <div id="task-med-div">
-                                    <label class="form-label">Médicament</label>
-                                    <select id="task-medication" class="form-control" onchange="onTaskMedSelect()">
-                                        <option value="">Sélectionner...</option>
-                                    </select>
-                                </div>
-                                <div id="task-analysis-div" style="display:none;">
-                                    <label class="form-label">Analyse</label>
-                                    <select id="task-analysis" class="form-control" onchange="onTaskAnalysisSelect()">
-                                        <option value="">Sélectionner...</option>
-                                    </select>
-                                </div>
-                                <div id="task-desc-div" style="display:none;grid-column:1/-1;">
-                                    <label class="form-label">Description / Indication *</label>
-                                    <input type="text" id="task-desc" class="form-control" placeholder="Ex: Changer pansement, Prendre tension toutes les 2h...">
-                                </div>
-                                <div id="task-dosage-div"><label class="form-label">Dosage</label>
-                                    <input type="text" id="task-dosage" class="form-control" placeholder="Ex: 500mg, 2 comprimés"></div>
-                                <div id="task-freq-div"><label class="form-label">Fréquence</label>
-                                    <select id="task-frequency" class="form-control">
-                                        <option value="1x/jour">1x/jour</option>
-                                        <option value="2x/jour">2x/jour</option>
-                                        <option value="3x/jour">3x/jour</option>
-                                        <option value="Toutes les 4h">Toutes les 4h</option>
-                                        <option value="Toutes les 6h">Toutes les 6h</option>
-                                        <option value="Toutes les 8h">Toutes les 8h</option>
-                                        <option value="Toutes les 12h">Toutes les 12h</option>
-                                        <option value="Au besoin">Au besoin</option>
-                                    </select>
-                                </div>
-                                <div id="task-dur-div"><label class="form-label">Durée</label>
-                                    <input type="text" id="task-duration" class="form-control" placeholder="Ex: 5 jours, 1 semaine"></div>
-                                <div id="task-route-div"><label class="form-label">Voie</label>
-                                    <select id="task-route" class="form-control">
-                                        <option value="Orale">Orale</option>
-                                        <option value="Injectable IV">Injectable IV</option>
-                                        <option value="Injectable IM">Injectable IM</option>
-                                        <option value="Sous-cutanée">Sous-cutanée</option>
-                                        <option value="Topique">Topique</option>
-                                    </select>
-                                </div>
-                                <div id="task-qty-div"><label class="form-label">Quantité</label>
-                                    <input type="number" id="task-qty" class="form-control" value="1" min="1" oninput="updateTaskCost()"></div>
-                                <div><label class="form-label">Coût (HTG)</label>
-                                    <input type="number" id="task-amount" class="form-control" placeholder="0.00" min="0" oninput="updateTaskCost()"></div>
-                                <div><label class="form-label">Priorité</label>
-                                    <select id="task-priority" class="form-control">
-                                        <option value="normal">Normal</option>
-                                        <option value="urgent">🔴 Urgent</option>
-                                        <option value="low">⬇️ Faible</option>
-                                    </select>
-                                </div>
-                                <div style="grid-column:1/-1"><label class="form-label">Note pour l'infirmière</label>
-                                    <textarea id="task-note" class="form-control" rows="2" placeholder="Instructions spéciales, précautions..."></textarea></div>
-                                <div style="display:flex;align-items:flex-end;">
-                                    <button class="btn btn-primary" style="width:100%;" onclick="saveHospTask()">
-                                        <i class="fas fa-paper-plane"></i> Envoyer à l'infirmière</button></div>
-                            </div>
-                            <div id="task-cost-preview" class="mt-2"></div>
-                        </div>
-                        <!-- Liste des tâches (visible médecin + infirmière) -->
-                        <div id="hosp-tasks-list" class="mt-3"></div>
                     </div>
 
                     <!-- Suivi infirmier -->
