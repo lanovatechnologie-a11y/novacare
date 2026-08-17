@@ -481,28 +481,34 @@
 
         <!-- ─── INFIRMIER ───────────────────────────────── -->
         <section id="nurse" class="content">
-            <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier</h2>
+            <h2 class="section-title"><i class="fas fa-user-nurse"></i> Infirmier — Signes Vitaux</h2>
 
-            <!-- Tâches à effectuer pour les patients hospitalisés -->
-            <div class="card mb-3" style="border-left-color:#dc3545;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
+            <!-- Tâches à effectuer -->
+            <div class="card" style="border-left-color:#dc3545;">
+                <div class="settings-section-header">
                     <h3><i class="fas fa-tasks" style="color:#dc3545;"></i> Tâches à effectuer</h3>
-                    <button class="btn btn-sm btn-primary" onclick="loadNurseTasks()"><i class="fas fa-sync"></i> Actualiser</button>
+                    <button class="btn btn-sm btn-primary" onclick="loadNurseTasks()">
+                        <i class="fas fa-sync"></i> Actualiser
+                    </button>
                 </div>
                 <div id="nurse-tasks-container" class="mt-2">
-                    <div class="text-muted" style="padding:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Chargement...</div>
+                    <p class="text-muted" style="padding:12px;text-align:center;">Cliquez Actualiser pour charger les tâches</p>
                 </div>
             </div>
 
-            <h3 style="margin:16px 0 8px;"><i class="fas fa-heartbeat" style="color:#1a6bca;"></i> Signes Vitaux</h3>
-
-            <!-- Patients hospitalisés -->
-            <div class="card">
+            <!-- Patients hospitalisés (recherche) -->
+            <div class="card mt-3">
                 <div class="settings-section-header">
                     <h3><i class="fas fa-hospital-user"></i> Patients hospitalisés</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="loadNurseHospList()">
+                        <i class="fas fa-sync"></i> Charger
+                    </button>
                 </div>
-                <div class="d-flex gap-15 mt-2">
+                <div class="d-flex gap-10 mt-2">
                     <input type="text" id="nurse-hosp-search" class="form-control" placeholder="Rechercher par nom, ID ou chambre..." oninput="filterNurseHospList()">
+                    <button class="btn btn-primary" onclick="filterNurseHospList()">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
                 <div id="nurse-hosp-list" class="mt-2"></div>
             </div>
